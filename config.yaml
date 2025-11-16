@@ -1,6 +1,6 @@
 name: "Seplos MQTT RS485 Add-on"
 description: "Read Seplos V2/V16 BMS data via RS485 and publish it to HA via MQTT"
-version: "1.0.0-beta1"
+version: "1.0.0-beta2"
 slug: "seplos_mqtt_rs485_add-on"
 init: false
 arch:
