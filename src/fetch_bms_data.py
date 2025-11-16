@@ -856,7 +856,7 @@ class SeplosBatteryPack:
             return None
 
 
-def on_mqtt_connect(client: mqtt.Client, userdata: Any, flags: Any, reason_code: int, properties=None) -> None:
+def on_mqtt_connect(client: mqtt.Client, userdata: Any, flags: Any, reason_code: int) -> None:
     """Handle MQTT connection."""
     if reason_code == 0:
         logger.info(f"Connected to MQTT broker ({Config.MQTT_HOST}:{Config.MQTT_PORT})")
@@ -866,7 +866,7 @@ def on_mqtt_connect(client: mqtt.Client, userdata: Any, flags: Any, reason_code:
 
 def initialize_mqtt() -> mqtt.Client:
     """Initialize and connect MQTT client."""
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client()
     client.username_pw_set(Config.MQTT_USERNAME, Config.MQTT_PASSWORD)
     client.on_connect = on_mqtt_connect
     client.will_set(f"{Config.MQTT_TOPIC}/availability", payload="offline", qos=2, retain=False)
