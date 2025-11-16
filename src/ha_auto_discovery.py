@@ -32,7 +32,6 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "name": "Min Cell Voltage",
         "value_template_key": "min_cell_voltage",
         "device_class": "voltage",
-        "state_class": "measurement",
         "unit_of_measurement": "V",
         "suggested_display_precision": 3,
         "icon": "mdi:cog"
@@ -41,7 +40,6 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "name": "Max Cell Voltage",
         "value_template_key": "max_cell_voltage",
         "device_class": "voltage",
-        "state_class": "measurement",
         "unit_of_measurement": "V",
         "suggested_display_precision": 3,
         "icon": "mdi:cog"
@@ -50,7 +48,6 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "name": "Min Pack Voltage",
         "value_template_key": "min_pack_voltage",
         "device_class": "voltage",
-        "state_class": "measurement",
         "unit_of_measurement": "V",
         "suggested_display_precision": 2,
         "icon": "mdi:cog"
@@ -59,7 +56,6 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "name": "Max Pack Voltage",
         "value_template_key": "max_pack_voltage",
         "device_class": "voltage",
-        "state_class": "measurement",
         "unit_of_measurement": "V",
         "suggested_display_precision": 2,
         "icon": "mdi:cog"
