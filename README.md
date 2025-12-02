@@ -2,7 +2,7 @@
 
 This is a Home Assistant Add-on that reads data from one or multiple V2 / V16 Seplos BMS (also called 10C and 10E) via a remote or local RS485 connection and publishes its/their stats to MQTT.
 
-Sensor auto discovery can be enabled (optional)
+Sensor auto discovery can be disabled (optional)
 
 ## Hardware requirements
 
