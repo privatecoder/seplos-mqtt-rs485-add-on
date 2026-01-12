@@ -8,9 +8,11 @@ import os
 import signal
 import logging
 import time
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime
 import json
-from typing import Optional, Dict, Any, Union, List, Callable
+from typing import Optional, Dict, Any, Union, List, Callable, Tuple
 import serial
 from serial.serialutil import SerialException
 import paho.mqtt.client as mqtt
@@ -33,6 +35,87 @@ app_state = AppState()
 
 logger: Optional[logging.Logger] = None
 
+# --- Health/Watchdog state ---
+# Timestamp of last successful BMS poll (seconds since epoch).
+last_bms_update_ts: float = 0.0
+# MQTT connection state as seen by callbacks.
+mqtt_connected: bool = False
+
+
+def _serial_is_open() -> bool:
+    """Compatibility wrapper across pyserial versions."""
+    s = app_state.serial_instance
+    if not s:
+        return False
+    # Newer pyserial: property
+    if hasattr(s, "is_open"):
+        return bool(getattr(s, "is_open"))
+    # Older pyserial: method
+    if hasattr(s, "isOpen"):
+        try:
+            return bool(s.isOpen())
+        except Exception:
+            return False
+    return False
+
+
+def _mqtt_loop_running() -> bool:
+    """Best-effort check whether Paho's network loop thread is alive."""
+    c = app_state.mqtt_client
+    if not c:
+        return False
+    t = getattr(c, "_thread", None)
+    return bool(t and getattr(t, "is_alive", lambda: False)())
+
+
+def _compute_max_age_seconds() -> int:
+    """Derive an acceptable age for the last BMS poll from the polling cadence."""
+    # The main loop sleeps 1s after each pack poll, plus an optional pause after a full cycle.
+    packs = len(app_state.battery_packs) or int(getattr(Config, "NUMBER_OF_PACKS", 1) or 1)
+    per_pack_delay = 1
+    cycle_pause = int(getattr(Config, "MQTT_UPDATE_INTERVAL", 0) or 0)
+    expected_cycle = packs * per_pack_delay + max(cycle_pause, 0)
+    # Add a little slack for serial hiccups and startup.
+    return max(15, int(expected_cycle * 3 + 5))
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/health":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        now = time.time()
+        max_age = _compute_max_age_seconds()
+
+        healthy = (
+            mqtt_connected
+            and _mqtt_loop_running()
+            and _serial_is_open()
+            and (now - last_bms_update_ts) < max_age
+        )
+
+        if healthy:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
+        else:
+            self.send_response(503)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"unhealthy")
+
+    def log_message(self, format, *args):
+        # Keep addon logs clean
+        return
+
+
+def _start_health_server() -> None:
+    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
+    server.serve_forever()
+
 
 def graceful_exit(signum: Optional[int] = None, _frame: Optional[Any] = None) -> None:
     """Handle script exit to disconnect MQTT gracefully and cleanup."""
@@ -43,13 +126,15 @@ def graceful_exit(signum: Optional[int] = None, _frame: Optional[Any] = None) ->
             if logger:
                 logger.info("Sending offline status to MQTT")
             app_state.mqtt_client.publish(f"{os.getenv('MQTT_TOPIC', 'seplos')}/availability", "offline", retain=True)
+            for pack in app_state.battery_packs:
+                app_state.mqtt_client.publish(_pack_availability_topic(pack["address"]), "offline", retain=False)
             if logger:
                 logger.info("Disconnecting MQTT client")
             app_state.mqtt_client.disconnect()
             app_state.mqtt_client.loop_stop()
 
-        # Close serial connections if open
-        if app_state.serial_instance and app_state.serial_instance.isOpen():
+        # Close serial connection if open
+        if _serial_is_open():
             if logger:
                 logger.info("Closing serial connection")
             app_state.serial_instance.close()
@@ -146,6 +231,29 @@ logger.setLevel(log_levels.get(Config.LOGGING_LEVEL, logging.INFO))
 # Log configuration on startup
 logger.info("Starting Seplos BMS Data Fetcher")
 logger.debug("Configuration loaded: %s", vars(Config))
+
+
+def _pack_availability_topic(pack_no: int) -> str:
+    return f"{Config.MQTT_TOPIC}/pack-{pack_no}/availability"
+
+
+def _pack_heartbeat_topic(pack_no: int) -> str:
+    return f"{Config.MQTT_TOPIC}/pack-{pack_no}/heartbeat"
+
+
+def _publish_pack_availability(pack_state: Dict[str, Any], now: float) -> None:
+    if not app_state.mqtt_client:
+        return
+
+    max_age = _compute_max_age_seconds()
+    last_success = pack_state.get("last_success_ts", 0.0)
+    is_online = last_success > 0 and (now - last_success) <= max_age
+    desired = "online" if is_online else "offline"
+
+    if pack_state.get("availability") != desired:
+        topic = _pack_availability_topic(pack_state["address"])
+        app_state.mqtt_client.publish(topic, desired, retain=False)
+        pack_state["availability"] = desired
 
 
 class Telemetry:
@@ -595,8 +703,7 @@ class SeplosBatteryPack:
             "highest_cell": highest_idx + 1,    # 1-based for display
             "highest_cell_voltage": highest_voltage,
             "delta_cell_voltage": delta_cell_voltage,
-            "delta_cell_temperature": delta_cell_temperature,
-            "last_update": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            "delta_cell_temperature": delta_cell_temperature
         })
 
         return telemetry_feedback
@@ -849,7 +956,7 @@ class SeplosBatteryPack:
         """Request a feedback frame (telemetry or telesignalization) with retry/validation."""
         if not app_state.serial_instance:
             logger.error("Serial instance not initialized")
-            return None
+            return None, False
 
         command = self.encode_cmd(address=self.pack_address, cid2=cid2)
         logger.debug("Pack%s:%s_command: %s", self.pack_address, frame_label, command)
@@ -903,7 +1010,7 @@ class SeplosBatteryPack:
         )
         return None
 
-    def read_serial_data(self) -> Optional[BatteryData]:
+    def read_serial_data(self) -> Tuple[Optional[BatteryData], bool]:
         """Read data for battery pack from serial interface."""
         logger.info("Pack%s:Requesting data...", self.pack_address)
 
@@ -929,7 +1036,7 @@ class SeplosBatteryPack:
                 frame_label="Telemetry"
             )
             if telemetry_feedback is None:
-                return None
+                return None, False
             battery_pack_data["telemetry"] = telemetry_feedback
 
             # Mandatory delay between each request or there will be corrupt data
@@ -943,18 +1050,18 @@ class SeplosBatteryPack:
                 frame_label="Telesignalization"
             )
             if telesignalization_feedback is None:
-                return None
+                return None, False
             battery_pack_data["telesignalization"] = telesignalization_feedback
 
             # Check if data has changed
             if self.last_status is None or self.last_status != battery_pack_data:
                 self.last_status = battery_pack_data
-                return battery_pack_data
+                return battery_pack_data, True
 
-            return None
+            return None, True
         except Exception as e:
             logger.error("Pack%s:Error reading serial data: %s", self.pack_address, e)
-            return None
+            return None, False
 
 
 def on_mqtt_connect(
@@ -964,14 +1071,28 @@ def on_mqtt_connect(
     reason_code: int
 ) -> None:
     """Handle MQTT connection."""
+    global mqtt_connected
     if reason_code == 0:
+        mqtt_connected = True
         logger.info(
             "Connected to MQTT broker (%s:%s)",
             Config.MQTT_HOST,
             Config.MQTT_PORT
         )
     else:
+        mqtt_connected = False
         logger.error("Failed to connect to MQTT broker: %s", reason_code)
+
+
+def on_mqtt_disconnect(
+    _client: mqtt.Client,
+    _userdata: Any,
+    _reason_code: int,
+    _properties: Any = None,
+) -> None:
+    """Handle MQTT disconnect."""
+    global mqtt_connected
+    mqtt_connected = False
 
 
 def initialize_mqtt() -> mqtt.Client:
@@ -979,6 +1100,7 @@ def initialize_mqtt() -> mqtt.Client:
     client = mqtt.Client()
     client.username_pw_set(Config.MQTT_USERNAME, Config.MQTT_PASSWORD)
     client.on_connect = on_mqtt_connect
+    client.on_disconnect = on_mqtt_disconnect
     client.will_set(f"{Config.MQTT_TOPIC}/availability", payload="offline", qos=2, retain=False)
 
     try:
@@ -1011,6 +1133,7 @@ def initialize_serial() -> serial.Serial:
 
 def main():
     """Main application loop."""
+    global last_bms_update_ts
     try:
         # Initialize MQTT
         app_state.mqtt_client = initialize_mqtt()
@@ -1024,9 +1147,22 @@ def main():
             pack_instance = SeplosBatteryPack(pack_address=i)
             app_state.battery_packs.append({
                 "pack_instance": pack_instance,
-                "address": i
+                "address": i,
+                "last_success_ts": 0.0,
+                "publish_counter": 0,
+                "availability": "offline",
             })
         logger.info("Initialized %s battery pack(s)", Config.NUMBER_OF_PACKS)
+        for pack in app_state.battery_packs:
+            app_state.mqtt_client.publish(_pack_availability_topic(pack["address"]), "offline", retain=False)
+
+        # Initial grace: consider startup healthy until the first successful poll updates the timestamp.
+        last_bms_update_ts = time.time()
+
+        # Start minimal HTTP health endpoint for HA Supervisor watchdog
+        health_thread = threading.Thread(target=_start_health_server, daemon=True)
+        health_thread.start()
+        logger.info("Health endpoint started on http://0.0.0.0:8080/health")
 
         # Send Home Assistant Auto-Discovery configurations on startup
         if Config.ENABLE_HA_DISCOVERY_CONFIG:
@@ -1050,7 +1186,28 @@ def main():
                 pack_address = current_pack["address"]
 
                 # Fetch battery pack data
-                pack_data = pack_instance.read_serial_data()
+                pack_data, poll_success = pack_instance.read_serial_data()
+                now = time.time()
+
+                if poll_success:
+                    last_bms_update_ts = now
+                    current_pack["last_success_ts"] = now
+                    current_pack["publish_counter"] += 1
+                    heartbeat_payload = {
+                        "last_publish": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "publish_counter": current_pack["publish_counter"],
+                    }
+                    app_state.mqtt_client.publish(
+                        _pack_heartbeat_topic(pack_address),
+                        json.dumps(heartbeat_payload),
+                        retain=False,
+                    )
+                    app_state.mqtt_client.publish(
+                        _pack_availability_topic(pack_address),
+                        "online",
+                        retain=False,
+                    )
+                    current_pack["availability"] = "online"
 
                 if pack_data:
                     # Publish updated data to MQTT
@@ -1058,8 +1215,11 @@ def main():
                     topic = f"{Config.MQTT_TOPIC}/pack-{pack_address}/sensors"
                     payload = {**pack_data}
                     app_state.mqtt_client.publish(topic, json.dumps(payload, indent=2))
-                else:
+                elif poll_success:
                     logger.info("Pack%s:No changes detected", pack_address)
+
+                for pack_state in app_state.battery_packs:
+                    _publish_pack_availability(pack_state, now)
 
                 # Publish availability
                 app_state.mqtt_client.publish(f"{Config.MQTT_TOPIC}/availability", "online", retain=False)

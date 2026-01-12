@@ -15,7 +15,7 @@ BASE_SENSOR = {
     "obj_id": "",  # object_id
     "stat_t": "",  # state_topic
     "val_tpl": "",  # value_template
-    "avty": {},  # availability
+    "avty": [],  # availability
     "dev": {}  # device
 }
 
@@ -217,11 +217,6 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "unit_of_measurement": "V",
         "suggested_display_precision": 2,
         "icon": "mdi:flash-triangle"
-    },
-    {
-        "name": "Last Update",
-        "value_template_key": "last_update",
-        "icon": "mdi:update"
     }
 ]
 
@@ -628,12 +623,19 @@ class AutoDiscoveryConfig:
             if pack_no > 0:
                 entity["dev"]["via_device"] = "seplos_bms_pack_0"
 
+    def _build_availability(self, pack_no: int) -> List[Dict[str, str]]:
+        return [
+            {"t": f"{self.mqtt_topic}/availability"},
+            {"t": f"{self.mqtt_topic}/pack-{pack_no}/availability"},
+        ]
+
     def _build_base_entity(
         self,
         pack_no: int,
         name: str,
         value_template: str,
         uniq_obj_id: str,
+        state_topic: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Erzeuge Grundstruktur eines Sensors/Binary Sensors basierend auf BASE_SENSOR."""
         entity = copy.deepcopy(BASE_SENSOR)
@@ -643,8 +645,9 @@ class AutoDiscoveryConfig:
 
         # Required fields
         entity["name"] = name
-        entity["avty"]["t"] = f"{self.mqtt_topic}/availability"
-        entity["stat_t"] = f"{self.mqtt_topic}/pack-{pack_no}/sensors"
+        entity["avty"] = self._build_availability(pack_no)
+        entity["avty_mode"] = "all"
+        entity["stat_t"] = state_topic or f"{self.mqtt_topic}/pack-{pack_no}/sensors"
         entity["val_tpl"] = value_template
         entity["uniq_id"] = uniq_obj_id
         entity["obj_id"] = uniq_obj_id
@@ -894,6 +897,31 @@ class AutoDiscoveryConfig:
             pack_no,
         )
 
+    def create_heartbeat_sensor_config(self, pack_no: int) -> None:
+        """Create and publish a heartbeat sensor for the pack."""
+        name = "Last Publish"
+        value_template_key = "last_publish"
+        state_topic = f"{self.mqtt_topic}/pack-{pack_no}/heartbeat"
+        value_template = "{{ value_json.last_publish }}"
+
+        sensor = self._build_base_entity(
+            pack_no=pack_no,
+            name=name,
+            value_template=value_template,
+            uniq_obj_id=f"seplos_bms_pack_{pack_no}_{value_template_key}",
+            state_topic=state_topic,
+        )
+
+        self._apply_optional_fields(
+            sensor,
+            {
+                "ic": "mdi:update",
+                "ent_cat": "diagnostic",
+            },
+        )
+
+        self._publish_sensor_config(pack_no, name, value_template_key, sensor)
+
     def create_similar_binary_sensor_config(
         self,
         num_sensors: int,
@@ -1009,6 +1037,9 @@ class AutoDiscoveryConfig:
                 value_template_group="telemetry",
                 **config
             )
+
+        # Create heartbeat sensor
+        self.create_heartbeat_sensor_config(pack_no=pack_no)
 
         ## Telesignalization sensors
 

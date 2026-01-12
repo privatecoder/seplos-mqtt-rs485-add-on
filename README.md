@@ -16,7 +16,7 @@ Sensor auto discovery can be disabled (optional)
 
 Carefully check the provided wiring scheme [below](#wiring-sample) (the PINK lines). There are two ways to approach the same result:
 1. A single, self-crimped cable with multiple plugs, crimped as shown in the picture below (recommended).
-2. Two or more splitters, one of which need to be modified (easier if you don't like crimping) – if you have two packs, you need two splitters, three packs require three splitters and so on.
+2. One or more splitters, one of which need to be modified (easier if you don't like crimping) – if you have two packs, you need two splitters, three packs require three splitters and so on.
 
 When using splitters, the **first** splitter (the one that connects to the Master's CAN-port) needs to be modified like so:
 - On one of the two outlets cut all but the three pins of the RS485-part (check the PINK lines in the [image below](#wiring-sample))

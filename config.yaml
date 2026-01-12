@@ -12,6 +12,7 @@ arch:
 startup: application
 boot: auto
 host_network: true
+watchdog: "http://[HOST]:8080/health"
 uart: true
 usb: true
 hassio_api: true
