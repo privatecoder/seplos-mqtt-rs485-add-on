@@ -11,17 +11,18 @@ cards:
     secondary: >
       {{ states('sensor.seplos_bms_pack_0_system_status') }}: {{
       states('sensor.seplos_bms_pack_0_dis_charge_power') | float | round(2) }}
-      W
+      W / {{ states('sensor.seplos_bms_pack_0_dis_charge_current') }} A
 
-      Δ Cell {{ states('sensor.seplos_bms_pack_0_delta_cell_voltage') }} V / {{
+      Δ Cell: {{ states('sensor.seplos_bms_pack_0_delta_cell_voltage') }} V / {{
       states('sensor.seplos_bms_pack_0_delta_cell_temperature') }} °C
 
-      {% set temps = [
-        states('sensor.seplos_bms_pack_0_cell_temperature_1') | float,
-        states('sensor.seplos_bms_pack_0_cell_temperature_2') | float,
-        states('sensor.seplos_bms_pack_0_cell_temperature_3') | float,
-        states('sensor.seplos_bms_pack_0_cell_temperature_4') | float
-      ] %} {%- set tmax = temps | max -%} Highest Cell: {{ tmax | round(1) }} °C
+      {% set temps = [ states('sensor.seplos_bms_pack_0_cell_temperature_1') |
+      float, states('sensor.seplos_bms_pack_0_cell_temperature_2') | float,
+      states('sensor.seplos_bms_pack_0_cell_temperature_3') | float,
+      states('sensor.seplos_bms_pack_0_cell_temperature_4') | float ] %}
+
+      {%- set tmax = temps | max -%} {%- set tmin = temps | min -%} Lowest /
+      Highest: {{ tmin | round(1) }} / {{ tmax | round(1) }} °C  
 
       BMS: {{ states('sensor.seplos_bms_pack_0_components_temperature') }} °C /
       Ambient: {{ states('sensor.seplos_bms_pack_0_ambient_temperature') }} °C
@@ -521,7 +522,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 2
+                    name: Temp. 1 (Cell 2)
                     entity: sensor.seplos_bms_pack_0_cell_temperature_1
                     show_icon: true
                     show_name: true
@@ -556,7 +557,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 7
+                    name: Temp. 2 (Cell 7)
                     entity: sensor.seplos_bms_pack_0_cell_temperature_2
                     show_icon: true
                     show_name: true
@@ -808,7 +809,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 15
+                    name: Temp. 3 (Cell 15)
                     entity: sensor.seplos_bms_pack_0_cell_temperature_3
                     show_icon: true
                     show_name: true
@@ -843,7 +844,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 10
+                    name: Temp. 4 (Cell 10)
                     entity: sensor.seplos_bms_pack_0_cell_temperature_4
                     show_icon: true
                     show_name: true
@@ -886,9 +887,10 @@ cards:
     theme: optimal_when_high
     bar_size: small
     layout: vertical
+    icon: mdi:battery-charging
+    force_circular_background: true
     hide:
       - name
-    icon: mdi:battery-charging
     grid_options:
       columns: 3
       rows: 2
@@ -899,9 +901,9 @@ cards:
     secondary: >
       {{ states('sensor.seplos_bms_pack_1_system_status') }}: {{
       states('sensor.seplos_bms_pack_1_dis_charge_power') | float(0) | round(2)
-      }} W
+      }} W / {{ states('sensor.seplos_bms_pack_1_dis_charge_current') }} A
 
-      Δ Cell {{ states('sensor.seplos_bms_pack_1_delta_cell_voltage') }} V / {{
+      Δ Cell: {{ states('sensor.seplos_bms_pack_1_delta_cell_voltage') }} V / {{
       states('sensor.seplos_bms_pack_1_delta_cell_temperature') }} °C
 
       {% set temps = [
@@ -909,7 +911,8 @@ cards:
         states('sensor.seplos_bms_pack_1_cell_temperature_2') | float(0),
         states('sensor.seplos_bms_pack_1_cell_temperature_3') | float(0),
         states('sensor.seplos_bms_pack_1_cell_temperature_4') | float(0)
-      ] %} {%- set tmax = temps | max -%} Highest Cell: {{ tmax | round(1) }} °C
+      ] %} {%- set tmax = temps | max -%} {%- set tmin = temps | min -%} Lowest
+      / Highest: {{ tmin | round(1) }} / {{ tmax | round(1) }} °C
 
       BMS: {{ states('sensor.seplos_bms_pack_1_components_temperature') }} °C /
       Ambient: {{ states('sensor.seplos_bms_pack_1_ambient_temperature') }} °C
@@ -1082,7 +1085,7 @@ cards:
               {% for sensor in failures %}
                 {% if not is_state(sensor, 'off') %}
                   {%- set has_failure.value = true -%}
-                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-0 (Master) ', '') }}: **{{ states(sensor) }}**
+                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-1 (Slave) ', '') }}: **{{ states(sensor) }}**
                 {% endif %}
               {% endfor %}
               {% if not has_failure.value %}
@@ -1126,7 +1129,7 @@ cards:
               {% for sensor in alarms %}
                 {% if states(sensor) not in ['OK', 'off'] %}
                   {%- set has_alarm.value = true -%}
-                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-0 (Master) ', '') }}: **{{ states(sensor) }}**
+                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-1 (Slave) ', '') }}: **{{ states(sensor) }}**
                 {% endif %}
               {% endfor %}
               {% if not has_alarm.value %}
@@ -1409,7 +1412,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 2
+                    name: Temp. 1 (Cell 2)
                     entity: sensor.seplos_bms_pack_1_cell_temperature_1
                     show_icon: true
                     show_name: true
@@ -1444,7 +1447,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 7
+                    name: Temp. 2 (Cell 7)
                     entity: sensor.seplos_bms_pack_1_cell_temperature_2
                     show_icon: true
                     show_name: true
@@ -1696,7 +1699,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 15
+                    name: Temp. 3 (Cell 15)
                     entity: sensor.seplos_bms_pack_1_cell_temperature_3
                     show_icon: true
                     show_name: true
@@ -1731,7 +1734,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 10
+                    name: Temp. 4 (Cell 10)
                     entity: sensor.seplos_bms_pack_1_cell_temperature_4
                     show_icon: true
                     show_name: true
@@ -1777,6 +1780,7 @@ cards:
     hide:
       - name
     icon: mdi:battery-charging
+    force_circular_background: true
     grid_options:
       columns: 3
       rows: 2
@@ -1787,9 +1791,9 @@ cards:
     secondary: >
       {{ states('sensor.seplos_bms_pack_2_system_status') }}: {{
       states('sensor.seplos_bms_pack_2_dis_charge_power') | float(0) | round(2)
-      }} W
+      }} W / {{ states('sensor.seplos_bms_pack_2_dis_charge_current') }} A
 
-      Δ Cell {{ states('sensor.seplos_bms_pack_2_delta_cell_voltage') }} V / {{
+      Δ Cell: {{ states('sensor.seplos_bms_pack_2_delta_cell_voltage') }} V / {{
       states('sensor.seplos_bms_pack_2_delta_cell_temperature') }} °C
 
       {% set temps = [
@@ -1797,7 +1801,8 @@ cards:
         states('sensor.seplos_bms_pack_2_cell_temperature_2') | float(0),
         states('sensor.seplos_bms_pack_2_cell_temperature_3') | float(0),
         states('sensor.seplos_bms_pack_2_cell_temperature_4') | float(0)
-      ] %} {%- set tmax = temps | max -%} Highest Cell: {{ tmax | round(1) }} °C
+      ] %} {%- set tmax = temps | max -%} {%- set tmin = temps | min -%} Lowest
+      / Highest: {{ tmin | round(1) }} / {{ tmax | round(1) }} °C
 
       BMS: {{ states('sensor.seplos_bms_pack_2_components_temperature') }} °C /
       Ambient: {{ states('sensor.seplos_bms_pack_2_ambient_temperature') }} °C
@@ -1970,7 +1975,7 @@ cards:
               {% for sensor in failures %}
                 {% if not is_state(sensor, 'off') %}
                   {%- set has_failure.value = true -%}
-                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-0 (Master) ', '') }}: **{{ states(sensor) }}**
+                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-2 (Slave) ', '') }}: **{{ states(sensor) }}**
                 {% endif %}
               {% endfor %}
               {% if not has_failure.value %}
@@ -2014,7 +2019,7 @@ cards:
               {% for sensor in alarms %}
                 {% if states(sensor) not in ['OK', 'off'] %}
                   {%- set has_alarm.value = true -%}
-                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-0 (Master) ', '') }}: **{{ states(sensor) }}**
+                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-2 (Slave) ', '') }}: **{{ states(sensor) }}**
                 {% endif %}
               {% endfor %}
               {% if not has_alarm.value %}
@@ -2297,7 +2302,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 2
+                    name: Temp. 1 (Cell 2)
                     entity: sensor.seplos_bms_pack_2_cell_temperature_1
                     show_icon: true
                     show_name: true
@@ -2332,7 +2337,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 7
+                    name: Temp. 2 (Cell 7)
                     entity: sensor.seplos_bms_pack_2_cell_temperature_2
                     show_icon: true
                     show_name: true
@@ -2584,7 +2589,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 15
+                    name: Temp. 3 (Cell 15)
                     entity: sensor.seplos_bms_pack_2_cell_temperature_3
                     show_icon: true
                     show_name: true
@@ -2619,7 +2624,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 10
+                    name: Temp. 4 (Cell 10)
                     entity: sensor.seplos_bms_pack_2_cell_temperature_4
                     show_icon: true
                     show_name: true
@@ -2665,6 +2670,7 @@ cards:
     hide:
       - name
     icon: mdi:battery-charging
+    force_circular_background: true
     grid_options:
       columns: 3
       rows: 2
@@ -2675,9 +2681,9 @@ cards:
     secondary: >
       {{ states('sensor.seplos_bms_pack_3_system_status') }}: {{
       states('sensor.seplos_bms_pack_3_dis_charge_power') | float(0) | round(2)
-      }} W
+      }} W / {{ states('sensor.seplos_bms_pack_3_dis_charge_current') }} A
 
-      Δ Cell {{ states('sensor.seplos_bms_pack_3_delta_cell_voltage') }} V / {{
+      Δ Cell: {{ states('sensor.seplos_bms_pack_3_delta_cell_voltage') }} V / {{
       states('sensor.seplos_bms_pack_3_delta_cell_temperature') }} °C
 
       {% set temps = [
@@ -2685,7 +2691,8 @@ cards:
         states('sensor.seplos_bms_pack_3_cell_temperature_2') | float(0),
         states('sensor.seplos_bms_pack_3_cell_temperature_3') | float(0),
         states('sensor.seplos_bms_pack_3_cell_temperature_4') | float(0)
-      ] %} {%- set tmax = temps | max -%} Highest Cell: {{ tmax | round(1) }} °C
+      ] %} {%- set tmax = temps | max -%} {%- set tmin = temps | min -%} Lowest
+      / Highest: {{ tmin | round(1) }} / {{ tmax | round(1) }} °C
 
       BMS: {{ states('sensor.seplos_bms_pack_3_components_temperature') }} °C /
       Ambient: {{ states('sensor.seplos_bms_pack_3_ambient_temperature') }} °C
@@ -2858,7 +2865,7 @@ cards:
               {% for sensor in failures %}
                 {% if not is_state(sensor, 'off') %}
                   {%- set has_failure.value = true -%}
-                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-0 (Master) ', '') }}: **{{ states(sensor) }}**
+                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-3 (Slave) ', '') }}: **{{ states(sensor) }}**
                 {% endif %}
               {% endfor %}
               {% if not has_failure.value %}
@@ -2902,7 +2909,7 @@ cards:
               {% for sensor in alarms %}
                 {% if states(sensor) not in ['OK', 'off'] %}
                   {%- set has_alarm.value = true -%}
-                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-0 (Master) ', '') }}: **{{ states(sensor) }}**
+                  - {{ state_attr(sensor, 'friendly_name')|replace('Seplos BMS Pack-3 (Slave) ', '') }}: **{{ states(sensor) }}**
                 {% endif %}
               {% endfor %}
               {% if not has_alarm.value %}
@@ -3185,7 +3192,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 2
+                    name: Temp. 1 (Cell 2)
                     entity: sensor.seplos_bms_pack_3_cell_temperature_1
                     show_icon: true
                     show_name: true
@@ -3220,7 +3227,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 7
+                    name: Temp. 2 (Cell 7)
                     entity: sensor.seplos_bms_pack_3_cell_temperature_2
                     show_icon: true
                     show_name: true
@@ -3472,7 +3479,7 @@ cards:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    name: Temp. Cell 15
+                    name: Temp. 3 (Cell 15)
                     entity: sensor.seplos_bms_pack_3_cell_temperature_3
                     show_icon: true
                     show_name: true
@@ -3507,7 +3514,7 @@ cards:
                         - height: 30px
                         - padding: 5px
                   - type: custom:button-card
-                    name: Temp. Cell 10
+                    name: Temp. 4 (Cell 10)
                     entity: sensor.seplos_bms_pack_3_cell_temperature_4
                     show_icon: true
                     show_name: true
@@ -3553,6 +3560,7 @@ cards:
     hide:
       - name
     icon: mdi:battery-charging
+    force_circular_background: true
     grid_options:
       columns: 3
       rows: 2
