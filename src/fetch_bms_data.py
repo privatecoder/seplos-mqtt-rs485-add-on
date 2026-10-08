@@ -281,10 +281,11 @@ class Telemetry:
         self.rated_capacity: Optional[float] = None
         self.charging_cycles: Optional[int] = None
         self.port_voltage: Optional[float] = None
-        self.reserved_1: Optional[int] = None
-        self.reserved_2: Optional[int] = None
-        self.reserved_3: Optional[int] = None
-        self.reserved_4: Optional[int] = None
+        self.current_offset: Optional[int] = None
+        self.current_idle: Optional[float] = None
+        self.energy_charged: Optional[float] = None
+        self.energy_discharged: Optional[float] = None
+        self.current: Optional[float] = None
 
         # From user settings
         self.cell_voltage_setting_min: Optional[float] = None
@@ -416,6 +417,8 @@ class SeplosBatteryPack:
         self.parameters: Optional[Dict[str, Any]] = None
         self.parameters_ts = 0.0
         self.extended_status: Optional[Dict[str, Any]] = None
+        self.last_energy: Dict[str, float] = {}
+        self.energy_overflow_logged = False
         self.telemetry = Telemetry()
         self.telesignalization = Telesignalization()
 
@@ -632,13 +635,15 @@ class SeplosBatteryPack:
             'charging_cycles':          { 'offset': 122 },  # doc: "Number of cycles" (0x42)
             # offset 126: SOH - not evaluated, the firmware always sends 1000 (100.0 %)
             'port_voltage':             { 'offset': 130, 'scale': 1/100, 'round': 2 },  # doc: "Port voltage" (0x42)
-            # "Reserved" fields per protocol doc, but filled by the firmware (raw values, meaning not confirmed):
-            # 1: second current measuring channel, 2: first current measuring channel (idle only, else 0),
-            # 3/4: presumably cumulative charge/discharge counters (firmware sends 6500 once >= 65000)
-            'reserved_1':               { 'offset': 134, 'signed': True },  # doc: "Reservation" 1 (0x42)
-            'reserved_2':               { 'offset': 138, 'signed': True },  # doc: "Reservation" 2 (0x42)
-            'reserved_3':               { 'offset': 142 },  # doc: "Reservation" 3 (0x42)
-            'reserved_4':               { 'offset': 146 }  # doc: "Reservation" 4 (0x42)
+            # The four "Reservation" fields of the doc are filled by the firmware:
+            # 1: reference/offset channel of the current measurement in mA (used for drift compensation)
+            # 2: offset corrected current in mA, only sent while idle (0 while charging/discharging)
+            # 3/4: charged/discharged energy in 0.1 kWh (I*U summed every second while charging/
+            #      discharging); the firmware sends 6500 once the counter reaches 65000
+            'current_offset':           { 'offset': 134, 'signed': True },  # doc: "Reservation" 1 (0x42), mA
+            'current_idle':             { 'offset': 138, 'signed': True, 'scale': 1/1000, 'round': 3 },  # doc: "Reservation" 2 (0x42)
+            'energy_charged':           { 'offset': 142, 'scale': 1/10, 'round': 1 },  # doc: "Reservation" 3 (0x42), kWh
+            'energy_discharged':        { 'offset': 146, 'scale': 1/10, 'round': 1 }  # doc: "Reservation" 4 (0x42), kWh
         }
 
         ## Fetch values for all telemetry fields
@@ -678,16 +683,36 @@ class SeplosBatteryPack:
                 ### Add to telemetry_feedback
                 feedback[attr] = value
 
+        # Current: 0x42 reports 0 while idle, the idle current (1 mA resolution) comes in "Reservation" 2
+        current = self.telemetry.dis_charge_current if self.telemetry.dis_charge_current else self.telemetry.current_idle
+        self.telemetry.current = current
+        feedback["current"] = current
+        feedback.pop("current_idle", None)
+
+        # Energy counters: the firmware sends 6500 (650.0 kWh) once a counter reaches 65000 (6500 kWh).
+        # Keep the last valid value instead of publishing a false reset.
+        for attr in ("energy_charged", "energy_discharged"):
+            value = feedback[attr]
+            last = self.last_energy.get(attr)
+            if value == 650.0 and last is not None and last > 650.0:
+                if not self.energy_overflow_logged:
+                    logger.warning("Pack%s:Energy counter exceeded 6500 kWh, the BMS no longer reports it", self.pack_address)
+                    self.energy_overflow_logged = True
+                value = last
+            self.last_energy[attr] = value
+            setattr(self.telemetry, attr, value)
+            feedback[attr] = value
+
         # Calculated values
 
         # Get values from previous readings
-        dis_charge_current  = self.telemetry.dis_charge_current
         total_pack_voltage  = self.telemetry.total_pack_voltage
         cell_voltages       = self.telemetry.voltage_cell
         cell_temps          = self.telemetry.cell_temperature
 
         ## Dis-/charge power
-        dis_charge_power = round(dis_charge_current * total_pack_voltage, 2)
+        # uses the combined current, so the power isn't 0 while idle
+        dis_charge_power = round((self.telemetry.current or 0) * total_pack_voltage, 2)
         self.telemetry.dis_charge_power = dis_charge_power
 
         ## Average cell voltage

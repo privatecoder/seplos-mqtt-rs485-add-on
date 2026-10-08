@@ -168,7 +168,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | Ambient Temperature | `telemetry.normal.ambient_temperature` | "Environment temperature" (0x42) |
 | MOSFET Temperature | `telemetry.normal.components_temperature` | "Power temperature" (0x42), MOSFET/power stage |
 | Current (0 when idle) | `telemetry.normal.dis_charge_current` | "Charge/discharge current" (0x42), 0 when idle |
-| Power (calculated) | `telemetry.normal.dis_charge_power` | – (calculated: current × pack voltage) |
+| Power (calculated) | `telemetry.normal.dis_charge_power` | – (calculated: Current × pack voltage) |
 | Pack Voltage | `telemetry.normal.total_pack_voltage` | "Total battery voltage" (0x42) |
 | Rated Capacity (Setting) | `telemetry.normal.rated_capacity` | "Rated capacity" (0x42), setting P58 |
 | Full Capacity | `telemetry.normal.full_capacity` | "Battery capacity" (0x42), learned full capacity |
@@ -176,10 +176,10 @@ Home Assistant names describe what a value actually does (verified against the B
 | State of Charge | `telemetry.normal.state_of_charge` | "SOC" (0x42) |
 | Cycle Count | `telemetry.normal.charging_cycles` | "Number of cycles" (0x42) |
 | Port Voltage (P+/P-) | `telemetry.normal.port_voltage` | "Port voltage" (0x42) |
-| Reserved 1 (Current Ch. B raw) | `telemetry.normal.reserved_1` | "Reservation" 1 (0x42) |
-| Reserved 2 (Current Ch. A raw, idle) | `telemetry.normal.reserved_2` | "Reservation" 2 (0x42) |
-| Reserved 3 (Cumulative raw) | `telemetry.normal.reserved_3` | "Reservation" 3 (0x42) |
-| Reserved 4 (Cumulative raw) | `telemetry.normal.reserved_4` | "Reservation" 4 (0x42) |
+| Current | `telemetry.normal.current` | "Charge/discharge current" (0x42), while idle "Reservation" 2 (0x42, 1 mA resolution) |
+| Current Sense Offset | `telemetry.normal.current_offset` | "Reservation" 1 (0x42): reference/offset channel of the current measurement, mA |
+| Energy Charged (total) | `telemetry.normal.energy_charged` | "Reservation" 3 (0x42): charged energy, 0.1 kWh raw |
+| Energy Discharged (total) | `telemetry.normal.energy_discharged` | "Reservation" 4 (0x42): discharged energy, 0.1 kWh raw |
 | Voltage Alarm Cell 1-16 | `telesignalization.normal.cell_voltage_alarm_N` | "Cell 1..M alarm" (0x44) |
 | Cell Temperature Alarm 1-4 | `telesignalization.normal.cell_temperature_alarm_N` | "Cell temperature alarm 1..4" (0x44) |
 | Balancing Cell 1-16 | `telesignalization.binary.balancer_cell_N` | "Equilibrium state 1/2" (cells 1-8 / 9-16) (0x44) |
@@ -269,7 +269,8 @@ Home Assistant names describe what a value actually does (verified against the B
 | Pack Communication Fault (System) | `system: binary.pack_communication_fault` | – undocumented Modbus RTU FC03 0x1000 (master) |
 
 Notes:
-- `Current (0 when idle)` is reported as 0 by the BMS as long as it is neither charging nor discharging; `Current (incl. idle)` (single pack mode) shows the real current.
+- `Current (0 when idle)` is reported as 0 by the BMS as long as it is neither charging nor discharging. `Current` combines it with the idle current the BMS sends in a "reserved" field (1 mA resolution), so it always shows the real current.
+- `Energy Charged/Discharged (total)` are the BMS' own energy counters (current × voltage summed every second while charging/discharging) and can be used in the Home Assistant energy dashboard. The BMS stops reporting them beyond 6500 kWh (the add-on then keeps the last value); they are reset by the BMS command "clear history".
 - Alarm/protection pairs report the more severe state (Protection/Lockout before Alarm).
 - The doc's "State of health" (always 100 %), "Disconnection state" (always 0) and system state bit 2 "Floating charge" (masked out, actually an internal "charge path active" flag) are not published.
 

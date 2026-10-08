@@ -210,34 +210,44 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "suggested_display_precision": 2,
         "icon": "mdi:flash-triangle"
     },
-    # "Reserved" fields of the telemetry frame, raw values (meaning not confirmed)
+    # Fields the protocol doc calls "Reservation" 1-4 (0x42)
     {
-        "name": "Reserved 1 (Current Ch. B raw)",
-        "value_template_key": "reserved_1",
+        "name": "Current",
+        "value_template_key": "current",
+        "invert_value": True,
+        "device_class": "current",
         "state_class": "measurement",
-        "icon": "mdi:help-circle-outline",
+        "unit_of_measurement": "A",
+        "suggested_display_precision": 3,
+        "icon": "mdi:current-dc"
+    },
+    {
+        "name": "Current Sense Offset",
+        "value_template_key": "current_offset",
+        "device_class": "current",
+        "state_class": "measurement",
+        "unit_of_measurement": "mA",
+        "suggested_display_precision": 0,
+        "icon": "mdi:tune-variant",
         "entity_category": "diagnostic"
     },
     {
-        "name": "Reserved 2 (Current Ch. A raw, idle)",
-        "value_template_key": "reserved_2",
-        "state_class": "measurement",
-        "icon": "mdi:help-circle-outline",
-        "entity_category": "diagnostic"
+        "name": "Energy Charged (total)",
+        "value_template_key": "energy_charged",
+        "device_class": "energy",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh",
+        "suggested_display_precision": 1,
+        "icon": "mdi:battery-arrow-up"
     },
     {
-        "name": "Reserved 3 (Cumulative raw)",
-        "value_template_key": "reserved_3",
-        "state_class": "measurement",
-        "icon": "mdi:help-circle-outline",
-        "entity_category": "diagnostic"
-    },
-    {
-        "name": "Reserved 4 (Cumulative raw)",
-        "value_template_key": "reserved_4",
-        "state_class": "measurement",
-        "icon": "mdi:help-circle-outline",
-        "entity_category": "diagnostic"
+        "name": "Energy Discharged (total)",
+        "value_template_key": "energy_discharged",
+        "device_class": "energy",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh",
+        "suggested_display_precision": 1,
+        "icon": "mdi:battery-arrow-down"
     }
 ]
 
@@ -1138,6 +1148,11 @@ class AutoDiscoveryConfig:
         topics.append(
             f"{self.discovery_prefix}/binary_sensor/seplos-mqtt-pack-{pack_no}/cell_voltage_difference_sensing_failure/config"
         )
+        # "Reservation" fields, renamed to current_offset, current, energy_charged, energy_discharged
+        topics += [
+            f"{self.discovery_prefix}/sensor/seplos-mqtt-pack-{pack_no}/reserved_{i}/config"
+            for i in range(1, 5)
+        ]
         topics += [
             f"{self.discovery_prefix}/binary_sensor/seplos-mqtt-pack-{pack_no}/disconnection_cell_{i}/config"
             for i in range(1, 17)
