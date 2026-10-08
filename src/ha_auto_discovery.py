@@ -12,7 +12,7 @@ logger = logging.getLogger("SeplosBMS.Discovery")
 BASE_SENSOR = {
     "name": "",
     "uniq_id": "",  # unique_id
-    "obj_id": "",  # object_id
+    "obj_id": "",  # object_id (older HA versions)
     "stat_t": "",  # state_topic
     "val_tpl": "",  # value_template
     "avty": [],  # availability
@@ -778,6 +778,7 @@ class AutoDiscoveryConfig:
     ) -> None:
         """Generische Publish-Funktion für Sensoren und Binary-Sensoren."""
         discovery_topic = f"{self.discovery_prefix}/{entity_type}/seplos-mqtt-pack-{pack_no}/{value_template_key}/config"
+        self._set_default_entity_id(entity_type, config)
 
         try:
             self.mqtt_client.publish(
@@ -1125,8 +1126,16 @@ class AutoDiscoveryConfig:
             for config in templates:
                 self._publish_raw_config(entity_type, config["key"], None)
 
+    @staticmethod
+    def _set_default_entity_id(entity_type: str, config: Optional[Dict[str, Any]]) -> None:
+        """Newer HA versions ignore object_id and derive the entity ID from the device and entity
+        name; default_entity_id keeps the entity IDs stable (seplos_bms_pack_<n>_<key>)."""
+        if config and config.get("obj_id"):
+            config["default_entity_id"] = f"{entity_type}.{config['obj_id']}"
+
     def _publish_raw_config(self, entity_type: str, key: str, config: Optional[Dict[str, Any]]) -> None:
         topic = f"{self.discovery_prefix}/{entity_type}/seplos-mqtt-system/{key}/config"
+        self._set_default_entity_id(entity_type, config)
         try:
             self.mqtt_client.publish(topic, json.dumps(config) if config is not None else "", retain=True, qos=1)
         except Exception as e:
