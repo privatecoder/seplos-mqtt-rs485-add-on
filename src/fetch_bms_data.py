@@ -245,6 +245,16 @@ def _pack_availability_topic(pack_no: int) -> str:
     return f"{Config.MQTT_TOPIC}/pack-{pack_no}/availability"
 
 
+def device_firmware(info: Dict[str, Any]) -> str:
+    """Firmware for the HA device info: the derived patch level if determined, else major.minor."""
+    normal = info.get("normal", {})
+    version = normal.get("firmware_version") or "unknown"
+    patch = normal.get("firmware_patch") or ""
+    if patch.startswith(version) and " " not in patch:
+        return patch
+    return version
+
+
 def _pack_heartbeat_topic(pack_no: int) -> str:
     return f"{Config.MQTT_TOPIC}/pack-{pack_no}/heartbeat"
 
@@ -1771,6 +1781,7 @@ def main():
         logger.info("Health endpoint started on http://0.0.0.0:8080/health")
 
         # Send Home Assistant Auto-Discovery configurations on startup
+        auto_discovery = None
         if Config.ENABLE_HA_DISCOVERY_CONFIG:
             logger.info("Sending Home Assistant Auto-Discovery configurations")
             auto_discovery = AutoDiscoveryConfig(
@@ -1822,6 +1833,11 @@ def main():
                         retain=False,
                     )
                     current_pack["availability"] = "online"
+
+                # Show the real firmware version in the HA device info once it's known
+                if auto_discovery and pack_instance.info and not current_pack.get("firmware_reported"):
+                    auto_discovery.update_firmware_version(pack_address, device_firmware(pack_instance.info))
+                    current_pack["firmware_reported"] = True
 
                 if pack_data:
                     # Publish updated data to MQTT

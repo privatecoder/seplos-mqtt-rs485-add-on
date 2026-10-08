@@ -712,6 +712,9 @@ class AutoDiscoveryConfig:
         self.invert_ha_dis_charge_measurements = invert_ha_dis_charge_measurements
         self.mqtt_client = mqtt_client
         self._device_info_published = set()
+        # firmware version shown in the device info, per pack number and "system"
+        self._sw_versions: Dict[Any, str] = {}
+        self._system_sensors_active = False
 
     # -------------------------------------------------------------------------
     # Interne Hilfsfunktionen zur Vereinheitlichung
@@ -720,7 +723,7 @@ class AutoDiscoveryConfig:
     def _add_device_info(self, entity: Dict[str, Any], pack_no: int) -> None:
         """Setze passende device-Infos für das gegebene Pack."""
         if pack_no not in self._device_info_published:
-            entity["dev"] = {**DEVICE_BASE_CONFIG}
+            entity["dev"] = {**DEVICE_BASE_CONFIG, "sw": self._sw_versions.get(pack_no, DEVICE_BASE_CONFIG["sw"])}
             entity["dev"]["name"] = f"Seplos BMS Pack-{pack_no} ({'Master' if pack_no == 0 else 'Slave'})"
             entity["dev"]["ids"] = f"seplos_bms_pack_{pack_no}"
             if pack_no > 0:
@@ -1090,7 +1093,13 @@ class AutoDiscoveryConfig:
         ]
         entity["avty_mode"] = "all"
         if "system" not in self._device_info_published:
-            entity["dev"] = {**DEVICE_BASE_CONFIG, "name": "Seplos BMS System", "ids": "seplos_bms_system", "via_device": "seplos_bms_pack_0"}
+            entity["dev"] = {
+                **DEVICE_BASE_CONFIG,
+                "sw": self._sw_versions.get("system", DEVICE_BASE_CONFIG["sw"]),
+                "name": "Seplos BMS System",
+                "ids": "seplos_bms_system",
+                "via_device": "seplos_bms_pack_0",
+            }
             self._device_info_published.add("system")
         else:
             entity["dev"] = {"ids": "seplos_bms_system"}
@@ -1099,6 +1108,7 @@ class AutoDiscoveryConfig:
     def create_system_sensors(self) -> None:
         """Create the sensors of the system device (Modbus 0x1000 of the master)."""
         self._device_info_published.discard("system")
+        self._system_sensors_active = True
         for config in SYSTEM_SENSOR_TEMPLATES:
             expr = f"value_json.normal.{config['key']}"
             if config.get("invert") and self.invert_ha_dis_charge_measurements:
@@ -1119,6 +1129,34 @@ class AutoDiscoveryConfig:
             entity = self._system_entity("binary_sensor", config, f"{{{{ value_json.binary.{config['key']} }}}}")
             self._apply_optional_fields(entity, {"dev_cla": config.get("device_class")})
             self._publish_raw_config("binary_sensor", config["key"], entity)
+
+    def update_firmware_version(self, pack_no: int, firmware: str) -> None:
+        """
+        Show the real firmware version in the device info. The discovery configs are sent before
+        the device info is read, so the device block is republished with one sensor config.
+        The system device shows the master's firmware.
+        """
+        if self._sw_versions.get(pack_no) == firmware:
+            return
+        self._sw_versions[pack_no] = firmware
+        self._device_info_published.discard(pack_no)
+        for config in INFO_SENSOR_TEMPLATES:
+            if config["value_template_key"] == "firmware_version":
+                self.create_info_sensor_config(pack_no=pack_no, **config)
+        if pack_no == 0 and self._system_sensors_active:
+            self._sw_versions["system"] = firmware
+            self._device_info_published.discard("system")
+            config = SYSTEM_SENSOR_TEMPLATES[0]
+            entity = self._system_entity("sensor", config, f"{{{{ value_json.normal.{config['key']} }}}}")
+            self._apply_optional_fields(entity, {
+                "dev_cla": config.get("device_class"),
+                "stat_cla": config.get("state_class"),
+                "unit_of_meas": config.get("unit"),
+                "sug_dsp_prc": config.get("precision"),
+                "ic": config.get("icon"),
+                "ent_cat": config.get("entity_category"),
+            })
+            self._publish_raw_config("sensor", config["key"], entity)
 
     def remove_system_sensors(self) -> None:
         """Remove the system device sensors (when not running on the CAN port RS485 bus)."""
@@ -1292,8 +1330,11 @@ class AutoDiscoveryConfig:
         # Create heartbeat sensor
         self.create_heartbeat_sensor_config(pack_no=pack_no)
 
-        # Create static info sensors
+        # Create static info sensors (the serial number (0xA2) is only served on RS485-1/2)
         for config in INFO_SENSOR_TEMPLATES:
+            if config["value_template_key"] == "serial_number" and not pack_bus:
+                self._remove_configs("sensor", pack_no, ["serial_number"])
+                continue
             self.create_info_sensor_config(pack_no=pack_no, **config)
 
         # Extended status (0x5A) and parameters (0x47): only served on RS485-1/2
