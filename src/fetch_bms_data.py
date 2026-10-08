@@ -1219,18 +1219,29 @@ class SeplosBatteryPack:
         - Pylontech 0x60 at ADR 0x02: accepted since 16.06.12 (before only ADR 0x12),
           0x60 itself exists since 16.06.04, 0x61 since 16.04
         - Modbus FC03 0x001F x9: since 16.06.13; Modbus FC04 0x0000 x21: since 16.06.11
+        - Modbus FC03 0x9000: 16.06.13 only accepts 26 registers, before only 21 (fallback check)
         """
         if self.pack_address != 0:
             return "16.06 (unknown, only derivable for the master)"
 
         time.sleep(1)
         if self._request_rtn(cid2=0x60, address=0x02) == 0x00:
-            time.sleep(1)
-            result = self._request_modbus(function_code=0x03, register=0x001F, count=9)
-            if result is True:
-                return "16.06.13+"
-            if result is False:
-                return "16.06.12"
+            # Modbus answers can get lost on the shared bus, so retry and cross-check
+            for _ in range(3):
+                time.sleep(1)
+                result = self._request_modbus(function_code=0x03, register=0x001F, count=9)
+                logger.debug("Pack%s:Patch probe Modbus 0x001F x9: %s", self.pack_address, result)
+                if result is True:
+                    return "16.06.13+"
+                if result is False:
+                    return "16.06.12"
+                time.sleep(1)
+                result = self._request_modbus(function_code=0x03, register=0x9000, count=21)
+                logger.debug("Pack%s:Patch probe Modbus 0x9000 x21: %s", self.pack_address, result)
+                if result is True:
+                    return "16.06.12"
+                if result is False:
+                    return "16.06.13+"
             return "16.06.12+"
 
         time.sleep(1)
