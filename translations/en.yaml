@@ -19,11 +19,11 @@ configuration:
   
   min_cell_voltage:
     name: "Minimum Cell Voltage"
-    description: "Minimum allowed cell voltage in volts (used for calculations)"
+    description: "Lower end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
   
   max_cell_voltage:
     name: "Maximum Cell Voltage"
-    description: "Maximum allowed cell voltage in volts (used for calculations)"
+    description: "Upper end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
   
   # MQTT Configuration
   mqtt_topic:

@@ -63,7 +63,7 @@ cards:
         'binary_sensor.seplos_bms_pack_0_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_0_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_0_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_0_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_0_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_0_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_0_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_0_current_limit_switch_failure',
@@ -76,7 +76,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_0_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_0_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_0_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -134,7 +133,7 @@ cards:
         'binary_sensor.seplos_bms_pack_0_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_0_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_0_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_0_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_0_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_0_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_0_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_0_current_limit_switch_failure',
@@ -147,7 +146,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_0_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_0_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_0_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -183,7 +181,7 @@ cards:
                 'binary_sensor.seplos_bms_pack_0_temperature_sensing_failure',
                 'binary_sensor.seplos_bms_pack_0_current_sensing_failure',
                 'binary_sensor.seplos_bms_pack_0_power_switch_failure',
-                'binary_sensor.seplos_bms_pack_0_cell_voltage_difference_sensing_failure',
+                'binary_sensor.seplos_bms_pack_0_cell_voltage_difference_fault',
                 'binary_sensor.seplos_bms_pack_0_charging_switch_failure',
                 'binary_sensor.seplos_bms_pack_0_discharging_switch_failure',
                 'binary_sensor.seplos_bms_pack_0_current_limit_switch_failure',
@@ -273,19 +271,6 @@ cards:
               *No active temperature warnings*
               {% endif %}
 
-              ### Connection warnings
-              {% set has_disconnection = namespace(value=false) %}
-              {% for i in range(1, 17) %}
-                {% set sensor = 'binary_sensor.seplos_bms_pack_0_disconnection_cell_' ~ i %}
-                {% if not is_state(sensor, 'on') %}
-                  {%- set has_disconnection.value = true -%}
-                  - Cell {{ i }}: **{{ 'disconnected' if is_state(sensor, 'off') else states(sensor) }}**
-                {% endif %}
-              {% endfor %}
-              {% if not has_disconnection.value %}
-              *No active connection warnings*
-              {% endif %}
-
               ---
               *Last update: {{ now().strftime('%H:%M:%S') }}*
     tap_action:
@@ -311,8 +296,8 @@ cards:
                         - color: |
                             [[[
                               const portVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_0_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_0_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_0_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_0_pack_voltage_setting_max'].state;
                               if (portVol < minPackVol + 8) return 'red';
                               if (portVol > maxPackVol - 3.2) return 'red';
                               if (portVol < minPackVol + 10.4) return 'orange';
@@ -338,8 +323,8 @@ cards:
                         - color: |
                             [[[
                               const totalPackVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_0_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_0_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_0_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_0_pack_voltage_setting_max'].state;
                               if (totalPackVol < minPackVol + 8) return 'red';
                               if (totalPackVol > maxPackVol - 3.2) return 'red';
                               if (totalPackVol < minPackVol + 10.4) return 'orange';
@@ -377,30 +362,6 @@ cards:
                         - font-weight: 500
                       card:
                         - font-size: 12px
-                  - type: custom:button-card
-                    name: SoH
-                    size: 15%
-                    entity: sensor.seplos_bms_pack_0_state_of_health
-                    show_icon: true
-                    show_name: true
-                    show_state: true
-                    styles:
-                      icon:
-                        - color: |
-                            [[[
-                              const soh = entity.state;
-                              if (soh > 99) return 'lightgreen';
-                              if (soh > 95) return 'yellow';
-                              if (soh > 90) return 'orange';
-                              return 'red';
-                            ]]]
-                      name:
-                        - font-size: 10px
-                      state:
-                        - font-size: 12px
-                        - font-weight: 500
-                      card:
-                        - font-size: 12px
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
@@ -415,8 +376,8 @@ cards:
                         - color: |
                             [[[
                               const cellVol = entity.state;
-                              const minCellVol = states['sensor.seplos_bms_pack_0_min_cell_voltage'].state;
-                              const maxCellVol = states['sensor.seplos_bms_pack_0_max_cell_voltage'].state;
+                              const minCellVol = states['sensor.seplos_bms_pack_0_cell_voltage_setting_min'].state;
+                              const maxCellVol = states['sensor.seplos_bms_pack_0_cell_voltage_setting_max'].state;
                               if (cellVol < minCellVol + 0.5) return 'red';
                               if (cellVol > maxCellVol - 0.2) return 'red';
                               if (cellVol < minCellVol + 0.65) return 'orange';
@@ -953,7 +914,7 @@ cards:
         'binary_sensor.seplos_bms_pack_1_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_1_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_1_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_1_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_1_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_1_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_1_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_1_current_limit_switch_failure',
@@ -966,7 +927,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_1_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_1_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_1_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -1024,7 +984,7 @@ cards:
         'binary_sensor.seplos_bms_pack_1_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_1_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_1_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_1_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_1_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_1_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_1_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_1_current_limit_switch_failure',
@@ -1037,7 +997,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_1_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_1_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_1_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -1073,7 +1032,7 @@ cards:
                 'binary_sensor.seplos_bms_pack_1_temperature_sensing_failure',
                 'binary_sensor.seplos_bms_pack_1_current_sensing_failure',
                 'binary_sensor.seplos_bms_pack_1_power_switch_failure',
-                'binary_sensor.seplos_bms_pack_1_cell_voltage_difference_sensing_failure',
+                'binary_sensor.seplos_bms_pack_1_cell_voltage_difference_fault',
                 'binary_sensor.seplos_bms_pack_1_charging_switch_failure',
                 'binary_sensor.seplos_bms_pack_1_discharging_switch_failure',
                 'binary_sensor.seplos_bms_pack_1_current_limit_switch_failure',
@@ -1163,19 +1122,6 @@ cards:
               *No active temperature warnings*
               {% endif %}
 
-              ### Connection warnings
-              {% set has_disconnection = namespace(value=false) %}
-              {% for i in range(1, 17) %}
-                {% set sensor = 'binary_sensor.seplos_bms_pack_1_disconnection_cell_' ~ i %}
-                {% if not is_state(sensor, 'on') %}
-                  {%- set has_disconnection.value = true -%}
-                  - Cell {{ i }}: **{{ 'disconnected' if is_state(sensor, 'off') else states(sensor) }}**
-                {% endif %}
-              {% endfor %}
-              {% if not has_disconnection.value %}
-              *No active connection warnings*
-              {% endif %}
-
               ---
               *Last update: {{ now().strftime('%H:%M:%S') }}*
     tap_action:
@@ -1201,8 +1147,8 @@ cards:
                         - color: |
                             [[[
                               const portVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_1_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_1_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_1_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_1_pack_voltage_setting_max'].state;
                               if (portVol < minPackVol + 8) return 'red';
                               if (portVol > maxPackVol - 3.2) return 'red';
                               if (portVol < minPackVol + 10.4) return 'orange';
@@ -1228,8 +1174,8 @@ cards:
                         - color: |
                             [[[
                               const totalPackVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_1_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_1_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_1_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_1_pack_voltage_setting_max'].state;
                               if (totalPackVol < minPackVol + 8) return 'red';
                               if (totalPackVol > maxPackVol - 3.2) return 'red';
                               if (totalPackVol < minPackVol + 10.4) return 'orange';
@@ -1267,30 +1213,6 @@ cards:
                         - font-weight: 500
                       card:
                         - font-size: 12px
-                  - type: custom:button-card
-                    name: SoH
-                    size: 15%
-                    entity: sensor.seplos_bms_pack_1_state_of_health
-                    show_icon: true
-                    show_name: true
-                    show_state: true
-                    styles:
-                      icon:
-                        - color: |
-                            [[[
-                              const soh = entity.state;
-                              if (soh > 99) return 'lightgreen';
-                              if (soh > 95) return 'yellow';
-                              if (soh > 90) return 'orange';
-                              return 'red';
-                            ]]]
-                      name:
-                        - font-size: 10px
-                      state:
-                        - font-size: 12px
-                        - font-weight: 500
-                      card:
-                        - font-size: 12px
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
@@ -1305,8 +1227,8 @@ cards:
                         - color: |
                             [[[
                               const cellVol = entity.state;
-                              const minCellVol = states['sensor.seplos_bms_pack_1_min_cell_voltage'].state;
-                              const maxCellVol = states['sensor.seplos_bms_pack_1_max_cell_voltage'].state;
+                              const minCellVol = states['sensor.seplos_bms_pack_1_cell_voltage_setting_min'].state;
+                              const maxCellVol = states['sensor.seplos_bms_pack_1_cell_voltage_setting_max'].state;
                               if (cellVol < minCellVol + 0.5) return 'red';
                               if (cellVol > maxCellVol - 0.2) return 'red';
                               if (cellVol < minCellVol + 0.65) return 'orange';
@@ -1843,7 +1765,7 @@ cards:
         'binary_sensor.seplos_bms_pack_2_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_2_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_2_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_2_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_2_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_2_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_2_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_2_current_limit_switch_failure',
@@ -1856,7 +1778,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_2_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_2_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_2_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -1914,7 +1835,7 @@ cards:
         'binary_sensor.seplos_bms_pack_2_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_2_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_2_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_2_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_2_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_2_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_2_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_2_current_limit_switch_failure',
@@ -1927,7 +1848,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_2_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_2_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_2_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -1963,7 +1883,7 @@ cards:
                 'binary_sensor.seplos_bms_pack_2_temperature_sensing_failure',
                 'binary_sensor.seplos_bms_pack_2_current_sensing_failure',
                 'binary_sensor.seplos_bms_pack_2_power_switch_failure',
-                'binary_sensor.seplos_bms_pack_2_cell_voltage_difference_sensing_failure',
+                'binary_sensor.seplos_bms_pack_2_cell_voltage_difference_fault',
                 'binary_sensor.seplos_bms_pack_2_charging_switch_failure',
                 'binary_sensor.seplos_bms_pack_2_discharging_switch_failure',
                 'binary_sensor.seplos_bms_pack_2_current_limit_switch_failure',
@@ -2053,19 +1973,6 @@ cards:
               *No active temperature warnings*
               {% endif %}
 
-              ### Connection warnings
-              {% set has_disconnection = namespace(value=false) %}
-              {% for i in range(1, 17) %}
-                {% set sensor = 'binary_sensor.seplos_bms_pack_2_disconnection_cell_' ~ i %}
-                {% if not is_state(sensor, 'on') %}
-                  {%- set has_disconnection.value = true -%}
-                  - Cell {{ i }}: **{{ 'disconnected' if is_state(sensor, 'off') else states(sensor) }}**
-                {% endif %}
-              {% endfor %}
-              {% if not has_disconnection.value %}
-              *No active connection warnings*
-              {% endif %}
-
               ---
               *Last update: {{ now().strftime('%H:%M:%S') }}*
     tap_action:
@@ -2091,8 +1998,8 @@ cards:
                         - color: |
                             [[[
                               const portVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_2_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_2_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_2_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_2_pack_voltage_setting_max'].state;
                               if (portVol < minPackVol + 8) return 'red';
                               if (portVol > maxPackVol - 3.2) return 'red';
                               if (portVol < minPackVol + 10.4) return 'orange';
@@ -2118,8 +2025,8 @@ cards:
                         - color: |
                             [[[
                               const totalPackVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_2_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_2_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_2_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_2_pack_voltage_setting_max'].state;
                               if (totalPackVol < minPackVol + 8) return 'red';
                               if (totalPackVol > maxPackVol - 3.2) return 'red';
                               if (totalPackVol < minPackVol + 10.4) return 'orange';
@@ -2157,30 +2064,6 @@ cards:
                         - font-weight: 500
                       card:
                         - font-size: 12px
-                  - type: custom:button-card
-                    name: SoH
-                    size: 15%
-                    entity: sensor.seplos_bms_pack_2_state_of_health
-                    show_icon: true
-                    show_name: true
-                    show_state: true
-                    styles:
-                      icon:
-                        - color: |
-                            [[[
-                              const soh = entity.state;
-                              if (soh > 99) return 'lightgreen';
-                              if (soh > 95) return 'yellow';
-                              if (soh > 90) return 'orange';
-                              return 'red';
-                            ]]]
-                      name:
-                        - font-size: 10px
-                      state:
-                        - font-size: 12px
-                        - font-weight: 500
-                      card:
-                        - font-size: 12px
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
@@ -2195,8 +2078,8 @@ cards:
                         - color: |
                             [[[
                               const cellVol = entity.state;
-                              const minCellVol = states['sensor.seplos_bms_pack_2_min_cell_voltage'].state;
-                              const maxCellVol = states['sensor.seplos_bms_pack_2_max_cell_voltage'].state;
+                              const minCellVol = states['sensor.seplos_bms_pack_2_cell_voltage_setting_min'].state;
+                              const maxCellVol = states['sensor.seplos_bms_pack_2_cell_voltage_setting_max'].state;
                               if (cellVol < minCellVol + 0.5) return 'red';
                               if (cellVol > maxCellVol - 0.2) return 'red';
                               if (cellVol < minCellVol + 0.65) return 'orange';
@@ -2733,7 +2616,7 @@ cards:
         'binary_sensor.seplos_bms_pack_3_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_3_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_3_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_3_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_3_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_3_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_3_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_3_current_limit_switch_failure',
@@ -2746,7 +2629,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_3_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_3_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_3_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -2804,7 +2686,7 @@ cards:
         'binary_sensor.seplos_bms_pack_3_temperature_sensing_failure',
         'binary_sensor.seplos_bms_pack_3_current_sensing_failure',
         'binary_sensor.seplos_bms_pack_3_power_switch_failure',
-        'binary_sensor.seplos_bms_pack_3_cell_voltage_difference_sensing_failure',
+        'binary_sensor.seplos_bms_pack_3_cell_voltage_difference_fault',
         'binary_sensor.seplos_bms_pack_3_charging_switch_failure',
         'binary_sensor.seplos_bms_pack_3_discharging_switch_failure',
         'binary_sensor.seplos_bms_pack_3_current_limit_switch_failure',
@@ -2817,7 +2699,6 @@ cards:
           {% set sensors = sensors + ['sensor.seplos_bms_pack_3_cell_temperature_alarm_' ~ i] %}
         {% endif %}
         {% set sensors = sensors + ['sensor.seplos_bms_pack_3_cell_voltage_alarm_' ~ i] %}
-        {% set sensors = sensors + ['binary_sensor.seplos_bms_pack_3_disconnection_cell_' ~ i] %}
       {% endfor %}
 
       {% set ns = namespace(has_failure=false, has_alarm=false) %}
@@ -2853,7 +2734,7 @@ cards:
                 'binary_sensor.seplos_bms_pack_3_temperature_sensing_failure',
                 'binary_sensor.seplos_bms_pack_3_current_sensing_failure',
                 'binary_sensor.seplos_bms_pack_3_power_switch_failure',
-                'binary_sensor.seplos_bms_pack_3_cell_voltage_difference_sensing_failure',
+                'binary_sensor.seplos_bms_pack_3_cell_voltage_difference_fault',
                 'binary_sensor.seplos_bms_pack_3_charging_switch_failure',
                 'binary_sensor.seplos_bms_pack_3_discharging_switch_failure',
                 'binary_sensor.seplos_bms_pack_3_current_limit_switch_failure',
@@ -2943,19 +2824,6 @@ cards:
               *No active temperature warnings*
               {% endif %}
 
-              ### Connection warnings
-              {% set has_disconnection = namespace(value=false) %}
-              {% for i in range(1, 17) %}
-                {% set sensor = 'binary_sensor.seplos_bms_pack_3_disconnection_cell_' ~ i %}
-                {% if not is_state(sensor, 'on') %}
-                  {%- set has_disconnection.value = true -%}
-                  - Cell {{ i }}: **{{ 'disconnected' if is_state(sensor, 'off') else states(sensor) }}**
-                {% endif %}
-              {% endfor %}
-              {% if not has_disconnection.value %}
-              *No active connection warnings*
-              {% endif %}
-
               ---
               *Last update: {{ now().strftime('%H:%M:%S') }}*
     tap_action:
@@ -2981,8 +2849,8 @@ cards:
                         - color: |
                             [[[
                               const portVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_3_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_3_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_3_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_3_pack_voltage_setting_max'].state;
                               if (portVol < minPackVol + 8) return 'red';
                               if (portVol > maxPackVol - 3.2) return 'red';
                               if (portVol < minPackVol + 10.4) return 'orange';
@@ -3008,8 +2876,8 @@ cards:
                         - color: |
                             [[[
                               const totalPackVol = entity.state;
-                              const minPackVol = states['sensor.seplos_bms_pack_3_min_pack_voltage'].state;
-                              const maxPackVol = states['sensor.seplos_bms_pack_3_max_pack_voltage'].state;
+                              const minPackVol = states['sensor.seplos_bms_pack_3_pack_voltage_setting_min'].state;
+                              const maxPackVol = states['sensor.seplos_bms_pack_3_pack_voltage_setting_max'].state;
                               if (totalPackVol < minPackVol + 8) return 'red';
                               if (totalPackVol > maxPackVol - 3.2) return 'red';
                               if (totalPackVol < minPackVol + 10.4) return 'orange';
@@ -3047,30 +2915,6 @@ cards:
                         - font-weight: 500
                       card:
                         - font-size: 12px
-                  - type: custom:button-card
-                    name: SoH
-                    size: 15%
-                    entity: sensor.seplos_bms_pack_3_state_of_health
-                    show_icon: true
-                    show_name: true
-                    show_state: true
-                    styles:
-                      icon:
-                        - color: |
-                            [[[
-                              const soh = entity.state;
-                              if (soh > 99) return 'lightgreen';
-                              if (soh > 95) return 'yellow';
-                              if (soh > 90) return 'orange';
-                              return 'red';
-                            ]]]
-                      name:
-                        - font-size: 10px
-                      state:
-                        - font-size: 12px
-                        - font-weight: 500
-                      card:
-                        - font-size: 12px
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
@@ -3085,8 +2929,8 @@ cards:
                         - color: |
                             [[[
                               const cellVol = entity.state;
-                              const minCellVol = states['sensor.seplos_bms_pack_3_min_cell_voltage'].state;
-                              const maxCellVol = states['sensor.seplos_bms_pack_3_max_cell_voltage'].state;
+                              const minCellVol = states['sensor.seplos_bms_pack_3_cell_voltage_setting_min'].state;
+                              const maxCellVol = states['sensor.seplos_bms_pack_3_cell_voltage_setting_max'].state;
                               if (cellVol < minCellVol + 0.5) return 'red';
                               if (cellVol > maxCellVol - 0.2) return 'red';
                               if (cellVol < minCellVol + 0.65) return 'orange';

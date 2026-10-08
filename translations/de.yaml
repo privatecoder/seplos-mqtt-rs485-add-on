@@ -19,11 +19,11 @@ configuration:
   
   min_cell_voltage:
     name: "Minimale Zellenspannung"
-    description: "Minimal erlaubte Zellenspannung in Volt (für Berechnungen)"
+    description: "Untere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
   
   max_cell_voltage:
     name: "Maximale Zellenspannung"
-    description: "Maximal erlaubte Zellenspannung in Volt (für Berechnungen)"
+    description: "Obere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
   
   # MQTT Konfiguration
   mqtt_topic:

@@ -29,32 +29,32 @@ DEVICE_BASE_CONFIG = {
 # Telemetry sensor templates
 TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
     {
-        "name": "Min Cell Voltage",
-        "value_template_key": "min_cell_voltage",
+        "name": "Cell Voltage Range Min (Setting)",
+        "value_template_key": "cell_voltage_setting_min",
         "device_class": "voltage",
         "unit_of_measurement": "V",
         "suggested_display_precision": 3,
         "icon": "mdi:cog"
     },
     {
-        "name": "Max Cell Voltage",
-        "value_template_key": "max_cell_voltage",
+        "name": "Cell Voltage Range Max (Setting)",
+        "value_template_key": "cell_voltage_setting_max",
         "device_class": "voltage",
         "unit_of_measurement": "V",
         "suggested_display_precision": 3,
         "icon": "mdi:cog"
     },
     {
-        "name": "Min Pack Voltage",
-        "value_template_key": "min_pack_voltage",
+        "name": "Pack Voltage Range Min (Setting)",
+        "value_template_key": "pack_voltage_setting_min",
         "device_class": "voltage",
         "unit_of_measurement": "V",
         "suggested_display_precision": 2,
         "icon": "mdi:cog"
     },
     {
-        "name": "Max Pack Voltage",
-        "value_template_key": "max_pack_voltage",
+        "name": "Pack Voltage Range Max (Setting)",
+        "value_template_key": "pack_voltage_setting_max",
         "device_class": "voltage",
         "unit_of_measurement": "V",
         "suggested_display_precision": 2,
@@ -70,7 +70,7 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:chart-line"
     },
     {
-        "name": "Lowest Cell",
+        "name": "Lowest Cell No.",
         "value_template_key": "lowest_cell",
         "icon": "mdi:numeric"
     },
@@ -84,7 +84,7 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:arrow-down-thin"
     },
     {
-        "name": "Highest Cell",
+        "name": "Highest Cell No.",
         "value_template_key": "highest_cell",
         "icon": "mdi:numeric"
     },
@@ -125,7 +125,7 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:thermometer"
     },
     {
-        "name": "Components Temperature",
+        "name": "MOSFET Temperature",
         "value_template_key": "components_temperature",
         "device_class": "temperature",
         "state_class": "measurement",
@@ -134,7 +134,7 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:thermometer"
     },
     {
-        "name": "Dis-/Charge Current",
+        "name": "Current (0 when idle)",
         "value_template_key": "dis_charge_current",
         "invert_value": True,
         "device_class": "current",
@@ -144,7 +144,7 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:current-dc"
     },
     {
-        "name": "Dis-/Charge Power",
+        "name": "Power (calculated)",
         "value_template_key": "dis_charge_power",
         "invert_value": True,
         "device_class": "power",
@@ -154,7 +154,7 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:flash"
     },
     {
-        "name": "Total Pack Voltage",
+        "name": "Pack Voltage",
         "value_template_key": "total_pack_voltage",
         "device_class": "voltage",
         "state_class": "measurement",
@@ -163,22 +163,22 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:server"
     },
     {
-        "name": "Rated Capacity",
+        "name": "Rated Capacity (Setting)",
         "value_template_key": "rated_capacity",
         "unit_of_measurement": "Ah",
         "suggested_display_precision": 2,
         "icon": "mdi:battery"
     },
     {
-        "name": "Battery Capacity",
-        "value_template_key": "battery_capacity",
+        "name": "Full Capacity",
+        "value_template_key": "full_capacity",
         "unit_of_measurement": "Ah",
         "state_class": "measurement",
         "suggested_display_precision": 2,
         "icon": "mdi:battery"
     },
     {
-        "name": "Residual Capacity",
+        "name": "Remaining Capacity",
         "value_template_key": "residual_capacity",
         "state_class": "measurement",
         "unit_of_measurement": "Ah",
@@ -195,29 +195,128 @@ TELEMETRY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:battery"
     },
     {
-        "name": "Charging Cycles",
+        "name": "Cycle Count",
         "value_template_key": "charging_cycles",
         "unit_of_measurement": "cycles",
         "state_class": "total_increasing",
         "icon": "mdi:counter"
     },
     {
-        "name": "State of Health",
-        "value_template_key": "state_of_health",
-        "state_class": "measurement",
-        "unit_of_measurement": "%",
-        "suggested_display_precision": 1,
-        "icon": "mdi:battery-heart"
-    },
-    {
-        "name": "Port Voltage",
+        "name": "Port Voltage (P+/P-)",
         "value_template_key": "port_voltage",
         "device_class": "voltage",
         "state_class": "measurement",
         "unit_of_measurement": "V",
         "suggested_display_precision": 2,
         "icon": "mdi:flash-triangle"
+    },
+    # "Reserved" fields of the telemetry frame, raw values (meaning not confirmed)
+    {
+        "name": "Reserved 1 (Current Ch. B raw)",
+        "value_template_key": "reserved_1",
+        "state_class": "measurement",
+        "icon": "mdi:help-circle-outline",
+        "entity_category": "diagnostic"
+    },
+    {
+        "name": "Reserved 2 (Current Ch. A raw, idle)",
+        "value_template_key": "reserved_2",
+        "state_class": "measurement",
+        "icon": "mdi:help-circle-outline",
+        "entity_category": "diagnostic"
+    },
+    {
+        "name": "Reserved 3 (Cumulative raw)",
+        "value_template_key": "reserved_3",
+        "state_class": "measurement",
+        "icon": "mdi:help-circle-outline",
+        "entity_category": "diagnostic"
+    },
+    {
+        "name": "Reserved 4 (Cumulative raw)",
+        "value_template_key": "reserved_4",
+        "state_class": "measurement",
+        "icon": "mdi:help-circle-outline",
+        "entity_category": "diagnostic"
     }
+]
+
+# Extended status from the intra-pack record (CID2 0x5A, RS485-1/2 only), published under "status"
+STATUS_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
+    {
+        "name": "Current (incl. idle)",
+        "value_template_key": "dis_charge_current_unfiltered",
+        "invert_value": True,
+        "device_class": "current",
+        "state_class": "measurement",
+        "unit_of_measurement": "A",
+        "suggested_display_precision": 2,
+        "icon": "mdi:current-dc"
+    },
+    {
+        "name": "Highest Cell Temperature",
+        "value_template_key": "highest_cell_temperature",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C",
+        "suggested_display_precision": 1,
+        "icon": "mdi:thermometer-chevron-up"
+    },
+    {
+        "name": "Lowest Cell Temperature",
+        "value_template_key": "lowest_cell_temperature",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C",
+        "suggested_display_precision": 1,
+        "icon": "mdi:thermometer-chevron-down"
+    }
+]
+
+STATUS_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
+    {"name": "Balancing Active", "value_template_key": "balancing_active", "device_class": "running", "entity_category": "diagnostic"},
+    {"name": "Balancing Not Running (Blocked / Not Needed)", "value_template_key": "balancing_blocked", "entity_category": "diagnostic"},
+    {"name": "Balancing Time Limit Reached", "value_template_key": "balancing_time_limit", "device_class": "problem", "entity_category": "diagnostic"},
+    {"name": "Balancing Blocked (Temperature)", "value_template_key": "balancing_temperature_blocked", "device_class": "problem", "entity_category": "diagnostic"},
+    {"name": "Charge Blocked (Charge MOSFET Off Request)", "value_template_key": "charge_forbidden", "device_class": "problem", "entity_category": "diagnostic"}
+]
+
+# System values from the master via Modbus 0x1000 (CAN port RS485 bus only), topic <topic>/system/sensors
+SYSTEM_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
+    {"name": "System State (as reported to inverter)", "key": "system_state", "icon": "mdi:information-outline"},
+    {"name": "System Voltage", "key": "system_voltage", "device_class": "voltage", "state_class": "measurement", "unit": "V", "precision": 1},
+    {"name": "System Current", "key": "system_current", "device_class": "current", "state_class": "measurement", "unit": "A", "precision": 1, "invert": True},
+    {"name": "System SOC", "key": "system_soc", "device_class": "battery", "state_class": "measurement", "unit": "%"},
+    {"name": "Total Capacity", "key": "total_capacity", "unit": "Ah", "icon": "mdi:battery"},
+    {"name": "Charge Voltage Limit", "key": "charge_voltage_limit", "device_class": "voltage", "state_class": "measurement", "unit": "V", "precision": 1},
+    {"name": "Charge Current Limit", "key": "charge_current_limit", "device_class": "current", "state_class": "measurement", "unit": "A", "precision": 1},
+    {"name": "Discharge Current Limit", "key": "discharge_current_limit", "device_class": "current", "state_class": "measurement", "unit": "A", "precision": 1},
+    {"name": "Discharge Voltage Limit", "key": "discharge_voltage_limit", "device_class": "voltage", "state_class": "measurement", "unit": "V", "precision": 1},
+    {"name": "Highest Cell Voltage", "key": "highest_cell_voltage", "device_class": "voltage", "state_class": "measurement", "unit": "V", "precision": 3},
+    {"name": "Highest Cell Voltage Pack", "key": "highest_cell_voltage_pack", "icon": "mdi:numeric"},
+    {"name": "Lowest Cell Voltage", "key": "lowest_cell_voltage", "device_class": "voltage", "state_class": "measurement", "unit": "V", "precision": 3},
+    {"name": "Lowest Cell Voltage Pack", "key": "lowest_cell_voltage_pack", "icon": "mdi:numeric"},
+    {"name": "Highest Cell Temperature", "key": "highest_cell_temperature", "device_class": "temperature", "state_class": "measurement", "unit": "°C", "precision": 1},
+    {"name": "Highest Cell Temperature Pack", "key": "highest_cell_temperature_pack", "icon": "mdi:numeric"},
+    {"name": "Lowest Cell Temperature", "key": "lowest_cell_temperature", "device_class": "temperature", "state_class": "measurement", "unit": "°C", "precision": 1},
+    {"name": "Lowest Cell Temperature Pack", "key": "lowest_cell_temperature_pack", "icon": "mdi:numeric"},
+    {"name": "Alarm Word Current/Voltage", "key": "alarm_word_current_voltage", "icon": "mdi:alert-outline", "entity_category": "diagnostic"},
+    {"name": "Alarm Word Temperature/Misc", "key": "alarm_word_temperature_misc", "icon": "mdi:alert-outline", "entity_category": "diagnostic"}
+]
+
+SYSTEM_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
+    {"name": "Charge Allowed", "key": "charge_allowed", "device_class": "power"},
+    {"name": "Discharge Allowed", "key": "discharge_allowed", "device_class": "power"},
+    {"name": "Pack Communication Fault", "key": "pack_communication_fault", "device_class": "problem"}
+]
+
+# Static device info sensors (CID2 0x51 / 0xA2), published under "info"
+INFO_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
+    {"name": "Device Name", "value_template_key": "device_name", "icon": "mdi:information-outline"},
+    {"name": "Firmware Version", "value_template_key": "firmware_version", "icon": "mdi:chip"},
+    {"name": "Firmware Patch (derived)", "value_template_key": "firmware_patch", "icon": "mdi:chip"},
+    {"name": "CAN Protocol", "value_template_key": "can_protocol", "icon": "mdi:swap-horizontal"},
+    {"name": "Serial Number", "value_template_key": "serial_number", "icon": "mdi:barcode"}
 ]
 
 # Telesignalization sensor templates
@@ -245,7 +344,7 @@ TELESIGNALIZATION_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "icon": "mdi:thermometer-alert"
     },
     {
-        "name": "Alarm Component Temp.",
+        "name": "Alarm MOSFET Temp.",
         "value_template_key": "component_temperature_alarm",
         "icon": "mdi:thermometer-alert"
     },
@@ -275,7 +374,7 @@ TELESIGNALIZATION_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "entity_category": "diagnostic"
     },
     {
-        "name": "Cell Voltage Low",
+        "name": "Cell Undervoltage",
         "value_template_key": "cell_voltage_low",
         "icon": "mdi:flash-alert",
         "entity_category": "diagnostic"
@@ -288,7 +387,7 @@ TELESIGNALIZATION_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "entity_category": "diagnostic"
     },
     {
-        "name": "Pack Voltage Low",
+        "name": "Pack Undervoltage",
         "value_template_key": "pack_voltage_low",
         "icon": "mdi:flash-alert",
         "entity_category": "diagnostic"
@@ -334,7 +433,7 @@ TELESIGNALIZATION_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "entity_category": "diagnostic"
     },
     {
-        "name": "Component Temp. High",
+        "name": "MOSFET Temp. High",
         "value_template_key": "component_temperature_high",
         "icon": "mdi:thermometer-alert",
         "entity_category": "diagnostic"
@@ -368,7 +467,7 @@ TELESIGNALIZATION_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
 
     # Warning 6
     {
-        "name": "SoC Low",
+        "name": "Remaining Capacity Low",
         "value_template_key": "soc_low",
         "icon": "mdi:battery-alert-variant-outline",
         "entity_category": "diagnostic"
@@ -404,7 +503,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "Power Switch Failure",
+        "name": "Power Button Failure",
         "value_template_key": "power_switch_failure",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -412,15 +511,15 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "Cell Voltage Difference Sensing Failure",
-        "value_template_key": "cell_voltage_difference_sensing_failure",
+        "name": "Cell Voltage Difference Fault",
+        "value_template_key": "cell_voltage_difference_fault",
         "entity_category": "diagnostic",
         "device_class": "problem",
         "payload_on": "Fault",
         "payload_off": "OK"
     },
     {
-        "name": "Charging Switch Failure",
+        "name": "Charge MOSFET Failure",
         "value_template_key": "charging_switch_failure",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -428,7 +527,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "Discharging Switch Failure",
+        "name": "Discharge MOSFET Failure",
         "value_template_key": "discharging_switch_failure",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -436,7 +535,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "Current Limit Switch Failure",
+        "name": "Current Limiter Failure",
         "value_template_key": "current_limit_switch_failure",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -446,15 +545,15 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
 
     # Warning 4
     {
-        "name": "Low Temp. Heating",
+        "name": "Cell Heating Requested",
         "value_template_key": "low_temperature_heating",
         "entity_category": "diagnostic",
-        "device_class": "problem"
+        "device_class": "heat"
     },
 
     # Warning 6
     {
-        "name": "Charging High Voltage Protection",
+        "name": "Charger Overvoltage Protection",
         "value_template_key": "charging_high_voltage_protection",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -462,15 +561,14 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "Intermittent Power Supplement",
+        "name": "Charging Paused (Intermittent Charge)",
         "value_template_key": "intermittent_power_supplement",
         "entity_category": "diagnostic",
-        "device_class": "problem",
         "payload_on": "Warning",
         "payload_off": "OK"
     },
     {
-        "name": "Cell Low Volt. Forb. Charg.",
+        "name": "Charging Blocked (Cell < Min.)",
         "value_template_key": "cell_low_voltage_forbidden_charging",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -496,7 +594,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
 
     # Warning 7
     {
-        "name": "Auto Charging Wait",
+        "name": "Charge Activation Waiting (Auto)",
         "value_template_key": "auto_charging_wait",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -504,7 +602,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "Manual Charging Wait",
+        "name": "Charge Activation Waiting (Manual)",
         "value_template_key": "manual_charging_wait",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -514,7 +612,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
 
     # Warning 8
     {
-        "name": "EEP Storage Failure",
+        "name": "EEPROM Failure",
         "value_template_key": "eep_storage_failure",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -546,7 +644,7 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
         "payload_off": "OK"
     },
     {
-        "name": "No Calibration Of Null Point",
+        "name": "Current Zero Point Not Calibrated",
         "value_template_key": "no_calibration_of_null_point",
         "entity_category": "diagnostic",
         "device_class": "problem",
@@ -556,25 +654,25 @@ TELESIGNALIZATION_BINARY_SENSOR_TEMPLATES: List[Dict[str, Any]] = [
 
     # Switch status
     {
-        "name": "Discharge Switch",
+        "name": "Discharge MOSFET",
         "value_template_key": "discharge_switch",
         "entity_category": "diagnostic",
         "device_class": "power"
     },
     {
-        "name": "Charge Switch",
+        "name": "Charge MOSFET",
         "value_template_key": "charge_switch",
         "entity_category": "diagnostic",
         "device_class": "power"
     },
     {
-        "name": "Current Limit Switch",
+        "name": "Current Limiter",
         "value_template_key": "current_limit_switch",
         "entity_category": "diagnostic",
         "device_class": "power"
     },
     {
-        "name": "Heating Switch",
+        "name": "Heater",
         "value_template_key": "heating_switch",
         "entity_category": "diagnostic",
         "device_class": "power"
@@ -922,6 +1020,134 @@ class AutoDiscoveryConfig:
 
         self._publish_sensor_config(pack_no, name, value_template_key, sensor)
 
+    def create_info_sensor_config(self, pack_no: int, name: str, value_template_key: str, icon: Optional[str] = None) -> None:
+        """Create and publish a static info sensor (tolerates a missing 'info' block in the payload)."""
+        value_template = (
+            f"{{{{ value_json.get('info', {{}}).get('normal', {{}}).get('{value_template_key}', 'unknown') }}}}"
+        )
+        sensor = self._build_base_entity(
+            pack_no=pack_no,
+            name=name,
+            value_template=value_template,
+            uniq_obj_id=f"seplos_bms_pack_{pack_no}_{value_template_key}",
+        )
+        self._apply_optional_fields(sensor, {"ic": icon, "ent_cat": "diagnostic"})
+        self._publish_sensor_config(pack_no, name, value_template_key, sensor)
+
+    def create_parameter_sensor_config(self, pack_no: int) -> None:
+        """
+        Create one diagnostic sensor carrying all parameters (CID2 0x47) as attributes.
+        State: number of parameters, attributes: name -> value.
+        """
+        name = "Parameters"
+        value_template_key = "parameters"
+        sensor = self._build_base_entity(
+            pack_no=pack_no,
+            name=name,
+            value_template="{{ value_json.get('parameters', {}) | length }}",
+            uniq_obj_id=f"seplos_bms_pack_{pack_no}_{value_template_key}",
+        )
+        self._apply_optional_fields(sensor, {
+            "ic": "mdi:tune-vertical",
+            "ent_cat": "diagnostic",
+            "json_attr_t": f"{self.mqtt_topic}/pack-{pack_no}/sensors",
+            "json_attr_tpl": "{{ value_json.get('parameters', {}) | tojson }}",
+        })
+        self._publish_sensor_config(pack_no, name, value_template_key, sensor)
+
+    def _remove_configs(self, entity_type: str, pack_no: int, keys: List[str]) -> None:
+        """Publish empty retained discovery configs to remove entities."""
+        for key in keys:
+            topic = f"{self.discovery_prefix}/{entity_type}/seplos-mqtt-pack-{pack_no}/{key}/config"
+            try:
+                self.mqtt_client.publish(topic, "", retain=True, qos=1)
+            except Exception as e:
+                logger.error("Failed to remove discovery config %s: %s", topic, e)
+
+    def _system_entity(self, entity_type: str, config: Dict[str, Any], value_template: str) -> Dict[str, Any]:
+        """Build an entity of the system device (values of the master as seen by the inverter)."""
+        key = config["key"]
+        entity = copy.deepcopy(BASE_SENSOR)
+        entity["name"] = config["name"]
+        entity["uniq_id"] = f"seplos_bms_system_{key}"
+        entity["obj_id"] = f"seplos_bms_system_{key}"
+        entity["stat_t"] = f"{self.mqtt_topic}/system/sensors"
+        entity["val_tpl"] = value_template
+        entity["avty"] = [
+            {"t": f"{self.mqtt_topic}/availability"},
+            {"t": f"{self.mqtt_topic}/system/availability"},
+        ]
+        entity["avty_mode"] = "all"
+        if "system" not in self._device_info_published:
+            entity["dev"] = {**DEVICE_BASE_CONFIG, "name": "Seplos BMS System", "ids": "seplos_bms_system", "via_device": "seplos_bms_pack_0"}
+            self._device_info_published.add("system")
+        else:
+            entity["dev"] = {"ids": "seplos_bms_system"}
+        return entity
+
+    def create_system_sensors(self) -> None:
+        """Create the sensors of the system device (Modbus 0x1000 of the master)."""
+        self._device_info_published.discard("system")
+        for config in SYSTEM_SENSOR_TEMPLATES:
+            expr = f"value_json.normal.{config['key']}"
+            if config.get("invert") and self.invert_ha_dis_charge_measurements:
+                template = f"{{{{ ({expr} | float) * -1 }}}}"
+            else:
+                template = f"{{{{ {expr} }}}}"
+            entity = self._system_entity("sensor", config, template)
+            self._apply_optional_fields(entity, {
+                "dev_cla": config.get("device_class"),
+                "stat_cla": config.get("state_class"),
+                "unit_of_meas": config.get("unit"),
+                "sug_dsp_prc": config.get("precision"),
+                "ic": config.get("icon"),
+                "ent_cat": config.get("entity_category"),
+            })
+            self._publish_raw_config("sensor", config["key"], entity)
+        for config in SYSTEM_BINARY_SENSOR_TEMPLATES:
+            entity = self._system_entity("binary_sensor", config, f"{{{{ value_json.binary.{config['key']} }}}}")
+            self._apply_optional_fields(entity, {"dev_cla": config.get("device_class")})
+            self._publish_raw_config("binary_sensor", config["key"], entity)
+
+    def remove_system_sensors(self) -> None:
+        """Remove the system device sensors (when not running on the CAN port RS485 bus)."""
+        for entity_type, templates in (("sensor", SYSTEM_SENSOR_TEMPLATES), ("binary_sensor", SYSTEM_BINARY_SENSOR_TEMPLATES)):
+            for config in templates:
+                self._publish_raw_config(entity_type, config["key"], None)
+
+    def _publish_raw_config(self, entity_type: str, key: str, config: Optional[Dict[str, Any]]) -> None:
+        topic = f"{self.discovery_prefix}/{entity_type}/seplos-mqtt-system/{key}/config"
+        try:
+            self.mqtt_client.publish(topic, json.dumps(config) if config is not None else "", retain=True, qos=1)
+        except Exception as e:
+            logger.error("Failed to publish discovery config %s: %s", topic, e)
+
+    def remove_obsolete_configs(self, pack_no: int) -> None:
+        """
+        Remove retained discovery configs of entities that no longer exist:
+        state of health (firmware always sends 100 %), cell disconnection (always 0) and renamed keys.
+        """
+        topics = [f"{self.discovery_prefix}/sensor/seplos-mqtt-pack-{pack_no}/state_of_health/config"]
+        # renamed keys (old -> new): min/max_cell_voltage -> cell_voltage_setting_min/max,
+        # min/max_pack_voltage -> pack_voltage_setting_min/max, battery_capacity -> full_capacity,
+        # cell_voltage_difference_sensing_failure -> cell_voltage_difference_fault
+        topics += [
+            f"{self.discovery_prefix}/sensor/seplos-mqtt-pack-{pack_no}/{key}/config"
+            for key in ("min_cell_voltage", "max_cell_voltage", "min_pack_voltage", "max_pack_voltage", "battery_capacity")
+        ]
+        topics.append(
+            f"{self.discovery_prefix}/binary_sensor/seplos-mqtt-pack-{pack_no}/cell_voltage_difference_sensing_failure/config"
+        )
+        topics += [
+            f"{self.discovery_prefix}/binary_sensor/seplos-mqtt-pack-{pack_no}/disconnection_cell_{i}/config"
+            for i in range(1, 17)
+        ]
+        for topic in topics:
+            try:
+                self.mqtt_client.publish(topic, "", retain=True, qos=1)
+            except Exception as e:
+                logger.error("Failed to remove obsolete discovery config %s: %s", topic, e)
+
     def create_similar_binary_sensor_config(
         self,
         num_sensors: int,
@@ -990,12 +1216,13 @@ class AutoDiscoveryConfig:
                 icon=icon
             )
 
-    def create_autodiscovery_sensors(self, pack_no: int) -> None:
+    def create_autodiscovery_sensors(self, pack_no: int, pack_bus: bool = True) -> None:
         """
         Create all Home Assistant auto-discovery sensors for a pack.
 
         Args:
             pack_no: Pack number to create sensors for
+            pack_bus: True if connected to RS485-1/2 (extended status and parameters available)
         """
         # Clear device info flag for this pack to ensure it's included in first sensor
         self._device_info_published.discard(pack_no)
@@ -1041,6 +1268,21 @@ class AutoDiscoveryConfig:
         # Create heartbeat sensor
         self.create_heartbeat_sensor_config(pack_no=pack_no)
 
+        # Create static info sensors
+        for config in INFO_SENSOR_TEMPLATES:
+            self.create_info_sensor_config(pack_no=pack_no, **config)
+
+        # Extended status (0x5A) and parameters (0x47): only served on RS485-1/2
+        if pack_bus:
+            for config in STATUS_SENSOR_TEMPLATES:
+                self.create_sensor_config(pack_no=pack_no, value_template_group="status", **config)
+            for config in STATUS_BINARY_SENSOR_TEMPLATES:
+                self.create_binary_sensor_config(pack_no=pack_no, value_template_group="status", **config)
+            self.create_parameter_sensor_config(pack_no=pack_no)
+        else:
+            self._remove_configs("sensor", pack_no, [c["value_template_key"] for c in STATUS_SENSOR_TEMPLATES] + ["parameters"])
+            self._remove_configs("binary_sensor", pack_no, [c["value_template_key"] for c in STATUS_BINARY_SENSOR_TEMPLATES])
+
         ## Telesignalization sensors
 
         # Create Cell voltage warning sensors
@@ -1071,23 +1313,13 @@ class AutoDiscoveryConfig:
             pack_no=pack_no,
             value_template_group="telesignalization",
             base_value_template_key="balancer_cell",
-            base_name="Balancer Cell",
+            base_name="Balancing Cell",
             entity_category="diagnostic",
             device_class="running"
         )
 
-        # Create Disconnection sensors
-        self.create_similar_binary_sensor_config(
-            num_sensors=16,
-            pack_no=pack_no,
-            value_template_group="telesignalization",
-            base_value_template_key="disconnection_cell",
-            base_name="Connection Cell",
-            entity_category="diagnostic",
-            device_class="connectivity",
-            payload_on="OK",
-            payload_off="Warning"
-        )
+        # Remove entities of former versions whose values the firmware never fills
+        self.remove_obsolete_configs(pack_no=pack_no)
 
         # Create telesignalization sensors
         for config in TELESIGNALIZATION_SENSOR_TEMPLATES:
