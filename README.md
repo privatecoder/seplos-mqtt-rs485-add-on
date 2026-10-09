@@ -34,9 +34,15 @@ The BMS has three sockets: CAN, RS485-1 and RS485-2. Besides CAN, the CAN socket
 
 Two common setups:
 1. Single pack: connect directly to RS485-1 or RS485-2 of the pack (19200 baud).
-2. Multiple packs: daisy chain all packs via the RS485 pins of their CAN sockets with splitters (9600 baud, see below). On RS485-1/2 the master is the bus master itself (it polls its slaves) and can't be read reliably, on the CAN socket bus every pack incl. the master answers under its DIP address.
+2. Multiple packs: daisy chain all packs via the RS485 pins of their CAN sockets with splitters (9600 baud, see below). On RS485-1/2 the master is the bus master itself: it polls its slaves (19200 baud) and never answers requests there. On the CAN socket bus every pack incl. the master answers under its DIP address.
 
 Note: the multiple pack wiring only works if your inverter is connected via CAN. The RS485 pins of the master's CAN socket are then free for this bus.
+
+Addresses: set the DIP switches of the master to 0 and of the slaves to 1, 2, 3, … The inverter must be connected to the master, only the master sends CAN. The add-on polls the packs under these addresses.
+
+There are two separate RS485 buses:
+- **Intra-pack bus** (RS485-1/RS485-2 sockets, orange in the wiring sample): master ↔ slaves, 19200 baud. Leave it as it is.
+- **CAN socket bus** (RS485 pins of the CAN sockets, pink in the wiring sample): all packs + your RS485 device, 9600 baud.
 
 ### Wiring the RS485 device to MULTIPLE battery packs
 
@@ -44,9 +50,13 @@ Carefully check the wiring sample (the pink lines). There are two ways to reach 
 1. One custom cable with multiple plugs (recommended).
 2. One or more splitters (easier if you do not want to crimp) – ([this one works for me](https://www.amazon.de/gp/product/B00D3KIQXC)).
 
+The CAN socket carries the RS485 bus twice: pins 1/2/3 and pins 6/7/8 are the same lines (B, A, GND), see the pin assignment below. That is what makes daisy chaining work: one side comes in, the other side goes on.
+
 If you use splitters, the first (**and only the first!**) splitter (connected to the master CAN port) must be modified:
-- One outlet keeps only the three RS485 pins.
-- The other outlet keeps only the two CAN pins.
+- The outlet to the inverter keeps **only the CAN pins 4 and 5**. Otherwise the inverter's own RS485 lines end up on the 9600 baud bus.
+- The other outlet keeps only the RS485 pins (1/2/3 or 6/7/8, both carry the same bus).
+
+The wiring sample below shows three packs with one custom cable; the splitter example uses four packs. Both follow the same scheme.
 
 Example for four packs:
 - Connect the modified splitter to the CAN port of the master (not the RS485 ports).
@@ -78,9 +88,13 @@ Example for four packs:
 
 #### Waveshare pin assignment (RS485 port)
 
-- orange => RS485-A
-- orange-white => RS485-B
-- green-white => GND
+With a regular patch cable (T568B) plugged into the CAN socket (or a splitter outlet) of the last pack, use either pin group – both carry the same bus:
+
+| Signal | pins 1/2/3 | pins 6/7/8 (as in the wiring sample) |
+|---|---|---|
+| RS485-A | pin 2, orange | pin 7, brown-white |
+| RS485-B | pin 1, orange-white | pin 8, brown |
+| GND | pin 3, green-white | pin 6, green |
 
 <img alt="waveshare gateway pinout" src="https://github.com/user-attachments/assets/442e0fee-5ec7-495b-81d7-013c56f1f304" width="100">
 
