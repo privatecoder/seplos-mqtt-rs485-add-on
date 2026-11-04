@@ -46,6 +46,8 @@ class Config:
     # BMS
     min_cell_voltage: float = 2.5
     max_cell_voltage: float = 3.65
+    # nominal cell voltage (manual): only for the calculated full energy
+    nominal_cell_voltage: float = 3.2
     number_of_packs: int = 1
     # Serial
     serial_interface: str = "/tmp/vcom0"
@@ -90,6 +92,7 @@ class Config:
         return cls(
             min_cell_voltage=_env(env, "MIN_CELL_VOLTAGE", d.min_cell_voltage, float),
             max_cell_voltage=_env(env, "MAX_CELL_VOLTAGE", d.max_cell_voltage, float),
+            nominal_cell_voltage=_env(env, "NOMINAL_CELL_VOLTAGE", d.nominal_cell_voltage, float),
             number_of_packs=_env(env, "NUMBER_OF_PACKS", d.number_of_packs, int),
             serial_interface=_env(env, "SERIAL_INTERFACE", d.serial_interface, str),
             serial_baudrate=_baudrate(env.get("SERIAL_BAUDRATE")),
@@ -113,6 +116,8 @@ class Config:
             problems.append(f"number_of_packs {self.number_of_packs} (1-16)")
         if not 0 < self.min_cell_voltage < self.max_cell_voltage <= 5:
             problems.append(f"cell voltage range {self.min_cell_voltage}-{self.max_cell_voltage} V")
+        if not 0 < self.nominal_cell_voltage <= 5:
+            problems.append(f"nominal cell voltage {self.nominal_cell_voltage} V")
         if not 1 <= self.mqtt_port <= 65535:
             problems.append(f"mqtt_port {self.mqtt_port}")
         if self.mqtt_update_interval < 0:

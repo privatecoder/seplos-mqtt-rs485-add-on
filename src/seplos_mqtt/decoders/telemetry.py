@@ -48,7 +48,14 @@ def _value(raw: bytes, offset: int, scale: float, rounding: int | None, bias: in
     return round(value, rounding) if rounding is not None else value
 
 
-def decode(info: bytes, min_cell_voltage: float, max_cell_voltage: float) -> dict:
+def full_energy(capacity_ah: float | None, series_cells: int | None, nominal_cell_voltage: float | None) -> float | None:
+    """Full energy in kWh from a capacity in Ah, the series cell count and the nominal cell voltage."""
+    if capacity_ah is None or not series_cells or not nominal_cell_voltage:
+        return None
+    return round(capacity_ah * series_cells * nominal_cell_voltage / 1000, 2)
+
+
+def decode(info: bytes, min_cell_voltage: float, max_cell_voltage: float, nominal_cell_voltage: float | None = None) -> dict:
     """Decode the 0x42 INFO into {"normal": {...}} incl. calculated values."""
     cell_count = info[2]
     base = CELL_OFFSET + 2 * cell_count
@@ -89,5 +96,7 @@ def decode(info: bytes, min_cell_voltage: float, max_cell_voltage: float) -> dic
         "highest_cell_temperature": max(temps),
         "lowest_cell_temperature": min(temps),
         "delta_cell_temperature": round(max(temps) - min(temps), 1),
+        # learned full capacity x series cells x configured nominal cell voltage, kWh
+        "full_energy": full_energy(feedback["full_capacity"], cell_count, nominal_cell_voltage),
     })
     return {"normal": feedback}
