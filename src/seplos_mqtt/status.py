@@ -1,0 +1,68 @@
+"""Status snapshot for the settings app: a plain, JSON-ready dict built by the main loop thread.
+
+The web thread only reads the finished dict (one attribute assignment hands it over), so it never
+touches the bus, the packs or any mutable polling state.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+# fields of the last pack data (decoder keys, canonical values: the HA inversion is not applied)
+_PACK_VALUES = ("state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage")
+_SYSTEM_VALUES = ("system_soc", "system_voltage", "system_current", "system_power", "total_capacity", "total_full_energy", "system_state")
+
+
+def _normal(data: dict | None, group: str | None = None) -> dict:
+    """The ``normal`` values of a group of the pack data (or of the system data when group is None)."""
+    if not isinstance(data, dict):
+        return {}
+    section = data if group is None else data.get(group)
+    normal = section.get("normal") if isinstance(section, dict) else None
+    return normal if isinstance(normal, dict) else {}
+
+
+def _maint(pack: Any) -> str:
+    if pack.maint is None:
+        return "disabled"
+    # unknown / unsupported (the MAINT query was inconclusive) count as not yet determined
+    return pack.maint.state if pack.maint.state in ("present", "absent") else "pending"
+
+
+def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
+    pack = pack_state.pack
+    info = _normal(pack.info) if pack.info else {}
+    values = _normal(pack_state.last_data, "telemetry")
+    age = None if pack_state.last_success is None else round(max(0.0, now_mono - pack_state.last_success), 1)
+    return {
+        "address": pack_state.address,
+        "availability": pack_state.availability,
+        "last_success_age_s": age,
+        "device_name": info.get("device_name"),
+        "firmware_version": info.get("firmware_version"),
+        "firmware_patch": info.get("firmware_patch"),
+        "cell_count": pack.cell_count,
+        "maint": _maint(pack),
+        **{key: values.get(key) for key in _PACK_VALUES},
+    }
+
+
+def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
+    """Snapshot of the running add-on. Missing values are None."""
+    multi = state.config.multi_pack
+    if state.bridge is None:
+        bridge = "none"
+    else:
+        bridge = "alive" if state.bridge.alive() else "dead"
+    system = None
+    if multi and state.system_data is not None:
+        values = _normal(state.system_data)
+        system = {key: values.get(key) for key in _SYSTEM_VALUES}
+    return {
+        "generated_at": now_wall,
+        "mode": "multi" if multi else "single",
+        "mqtt_connected": bool(state.mqtt is not None and state.mqtt.is_connected()),
+        "bridge": bridge,
+        "last_cycle_s": round(state.last_cycle, 1) if state.last_cycle else None,
+        "packs": [_pack_status(p, now_mono) for p in state.packs],
+        "system": system,
+    }

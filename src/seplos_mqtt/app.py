@@ -21,12 +21,14 @@ from .config import Config, ConfigError
 from .decoders import telemetry
 from .decoders.identity import device_firmware
 from .discovery import Discovery
+from .jobs import JobQueue, step_detect
 from .monitoring.migration import load_or_migrate
 from .monitoring.model import ConfigValidationError
 from .monitoring.store import JsonStore
 from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
 from .state import StateStore
+from .status import build_status
 from .system import SystemReader
 from .transport import SerialBus
 
@@ -51,6 +53,7 @@ class PackState:
     publish_counter: int = 0
     availability: str = "offline"
     firmware_reported: int = 0          # info_revision of the pack shown in the HA device info
+    last_data: dict | None = None       # data of the last successful poll (for the status snapshot)
 
 
 @dataclass
@@ -74,6 +77,9 @@ class AppState:
     restart_event: threading.Event = field(default_factory=threading.Event)
     restart_reason: str | None = None
     bridge_dead_since: float | None = None   # monotonic time socat was first seen dead
+    system_data: dict | None = None   # last system values (multi pack mode)
+    status: dict | None = None        # snapshot for the web thread (replaced as a whole, never mutated)
+    jobs: Any = None                  # JobQueue: submitted by the web thread, run by the main loop
 
     def request_restart(self, _config: Any = None, reason: str = "connection") -> None:
         """A clean process restart is wanted ("connection": a saved change, called from the web
@@ -213,6 +219,7 @@ def publish_system_data(state: AppState, reader: SystemReader) -> None:
         cells = next((p.pack.cell_count for p in state.packs if p.pack.cell_count), None)
         data["normal"]["total_full_energy"] = telemetry.full_energy(
             data["normal"].get("total_capacity"), cells, state.config.nominal_cell_voltage)
+        state.system_data = data
     base = state.config.mqtt_topic
     state.publisher.publish(topics.system_availability(base), "online" if data is not None else "offline")
     if data is not None and state.publisher.state(topics.system_sensors(base), data):
@@ -245,6 +252,7 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
         pack_state.firmware_reported = pack_state.pack.info_revision
 
     if data is not None:
+        pack_state.last_data = data
         if state.publisher.state(topics.pack_sensors(base, address), data):
             logger.info("Pack%s:Publishing updated data to MQTT", address)
         else:
@@ -253,6 +261,31 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
     for other in state.packs:
         publish_pack_availability(state, other, now)
     state.publisher.publish(topics.availability(base), "online")
+
+
+def update_status(state: AppState) -> None:
+    """Rebuild the snapshot the web thread reads; a defect here must never stop the polling."""
+    try:
+        state.status = build_status(state, time.monotonic(), timeutil.now_iso())
+    except Exception:
+        logger.exception("Could not build the status snapshot")
+
+
+def run_job(state: AppState, job: Any) -> None:
+    """One step of a job from the web thread, on the bus in the main loop thread (never during a
+    poll). A job spreads over loop iterations; the core polling keeps going in between."""
+    jobs = state.jobs
+    try:
+        if job.kind == "detect":
+            if job.scan is None:
+                logger.info("Running job %s (%s)", job.id, job.kind)
+            if step_detect(state.bus, job):
+                jobs.complete(job, job.scan.final, result=job.scan.result())
+        else:
+            jobs.complete(job, "failed", error="unknown_job_kind")
+    except Exception:
+        logger.exception("Job %s failed", job.id)
+        jobs.complete(job, "failed", error="job_failed")
 
 
 def graceful_exit(state: AppState) -> None:
@@ -360,7 +393,11 @@ def start_web(state: AppState, store: JsonStore, port: str) -> None:
     try:
         from .web.server import WebApp, WebSettings, WebThread
 
-        web = WebThread(WebApp(WebSettings(port=int(port)), store, on_connection_saved=state.request_restart))
+        web_app = WebApp(
+            WebSettings(port=int(port)), store, on_connection_saved=state.request_restart,
+            status_provider=lambda: state.status, jobs=state.jobs,
+        )
+        web = WebThread(web_app)
         bound = web.start()
     except Exception as e:
         logger.error("Settings app could not be started: %s", e)
@@ -379,6 +416,7 @@ def main(config: Config | None = None) -> None:
     logger.debug("Configuration loaded: %s", config.loggable())
 
     state = AppState(config=config)
+    state.jobs = JobQueue()
     signal.signal(signal.SIGTERM, _raise_exit)
     signal.signal(signal.SIGINT, _raise_exit)
 
@@ -433,13 +471,20 @@ def main(config: Config | None = None) -> None:
                     resync(state)
                 refresh_states(state)
                 retry_discovery(state)
+                job = state.jobs.current()
+                if job is not None:
+                    run_job(state, job)       # at most one probe per iteration, same thread as the polling
+                    if state.restart_event.is_set():
+                        raise RestartRequested    # no further probe and no further poll
                 poll_pack(state, state.packs[index])
+                update_status(state)
                 index += 1
                 if index >= len(state.packs):
                     index = 0
                     publish_system_data(state, system_reader)
                     now = time.monotonic()
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
+                    update_status(state)
                     if config.mqtt_update_interval > 0:
                         logger.info("Waiting %s seconds before next cycle", config.mqtt_update_interval)
                         if wait_or_restart(state, config.mqtt_update_interval):
@@ -465,6 +510,8 @@ def main(config: Config | None = None) -> None:
             except Exception as e:
                 logger.error("Stopping the settings app failed: %s", e)
                 web_stopped = False
+        # an interrupted job keeps its partial result (the web server no longer accepts new ones)
+        state.jobs.abort_active("restarting" if restart else "shutting_down")
         try:
             graceful_exit(state)
         except Exception as e:

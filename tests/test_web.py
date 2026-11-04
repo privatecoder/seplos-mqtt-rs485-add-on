@@ -484,6 +484,165 @@ def _get_json(url, headers=None):
         return json.load(res)
 
 
+# ---------------------------------------------------------------- jobs
+
+
+async def post(client, path, body=None, *, csrf=True, user=True, content_type="application/json", raw=None):
+    headers = dict(USER) if user else {}
+    if csrf:
+        headers["X-CSRF-Token"] = await csrf_of(client)
+    headers["Content-Type"] = content_type
+    data = raw if raw is not None else json.dumps({} if body is None else body)
+    return await client.post(path, data=data, headers=headers)
+
+
+async def key_of(res):
+    return (await res.json())["error"]["key"]
+
+
+def job_app(tmp_path, jobs="queue"):
+    from seplos_mqtt.jobs import JobQueue
+
+    queue = JobQueue() if jobs == "queue" else None
+    return WebApp(LOCAL, make_store(tmp_path), jobs=queue), queue
+
+
+def test_detect_job_gate(tmp_path):
+    app, queue = job_app(tmp_path)
+
+    async def scenario(client):
+        res = await post(client, "/api/jobs/detect", user=False, csrf=False)
+        assert (res.status, await key_of(res)) == (403, "identity_required")
+        res = await client.post(
+            "/api/jobs/detect", data="{}", headers={**USER, "X-CSRF-Token": "wrong", "Content-Type": "application/json"}
+        )
+        assert (res.status, await key_of(res)) == (403, "csrf_invalid")
+        res = await post(client, "/api/jobs/detect", content_type="text/plain")
+        assert (res.status, await key_of(res)) == (415, "json_required")
+        res = await post(client, "/api/jobs/detect", raw="{nope")
+        assert (res.status, await key_of(res)) == (400, "invalid_json")
+        res = await post(client, "/api/jobs/detect", {"addresses": [1]})
+        assert (res.status, await key_of(res)) == (400, "invalid_request")
+        res = await post(client, "/api/jobs/detect", raw="[]")
+        assert (res.status, await key_of(res)) == (400, "invalid_request")
+
+    run_with(app, scenario)
+    assert queue.take() is None                 # nothing was submitted
+
+
+def test_detect_job_lifecycle(tmp_path):
+    app, queue = job_app(tmp_path)
+
+    async def scenario(client):
+        res = await post(client, "/api/jobs/detect")
+        body = await res.json()
+        assert res.status == 202
+        job = body["job"]
+        assert job["kind"] == "detect" and job["state"] == "queued" and len(job["id"]) == 32
+        assert res.headers["Cache-Control"] == "no-store"
+        # a second one while the first is queued
+        res = await post(client, "/api/jobs/detect")
+        assert (res.status, await key_of(res)) == (409, "job_busy")
+        # reading needs no identity
+        res = await client.get(f"/api/jobs/{job['id']}")
+        assert res.status == 200 and (await res.json())["job"]["state"] == "queued"
+        # what the main loop thread does
+        taken = queue.take()
+        queue.complete(taken, "done", result={"responding": []})
+        res = await client.get(f"/api/jobs/{job['id']}")
+        done = (await res.json())["job"]
+        assert done["state"] == "done" and done["result"] == {"responding": []}
+        # busy is over, a new one is accepted
+        res = await post(client, "/api/jobs/detect")
+        assert res.status == 202
+
+    run_with(app, scenario)
+
+
+def test_job_ids_must_be_known_and_well_formed(tmp_path):
+    app, _ = job_app(tmp_path)
+
+    async def scenario(client):
+        for job_id in ("0" * 32, "x" * 32, "ABCDEF" + "0" * 26, "abc", "0" * 33):
+            res = await client.get(f"/api/jobs/{job_id}")
+            assert (res.status, await key_of(res)) == (404, "unknown_job"), job_id
+            res = await post(client, f"/api/jobs/{job_id}/cancel")
+            assert (res.status, await key_of(res)) == (404, "unknown_job"), job_id
+
+    run_with(app, scenario)
+
+
+def test_cancel_job(tmp_path):
+    app, queue = job_app(tmp_path)
+
+    async def scenario(client):
+        job = (await (await post(client, "/api/jobs/detect")).json())["job"]
+        # identity / CSRF are required
+        res = await post(client, f"/api/jobs/{job['id']}/cancel", user=False, csrf=False)
+        assert (res.status, await key_of(res)) == (403, "identity_required")
+        res = await client.post(
+            f"/api/jobs/{job['id']}/cancel", data="{}",
+            headers={**USER, "X-CSRF-Token": "wrong", "Content-Type": "application/json"},
+        )
+        assert (res.status, await key_of(res)) == (403, "csrf_invalid")
+        assert queue.get(job["id"]).state == "queued"
+        res = await post(client, f"/api/jobs/{job['id']}/cancel")
+        assert res.status == 200 and (await res.json())["job"]["state"] == "cancelled"
+        # cancelling again is harmless
+        res = await post(client, f"/api/jobs/{job['id']}/cancel")
+        assert res.status == 200 and (await res.json())["job"]["state"] == "cancelled"
+        # a running job is only asked to stop
+        again = (await (await post(client, "/api/jobs/detect")).json())["job"]
+        running = queue.take()
+        res = await post(client, f"/api/jobs/{again['id']}/cancel")
+        assert (await res.json())["job"]["state"] == "running"
+        assert running.cancel_requested
+
+    run_with(app, scenario)
+
+
+def test_job_routes_without_a_queue(tmp_path):
+    app, _ = job_app(tmp_path, jobs=None)
+
+    async def scenario(client):
+        res = await post(client, "/api/jobs/detect")
+        assert (res.status, await key_of(res)) == (503, "jobs_unavailable")
+        res = await client.get("/api/jobs/" + "0" * 32)
+        assert (res.status, await key_of(res)) == (503, "jobs_unavailable")
+        res = await post(client, "/api/jobs/" + "0" * 32 + "/cancel")
+        assert (res.status, await key_of(res)) == (503, "jobs_unavailable")
+        res = await post(client, "/api/jobs/detect", user=False, csrf=False)      # the gate still comes first
+        assert (res.status, await key_of(res)) == (403, "identity_required")
+
+    run_with(app, scenario)
+
+
+def test_detect_is_refused_while_closing(tmp_path):
+    app, queue = job_app(tmp_path)
+    app._closing = True
+
+    async def scenario(client):
+        res = await post(client, "/api/jobs/detect")
+        assert (res.status, await key_of(res)) == (503, "shutting_down")
+
+    run_with(app, scenario)
+    assert queue.take() is None
+
+
+def test_job_routes_from_a_foreign_peer(tmp_path):
+    from seplos_mqtt.jobs import JobQueue
+
+    app = WebApp(WebSettings(host="127.0.0.1", allowed_peers=frozenset({"10.0.0.1"})), make_store(tmp_path), jobs=JobQueue())
+
+    async def scenario(client):
+        res = await post(client, "/api/jobs/detect", csrf=False)       # no token can be fetched from a foreign peer
+        assert (res.status, await key_of(res)) == (403, "forbidden_peer")
+        res = await client.get("/api/status")
+        assert (res.status, await key_of(res)) == (403, "forbidden_peer")
+
+    run_with(app, scenario)
+
+
 def test_get_waits_for_paused_adoption(tmp_path, monkeypatch):
     store = make_store(tmp_path)
     app = WebApp(LOCAL, store)

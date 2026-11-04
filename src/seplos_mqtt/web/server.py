@@ -27,6 +27,7 @@ from typing import Any
 
 from aiohttp import web
 
+from ..jobs import Job, JobBusy, JobQueue
 from ..monitoring.model import ConfigValidationError, MonitoringConfig
 from ..monitoring.store import JsonStore, LoadStatus, StaleRevision, StoreCorrupt
 
@@ -36,7 +37,8 @@ SUPERVISOR_PEER = "172.30.32.2"
 MAX_BODY = 64 * 1024
 
 _REVISION_RE = re.compile(r'^(?:W/)?"?([0-9]{1,12})"?$')
-_STATIC_PART_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_JOB_ID_RE = re.compile(r"[0-9a-f]{32}")
+_STATIC_PART_RE =re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
@@ -88,12 +90,19 @@ class WebApp:
         store: JsonStore,
         *,
         on_connection_saved: Callable[[MonitoringConfig], None] | None = None,
+        status_provider: Callable[[], dict[str, Any] | None] | None = None,
+        jobs: JobQueue | None = None,
     ) -> None:
         """``on_connection_saved`` is called on the web event loop after each successful save, in
-        commit order, and must return quickly (step 1c hands the work to the main thread)."""
+        commit order, and must return quickly (step 1c hands the work to the main thread).
+        ``status_provider`` returns the latest status snapshot (a finished dict, read-only here);
+        ``jobs`` is the queue the main loop thread works off (None: the job routes answer 503).
+        The web thread never touches the serial bus."""
         self.settings = settings
         self.store = store
         self._on_connection_saved = on_connection_saved
+        self._status_provider = status_provider or (lambda: None)
+        self._jobs = jobs
         # serialises PUT /api/connection from the corrupt check through callback and response
         # (binds to the server's loop on first contention)
         self._save_lock = asyncio.Lock()
@@ -114,6 +123,10 @@ class WebApp:
         r.add_get("/api/session", self._session)
         r.add_get("/api/connection", self._get_connection)
         r.add_put("/api/connection", self._put_connection)
+        r.add_get("/api/status", self._get_status)
+        r.add_post("/api/jobs/detect", self._post_detect)
+        r.add_get("/api/jobs/{job_id}", self._get_job)
+        r.add_post("/api/jobs/{job_id}/cancel", self._cancel_job)
         return app
 
     async def start(self) -> int:
@@ -184,8 +197,9 @@ class WebApp:
     def _csrf(self, user: User) -> str:
         return hmac.new(self._secret, user.id.encode(), hashlib.sha256).hexdigest()
 
-    async def _mutation(self, request: web.Request) -> tuple[User, Any, int]:
-        """Common gate of every changing call: user, CSRF, JSON body and revision."""
+    async def _mutation(self, request: web.Request, *, revision: bool = True) -> tuple[User, Any, int]:
+        """Common gate of every changing call: user, CSRF, JSON body and (unless ``revision`` is
+        False, as for jobs) the current revision in ``If-Match``."""
         user = self._user(request)
         if user is None:
             raise ApiError("identity_required", 403)
@@ -200,6 +214,8 @@ class WebApp:
             raise ApiError("invalid_json") from None
         if not _all_finite(body):
             raise ApiError("invalid_number")
+        if not revision:
+            return user, body, 0
         header = request.headers.get("If-Match")
         if header is None:
             raise ApiError("revision_required", 428)
@@ -251,6 +267,51 @@ class WebApp:
         except ConfigValidationError:
             raise ApiError("store_corrupt", 409) from None
         return json_response(self._connection_view(config, revision))
+
+    # -- status and jobs (the web thread only reads snapshots and enqueues jobs) --------------
+
+    async def _get_status(self, request: web.Request) -> web.Response:
+        return json_response({"status": self._status_provider()})
+
+    def _job_queue(self) -> JobQueue:
+        if self._jobs is None:
+            raise ApiError("jobs_unavailable", 503)
+        return self._jobs
+
+    async def _job_gate(self, request: web.Request) -> JobQueue:
+        """Identity, CSRF and an empty JSON object as body (jobs carry no parameters, no revision)."""
+        _user, body, _ = await self._mutation(request, revision=False)
+        if body != {}:
+            raise ApiError("invalid_request", field="body")
+        return self._job_queue()
+
+    def _job_of(self, request: web.Request) -> tuple[JobQueue, Job]:
+        queue = self._job_queue()
+        job_id = request.match_info["job_id"]
+        job = queue.get(job_id) if _JOB_ID_RE.fullmatch(job_id) else None
+        if job is None:
+            raise ApiError("unknown_job", 404)
+        return queue, job
+
+    async def _post_detect(self, request: web.Request) -> web.Response:
+        queue = await self._job_gate(request)
+        if self._closing:
+            raise ApiError("shutting_down", 503)
+        try:
+            job = queue.submit("detect")
+        except JobBusy:
+            raise ApiError("job_busy", 409) from None
+        return json_response({"job": job.to_dict()}, 202)
+
+    async def _get_job(self, request: web.Request) -> web.Response:
+        _queue, job = self._job_of(request)
+        return json_response({"job": job.to_dict()})
+
+    async def _cancel_job(self, request: web.Request) -> web.Response:
+        queue = await self._job_gate(request)
+        _queue, job = self._job_of(request)
+        queue.cancel(job.id)
+        return json_response({"job": job.to_dict()})
 
     async def _put_connection(self, request: web.Request) -> web.Response:
         _user, body, expected = await self._mutation(request)

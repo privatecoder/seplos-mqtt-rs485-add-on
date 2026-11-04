@@ -228,7 +228,7 @@ class StopLoop(BaseException):
 
 
 # execv calls ((path, argv) tuples) and AppState instances of the last run_main()
-LAST_RUN: dict = {"execs": [], "states": [], "exit": None}   # "exit": SystemExit code, None if none
+LAST_RUN: dict = {"execs": [], "states": [], "exit": None, "job": None}   # "exit": SystemExit code, None if none
 
 
 def run_main(
@@ -244,6 +244,7 @@ def run_main(
     signal_after_polls: int | None = None,
     restart_after_polls: int | None = None,
     startup: bool = False,
+    job_after_polls: int | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -251,6 +252,7 @@ def run_main(
     `restart_after_polls` simulates a saved connection change (AppState.request_restart); the
     execv calls and the AppState instances of the run are left in LAST_RUN. `startup=True` runs
     main() without a config (startup_config(os.environ), bridge): the caller sets the environment.
+    `job_after_polls` submits a "detect" job (like the web thread would); it is left in LAST_RUN["job"].
     """
     from frames import ascii_frame
 
@@ -270,6 +272,8 @@ def run_main(
                 handlers["SIGTERM"](15, None)
             if restart_after_polls is not None and counter["n"] == restart_after_polls + 1:
                 LAST_RUN["states"][0].request_restart()
+            if job_after_polls is not None and counter["n"] == job_after_polls + 1:
+                LAST_RUN["job"] = LAST_RUN["states"][0].jobs.submit("detect")
             if entry is None:
                 return b""
             return entry(req) if callable(entry) else ascii_frame(adr, 0x00, entry)
@@ -298,6 +302,7 @@ def run_main(
     monkeypatch.setattr(app, "wait_or_restart", lambda state, _s: state.restart_event.is_set())
     LAST_RUN["execs"].clear()
     LAST_RUN["states"].clear()
+    LAST_RUN["job"] = None
     monkeypatch.setattr(app, "_execv", lambda path, argv: LAST_RUN["execs"].append((path, argv)))
 
     @dataclasses.dataclass
