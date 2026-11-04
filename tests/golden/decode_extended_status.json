@@ -1,0 +1,18 @@
+{
+  "binary": {
+    "balancing_active": "ON",
+    "balancing_blocked": "OFF",
+    "balancing_temperature_blocked": "OFF",
+    "balancing_time_limit": "OFF",
+    "charge_current_status": "OFF",
+    "charge_forbidden": "ON",
+    "discharge_current_status": "OFF",
+    "external_voltage_detected": "OFF",
+    "limiter_after_charge_overcurrent_warning": "OFF",
+    "limiter_charging_from_10a": "OFF",
+    "precharge_running": "OFF"
+  },
+  "normal": {
+    "dis_charge_current_unfiltered": 0.37
+  }
+}

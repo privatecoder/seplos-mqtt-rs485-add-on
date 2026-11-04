@@ -1,0 +1,17 @@
+{
+  "alarm_event_7": "01",
+  "alarm_event_8": "40",
+  "alarm_events_1_6": "01 02 03 04 05 06",
+  "current": 0.37,
+  "full_capacity": 280.01,
+  "highest_cell_temperature": 23.4,
+  "highest_cell_voltage": 3.315,
+  "lowest_cell_temperature": 20.0,
+  "lowest_cell_voltage": 3.3,
+  "pack_voltage": 52.93,
+  "port_voltage": 52.9,
+  "residual_capacity": 150.0,
+  "state_of_charge": 53.6,
+  "switch_status": "03",
+  "system_status": "12"
+}

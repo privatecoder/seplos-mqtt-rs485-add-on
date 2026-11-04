@@ -1,0 +1,17 @@
+[project]
+name = "seplos-mqtt-addon"
+version = "0"
+description = "Home Assistant add-on: Seplos V2/V16 BMS via RS485 to MQTT (not a distributable package)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 150
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

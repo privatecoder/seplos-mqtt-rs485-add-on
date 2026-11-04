@@ -5,9 +5,10 @@ This Home Assistant add-on reads one or more Seplos V2/V16 BMS packs over RS485 
 ## What you get
 
 - MQTT telemetry and alarm data per pack (cell voltages and temperatures, current, voltages, capacities, SOC, cycles, protection/alarm states, MOSFET and balancing states)
-- Device info per pack: device name, firmware version, derived firmware patch level, active CAN inverter protocol, serial number (single pack mode)
-- Single pack mode only: extended status (balancing active/blocked, charge blocked request, current incl. idle) and all BMS parameters/function switches as attributes
-- Multiple pack mode only: a "Seplos BMS System" device with the values the master reports to the inverter (charge/discharge voltage and current limits, charge/discharge allowed, system SOC/voltage/current, min/max cell per pack)
+- Device info per pack: device name, firmware version, derived firmware patch level, active CAN inverter protocol, battery and BMS serial number (single pack mode)
+- Single pack mode only: extended status (balancing, charge blocked request, current limiter reasons, precharge, external voltage/charger detected, current incl. idle) and all BMS parameters and named function switches as attributes
+- Multiple pack mode only: a "Seplos BMS System" device with the master's aggregate over all packs via Modbus (charge/discharge voltage and current limits, charge/discharge allowed, force charge requests, system SOC/voltage/current, min/max cell per pack)
+- Packs with 7 to 16 cells
 - Home Assistant MQTT discovery (optional)
 - Per-pack heartbeat and availability
 - Simple /health endpoint for the HA supervisor watchdog
@@ -113,7 +114,7 @@ Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one
 2. Configure your RS485 device.
    - Waveshare example: IP Mode Static, Port 4196, Work Mode TCP Server, Transfer Protocol None.
    - Baud rate: 9600 for multiple packs (RS485 bus on the CAN socket), 19200 for a single pack (RS485-1/2).
-     The add-on derives the baud rate from the number of packs. Firmware 16.04.06 (`..._9600.ehex`) used 9600 baud on RS485-1/2 as well, which the add-on doesn't support for a single pack.
+     With the option `serial_baudrate: auto` (default) the add-on derives the baud rate from the number of packs. Firmware 16.04.06 (`..._9600.ehex`) uses 9600 baud on RS485-1/2 as well: set `serial_baudrate: "9600"` for a single pack with that firmware.
 3. Install the add-on.
 4. Open the add-on configuration and set:
    - RS485 connection (remote IP/port or local serial interface)
@@ -152,9 +153,9 @@ Example log output:
 ## MQTT topics (default prefix: seplos)
 
 - seplos/pack-{n}/sensors: JSON with the groups `telemetry`, `telesignalization`, `info` and (single pack mode only) `status` and `parameters`
-- seplos/pack-{n}/heartbeat: last_publish and publish_counter (JSON)
+- seplos/pack-{n}/heartbeat: last_publish (time of the last successful poll, ISO 8601 with UTC offset) and publish_counter (JSON)
 - seplos/pack-{n}/availability: per-pack online/offline
-- seplos/system/sensors: system values of the master as reported to the inverter (multiple pack mode only)
+- seplos/system/sensors: system aggregate of the master over all packs (multiple pack mode only)
 - seplos/system/availability: system online/offline (multiple pack mode only)
 - seplos/availability: global online/offline
 
@@ -166,7 +167,7 @@ Home Assistant names describe what a value actually does (verified against the B
 
 | Home Assistant name | MQTT key (JSON path) | Seplos protocol doc name / source |
 |---|---|---|
-| Voltage Cell 1-16 | `telemetry.normal.voltage_cell_N` | "Voltage of cell 1..M" (0x42) |
+| Voltage Cell 1-M | `telemetry.normal.voltage_cell_N` | "Voltage of cell 1..M" (0x42), M = cell count (P65) |
 | Cell Temperature 1-4 | `telemetry.normal.cell_temperature_N` | "Cell temperature 1..4" (0x42) |
 | Cell Voltage Range Min (Setting) | `telemetry.normal.cell_voltage_setting_min` | – (add-on setting) |
 | Cell Voltage Range Max (Setting) | `telemetry.normal.cell_voltage_setting_max` | – (add-on setting) |
@@ -178,6 +179,8 @@ Home Assistant names describe what a value actually does (verified against the B
 | Highest Cell No. | `telemetry.normal.highest_cell` | – (calculated from 0x42) |
 | Highest Cell Voltage | `telemetry.normal.highest_cell_voltage` | – (calculated from 0x42) |
 | Delta Cell Voltage | `telemetry.normal.delta_cell_voltage` | – (calculated from 0x42) |
+| Highest Cell Temperature | `telemetry.normal.highest_cell_temperature` | – (maximum of the 4 cell temperatures, 0x42) |
+| Lowest Cell Temperature | `telemetry.normal.lowest_cell_temperature` | – (minimum of the 4 cell temperatures, 0x42) |
 | Delta Cell Temperature | `telemetry.normal.delta_cell_temperature` | – (calculated from 0x42) |
 | Ambient Temperature | `telemetry.normal.ambient_temperature` | "Environment temperature" (0x42) |
 | MOSFET Temperature | `telemetry.normal.components_temperature` | "Power temperature" (0x42), MOSFET/power stage |
@@ -194,9 +197,9 @@ Home Assistant names describe what a value actually does (verified against the B
 | Current Sense Offset | `telemetry.normal.current_offset` | "Reservation" 1 (0x42): reference/offset channel of the current measurement, mA |
 | Energy Charged (total) | `telemetry.normal.energy_charged` | "Reservation" 3 (0x42): charged energy, 0.1 kWh raw |
 | Energy Discharged (total) | `telemetry.normal.energy_discharged` | "Reservation" 4 (0x42): discharged energy, 0.1 kWh raw |
-| Voltage Alarm Cell 1-16 | `telesignalization.normal.cell_voltage_alarm_N` | "Cell 1..M alarm" (0x44) |
+| Voltage Alarm Cell 1-M | `telesignalization.normal.cell_voltage_alarm_N` | "Cell 1..M alarm" (0x44) |
 | Cell Temperature Alarm 1-4 | `telesignalization.normal.cell_temperature_alarm_N` | "Cell temperature alarm 1..4" (0x44) |
-| Balancing Cell 1-16 | `telesignalization.binary.balancer_cell_N` | "Equilibrium state 1/2" (cells 1-8 / 9-16) (0x44) |
+| Balancing Cell 1-M | `telesignalization.binary.balancer_cell_N` | "Equilibrium state 1/2" (cells 1-8 / 9-16) (0x44) |
 | Alarm Cell Voltage | `telesignalization.normal.any_cell_voltage_alarm` | – (any of the cell alarms, 0x44) |
 | Alarm Cell Temperature | `telesignalization.normal.any_cell_temperature_alarm` | – (any of the cell temperature alarms, 0x44) |
 | Alarm Ambient Temp. | `telesignalization.normal.ambient_temperature_alarm` | "Environment temperature alarm" (0x44) |
@@ -229,18 +232,19 @@ Home Assistant names describe what a value actually does (verified against the B
 | Discharge MOSFET Failure | `telesignalization.binary.discharging_switch_failure` | Alarm event 1 bit 6 "Discharge switch fault" (0x44) |
 | Current Limiter Failure | `telesignalization.binary.current_limit_switch_failure` | Alarm event 1 bit 7 "Current limit switch fault" (0x44) |
 | Cell Heating Requested | `telesignalization.binary.low_temperature_heating` | Alarm event 4 bit 6 "Cell low temperature heating" = heating requested (0x44) |
+| Severe Fault (Latched Until Restart) | `telesignalization.binary.severe_fault` | Alarm event 4 bit 7: sensor fault, cell ≥ P4 + 50 mV, cell ≤ P6 − 200 mV or overcurrent beyond P54/P55; stays set until the BMS restarts, only reported with function switch BitGroup3 bit 7 (0x44) |
 | Charger Overvoltage Protection | `telesignalization.binary.charging_high_voltage_protection` | Alarm event 6 bit 0 "Charge high voltage protection" (charger > P18) (0x44) |
-| Charging Paused (Intermittent Charge) | `telesignalization.binary.intermittent_power_supplement` | Alarm event 6 bit 1 "Intermittent recharge waiting" (0x44) |
+| Intermittent Recharge Waiting | `telesignalization.binary.intermittent_power_supplement` | Alarm event 6 bit 1 "Intermittent recharge waiting" (0x44): the pack no longer counts towards the charge capability (CCL); with the OEM soft stop the charge MOSFET stays on |
 | Charging Blocked (Cell < Min.) | `telesignalization.binary.cell_low_voltage_forbidden_charging` | Alarm event 6 bit 4 "Cell low voltage charging prohibition" (cell < P9) (0x44) |
-| Output Reverse Polarity Protection | `telesignalization.binary.output_reverse_polarity_protection` | Alarm event 6 bit 5 "Output reverse polarity protection" (0x44) |
-| Output Connection Failure | `telesignalization.binary.output_connection_failure` | Alarm event 6 bit 6 "Output connection fault" (0x44) |
-| Charge Activation Waiting (Auto) | `telesignalization.binary.auto_charging_wait` | Alarm event 7 bit 4 "Automatic charging waiting" (0x44) |
-| Charge Activation Waiting (Manual) | `telesignalization.binary.manual_charging_wait` | Alarm event 7 bit 5 "Manual charging waiting" (0x44) |
+| Output Connection Failure | `telesignalization.binary.output_connection_failure` | Alarm event 6 bit 6 "Output connection fault" (0x44): GPIO input low for ≥ 5 s; parameter P82 is not used by the firmware |
+| Charge Activation Window Active (Auto) | `telesignalization.binary.auto_charging_wait` | Alarm event 7 bit 4 "Automatic charging waiting" (0x44): a P72-minute window is running in which undervoltage/empty protections are cleared so a charger can charge |
+| Charge Activation Window Active (Manual) | `telesignalization.binary.manual_charging_wait` | Alarm event 7 bit 5 "Manual charging waiting" (0x44), once after power-on |
 | EEPROM Failure | `telesignalization.binary.eep_storage_failure` | Alarm event 8 bit 0 "EEP storage fault" (0x44) |
 | RTC Clock Failure | `telesignalization.binary.rtc_clock_failure` | Alarm event 8 bit 1 "RTC error" (0x44) |
 | No Calibration Of Voltage | `telesignalization.binary.no_calibration_of_voltage` | Alarm event 8 bit 2 "Voltage calibration not performed" (0x44) |
 | No Calibration Of Current | `telesignalization.binary.no_calibration_of_current` | Alarm event 8 bit 3 "Current calibration not performed" (0x44) |
 | Current Zero Point Not Calibrated | `telesignalization.binary.no_calibration_of_null_point` | Alarm event 8 bit 4 "Zero calibration not performed" (0x44) |
+| RTC Time Invalid | `telesignalization.binary.rtc_time_invalid` | Alarm event 8 bit 5: the RTC lost its time (RTC register 2 bit 7) (0x44) |
 | Discharge MOSFET | `telesignalization.binary.discharge_switch` | On-off state bit 0 "Discharge switch state" (0x44) |
 | Charge MOSFET | `telesignalization.binary.charge_switch` | On-off state bit 1 "Charge switch state" (0x44) |
 | Current Limiter | `telesignalization.binary.current_limit_switch` | On-off state bit 2 "Current limit switch state" (0x44) |
@@ -249,21 +253,28 @@ Home Assistant names describe what a value actually does (verified against the B
 | Firmware Version | `info.normal.firmware_version` | software version (0x51 bytes 10-11) |
 | Firmware Patch (derived) | `info.normal.firmware_patch` | – (derived from features, see firmware analysis) |
 | CAN Protocol | `info.normal.can_protocol` | manufacturer name field = active CAN protocol (0x51 bytes 12-31) |
-| Serial Number | `info.normal.serial_number` | – undocumented CID2 0xA2 (RS485-1/2 only) |
+| Battery Serial Number | `info.normal.serial_number` | string 1 (CID2 0xA2, RS485-1/2 only) |
+| BMS Serial Number | `info.normal.bms_serial_number` | string 2 (CID2 0xA4, RS485-1/2 only) |
+| BMS Clock Offset | `clock.normal.clock_offset` (s, BMS minus host local time), attribute `bms_time` | CID2 0x4D (RS485-1/2; on the CAN port only with MAINT), every 10 min. The BMS clock has no time zone; it's compared with the add-on's local time |
+| Last Successful Poll | heartbeat `last_publish` | – (time of the last successful poll, also when no value changed) |
 | Current (incl. idle) | `status.normal.dis_charge_current_unfiltered` | intra-pack record current (undocumented CID2 0x5A) |
-| Highest Cell Temperature | `status.normal.highest_cell_temperature` | intra-pack record (0x5A) |
-| Lowest Cell Temperature | `status.normal.lowest_cell_temperature` | intra-pack record (0x5A) |
 | Balancing Active | `status.binary.balancing_active` | Alarm event 7 bit 0 "Inside bit" (0x5A) |
 | Balancing Not Running (Blocked / Not Needed) | `status.binary.balancing_blocked` | Alarm event 7 bit 1 "Inside bit" (0x5A) |
 | Balancing Time Limit Reached | `status.binary.balancing_time_limit` | Alarm event 7 bit 2 "Inside bit" (0x5A) |
 | Balancing Blocked (Temperature) | `status.binary.balancing_temperature_blocked` | Alarm event 7 bit 3 "Inside bit" (0x5A) |
-| Charge Blocked (Charge MOSFET Off Request) | `status.binary.charge_forbidden` | Alarm event 8 bit 6 "Inside bit" (0x5A) |
-| Parameters | `parameters` (all as attributes) | parameters 0-86 and function switches (CID2 0x47, "Acquisition of teleregulation information") |
-| System State (as reported to inverter) (System) | `system: normal.system_state` | – undocumented Modbus RTU FC03 0x1000 (master) |
+| Charge Blocked (Charge MOSFET Off Request) | `status.binary.charge_forbidden` | Alarm event 8 bit 6 "Inside bit" (0x5A): also normal while recharge waiting with hard stop or before a shutdown |
+| Current Limiter Active (Charging Detected) | `status.binary.limiter_charging_from_10a` | Alarm event 7 bit 6 (0x5A): active current limiting (BitGroup6 bit 6) as soon as charging is detected (normally from +0.6 A), immediately from 10 A; stays on until 5 s without charging |
+| Current Limiter Active (After Charge Overcurrent Warning) | `status.binary.limiter_after_charge_overcurrent_warning` | Alarm event 7 bit 7 (0x5A): passive current limiting for P71 minutes (BitGroup6 bit 7) |
+| Precharge Running | `status.binary.precharge_running` | On-off state bit 4 (0x5A), P57 |
+| External Voltage Detected (Charger) | `status.binary.external_voltage_detected` | System state bit 2 "floating charge" (0x5A): a charger/external voltage is detected at the port, no float mode |
+| Charge Current Status (>= 3 A) | `status.binary.charge_current_status` | System state bit 7 (0x5A), with hysteresis |
+| Discharge Current Status (>= 3 A) | `status.binary.discharge_current_status` | System state bit 6 (0x5A), with hysteresis |
+| Parameters | `parameters` (all as attributes), state: `parameters.read_at` | parameters 0-86, function switches (raw `function_switches` and named, e.g. `intermittent_recharge`, `passive_current_limiting`), `disabled_alarm_bits` per alarm event 2-6, `ccl_base_mode` (CID2 0x47, "Acquisition of teleregulation information") |
+| System State (Aggregate) (System) | `system: normal.system_state` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System Voltage (System) | `system: normal.system_voltage` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System Current (System) | `system: normal.system_current` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System SOC (System) | `system: normal.system_soc` | – undocumented Modbus RTU FC03 0x1000 (master) |
-| Total Capacity (System) | `system: normal.total_capacity` | – undocumented Modbus RTU FC03 0x1000 (master) |
+| Total Full Capacity (System) | `system: normal.total_capacity` | – undocumented Modbus RTU FC03 0x1000 (master): sum of the learned full capacities |
 | Charge Voltage Limit (System) | `system: normal.charge_voltage_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Charge Current Limit (System) | `system: normal.charge_current_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Discharge Current Limit (System) | `system: normal.discharge_current_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
@@ -281,12 +292,45 @@ Home Assistant names describe what a value actually does (verified against the B
 | Charge Allowed (System) | `system: binary.charge_allowed` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Discharge Allowed (System) | `system: binary.discharge_allowed` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Pack Communication Fault (System) | `system: binary.pack_communication_fault` | – undocumented Modbus RTU FC03 0x1000 (master) |
+| Force Charge Request I (SOC <= 5 %) (System) | `system: binary.force_charge_1` | – undocumented Modbus RTU FC03 0x0074 bit 5 (master, firmware 16.06.11+) |
+| Force Charge Request II (SOC <= 9 %) (System) | `system: binary.force_charge_2` | – undocumented Modbus RTU FC03 0x0074 bit 4 (master, firmware 16.06.11+) |
 
 Notes:
 - `Current (0 when idle)` is reported as 0 by the BMS as long as it is neither charging nor discharging. `Current` combines it with the idle current the BMS sends in a "reserved" field (1 mA resolution), so it always shows the real current.
-- `Energy Charged/Discharged (total)` are the BMS' own energy counters (current × voltage summed every second while charging/discharging) and can be used in the Home Assistant energy dashboard. The BMS stops reporting them beyond 6500 kWh (the add-on then keeps the last value); they are reset by the BMS command "clear history".
+- `Energy Charged/Discharged (total)` are the BMS' own energy counters (current × voltage summed every second while charging/discharging) and can be used in the Home Assistant energy dashboard. From 6500 kWh on the BMS sends a fixed 650.0 kWh instead. The add-on recognizes that fallback from the last valid value, which it keeps in `/data/seplos_state.json` across restarts, and then keeps publishing the last value. Without any stored value a 650.0 is ambiguous and published as unknown until the counter moves. The counters are reset by the BMS command "clear history".
+- The extended status (`status`, single pack mode) bridges single failed requests, but becomes unknown when it is older than 60 s (or 3 update intervals), and is unknown until the first successful read after a restart. The force charge flags of the system device become unknown when register 0x0074 doesn't answer.
+- The energy fallback detection keeps the last valid value per pack address. After replacing or re-addressing a pack, delete `/data/seplos_state.json` (via the add-on's data folder) or the new pack's first 650.0 kWh might be held at the old pack's value. A bare 650.0 after a higher stored value is always treated as the fallback; values are only written every 5 minutes, so a crash can lose the most recent increase.
+- The system device shows the master's aggregate over all packs via Modbus, not a capture of what a specific CAN/RS485 inverter profile sends (profiles add their own rules, e.g. SOC capping). System voltage is the average of the online packs, system current their sum with its own idle dead band (about −0.8 … +1.0 A reads 0) and 0.1 A resolution, Total Full Capacity the sum of the learned full capacities. Pack numbers are 0-based like the pack devices.
+- Packs with fewer than 16 cells (7-16 are supported): the per-cell entities above the cell count are removed once the first telemetry is read. With ≤ 8 cells, cell temperatures 3/4 are copies of temperature 2. The Lovelace example ignores unknown/unavailable cells, so it also works for smaller packs.
+- Version 2.0.0-beta6 renamed these `parameters` attributes: `overcurrent_recovery_attempts` → `transient_or_short_circuit_lockout_event_count` (P70, lockout after this many transient overcurrent/short circuit events), `charge_current_limit_delay_min` → `charge_current_limit_duration_min` (P71), `charge_activation_delay_min` → `charge_activation_window_min` (P72), `charge_current_limit_mode` → `ccl_base_mode`. The Parameters state is now the time of the last successful read. `connection_fault_impedance_mohm` (P82) is stored but not used by the firmware; its 0.1 mΩ scale (also for P84/P86) is taken from the BatteryMonitor export and not verified in the firmware. The JSON paths of the cell temperature extrema moved from `status.normal.highest_cell_temperature` / `lowest_cell_temperature` to `telemetry.normal.*` (they are calculated from 0x42 now, also in multiple pack mode); the entity IDs are unchanged.
 - Alarm/protection pairs report the more severe state (Protection/Lockout before Alarm).
-- The doc's "State of health" (always 100 %), "Disconnection state" (always 0) and system state bit 2 "Floating charge" (masked out, actually an internal "charge path active" flag) are not published.
+- The doc's "State of health" (always 100 %), "Disconnection state" (always 0) and alarm event 6 bit 5 "reverse polarity" (no firmware code sets it) are not published.
+
+## MAINT custom firmware (optional)
+
+With the option `maint_firmware: true` the add-on also reads the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware (built from OEM firmware with the offline patcher of the Seplos knowledge base). Everything is read-only, nothing is written to the BMS.
+
+- Each pack is identified on its own via ASCII 64/03 (MNT05: MAINT version, reported OEM base, build ID, image flags, read capabilities). Packs that answer with an error (OEM firmware) or stay silent three times keep the normal OEM reads. Mixed banks work; a patched master says nothing about its slaves.
+- Full-width energy counters (64/06, live, 0.1 kWh, no 6500 kWh fallback) replace `Energy Charged/Discharged (total)`. If that read fails for more than 10 minutes the counters become unknown instead of falling back to the 0x42 value. The same answer reports the two persisted SOC records (class, CRC acceptance, boot choice) as attributes of `MAINT Firmware`.
+- Flash storage diagnostics (64/04, image flag 0x20, every 10 min): `Flash Storage Problem` turns on if a parameter or SOC mirror record is invalid. The raw classification and the 1.6.4 lock bytes are attributes (`null` = unavailable, not "unlocked").
+- Multiple pack mode (CAN port, UART1): parameters and function switches (binary 47, hourly) and the battery/BMS serial numbers (binary A2/A4) of every MAINT pack, which the OEM firmware only serves on RS485-1/2.
+- The derived firmware patch level is replaced by the OEM base version the MAINT image reports.
+- Supported releases are MAINT **1.5.4 and 1.6.4** (identity format MNT05) and newer. **Deprecated:** older builds that answer with MNT03/MNT04 (e.g. MAINT 1.6 build `18daf61d8a93671d`, image flags 0x06) still work for testing, but this support will be removed in one of the next versions; the add-on logs a warning for them. Currently they deliver: identity, maintenance marker, clock (flag 0x02), parameters and serial numbers on the CAN port, and the individual pack lock from BitGroup0 bit 5 of the parameters (read every 5 min, these builds have no 64/04). They use inverse polarity (no flag 0x08): BitGroup0 bit 3 = 0 permits UART1 power/RTC, bit 4 = 0 enables extended off. They have no full-width energy (64/06) and no storage diagnostics (64/04).
+- 1.6.4 (image flag 0x04): `Individual Pack Lock Active` from the runtime lock cache (64/04, every 60 s). `null`/unknown if the cache is not valid. It's normally the persistent lock set by a targeted off command (the add-on itself never sends one), but the firmware also locks conservatively after storage failures, and the runtime state alone doesn't prove that both mirrors keep the lock across a reboot: see `lock_recorded_primary/backup` and `lock_cache_consistent` in the `storage` attributes.
+- `Maintenance Mode (Slave Polling Paused)` and `Effective Slave Count` (64/02, every 60 s; on the CAN port only the master answers). While the marker is active the master doesn't poll its slaves, so the system values cover the local pack only.
+- `Recharge Waiting Stop Mode` (hard stop / soft stop): the configuration from BitGroup0 bits 6/7 and the image default (flag 0x80), not proof that charging is currently stopped. All MAINT meanings of BitGroup0 (UART1 write/maintenance/power permissions, extended off, recorded lock) are attributes (`settings`) of `MAINT Firmware`.
+- Active calibration (64/05 page 00, every 10 min): invalid calibration flags and the converted currents A/B in mA as attributes (`calibration`).
+
+| Home Assistant name | MQTT key (JSON path) | Source |
+|---|---|---|
+| MAINT Firmware | `maint.normal.maint_version`, attributes `maint.attributes` (identity, storage, checkpoint, live snapshot) | ASCII 64/03, 64/04, 64/06 |
+| Flash Storage Problem | `maint.binary.storage_problem` | ASCII 64/04 |
+| Individual Pack Lock Active | `maint.binary.pack_lock_active` | ASCII 64/04 byte 9 (1.6.4) |
+| Maintenance Mode (Slave Polling Paused) | `maint.binary.maintenance_mode` | ASCII 64/02 marker |
+| Effective Slave Count | `maint.normal.effective_slave_count` | ASCII 64/02 |
+| Recharge Waiting Stop Mode | `maint.normal.recharge_stop_mode` | BitGroup0 bits 6/7 + image flags (0x47) |
+
+The current MAINT images were validated offline only (emulator), not on hardware. Keep the option off unless your packs run MAINT firmware.
 
 ## Home Assistant setup
 
