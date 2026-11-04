@@ -61,9 +61,7 @@ class Discovery:
             return f"{{{{ ({path} | float) * -1 }}}}"
         return f"{{{{ {path} }}}}"
 
-    def _device(self, scope) -> dict:
-        full = scope not in self._device_sent
-        self._device_sent.add(scope)
+    def _device(self, scope, full: bool) -> dict:
         if scope == SYSTEM_SCOPE:
             if not full:
                 return {"ids": topics.SYSTEM_DEVICE_ID}
@@ -77,8 +75,8 @@ class Discovery:
             device["via_device"] = topics.pack_device_id(0)
         return device
 
-    def render(self, entity: Entity, scope) -> dict:
-        """Discovery config of `entity` for a pack number or the system device."""
+    def render(self, entity: Entity, scope, full_device: bool = False) -> dict:
+        """Discovery config of `entity` for a pack number or the system device (pure)."""
         if scope == SYSTEM_SCOPE:
             object_id = f"{topics.SYSTEM_DEVICE_ID}_{entity.key}"
             state_topic = topics.system_sensors(self.topic)
@@ -95,7 +93,7 @@ class Discovery:
             "val_tpl": self._template(entity, scope),
             "avty": [{"t": topics.availability(self.topic)}, {"t": availability}],
             "avty_mode": "all",
-            "dev": self._device(scope),
+            "dev": self._device(scope, full_device),
         }
         for short, attr in _OPTIONAL.items():
             value = getattr(entity, attr)
@@ -114,15 +112,21 @@ class Discovery:
     def _node(self, scope) -> str:
         return topics.SYSTEM_NODE if scope == SYSTEM_SCOPE else topics.pack_node(scope)
 
-    def _publish(self, domain: str, scope, key: str, config: dict | None) -> None:
+    def _publish(self, domain: str, scope, key: str, config: dict | None) -> bool:
         topic = topics.discovery_topic(self.prefix, domain, self._node(scope), key)
         try:
-            self.client.publish(topic, json.dumps(config) if config is not None else "", retain=True, qos=1)
+            info = self.client.publish(topic, json.dumps(config) if config is not None else "", retain=True, qos=1)
         except Exception as e:
             logger.error("Failed to publish discovery config %s: %s", topic, e)
+            return False
+        # Publisher returns a bool, a Paho client an info object with rc
+        return info if isinstance(info, bool) else getattr(info, "rc", 0) == 0
 
     def _publish_entity(self, entity: Entity, scope) -> None:
-        self._publish(entity.domain, scope, entity.key, self.render(entity, scope))
+        """The full device block travels with the first successfully published config of a device."""
+        full = scope not in self._device_sent
+        if self._publish(entity.domain, scope, entity.key, self.render(entity, scope, full)) and full:
+            self._device_sent.add(scope)
 
     def _remove(self, domain: str, scope, key: str) -> None:
         self._publish(domain, scope, key, None)
@@ -134,9 +138,11 @@ class Discovery:
         """
         self._device_sent.discard(pack_no)
         removed: list[Entity] = []
+        cells = self._cells.get(pack_no, 16)
+        cell_keys = {key for _domain, key in CELL_ENTITIES}
         for entity in PACK_ENTITIES:
-            for item in entity.expand():
-                if item.pack_bus_only and not pack_bus:
+            for index, item in enumerate(entity.expand(), start=1):
+                if entity.key in cell_keys and index > cells or item.pack_bus_only and not pack_bus:
                     removed.append(item)
                 else:
                     self._publish_entity(item, pack_no)

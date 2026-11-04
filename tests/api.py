@@ -8,7 +8,7 @@ from __future__ import annotations
 import dataclasses
 from contextlib import contextmanager
 
-from fakes import FakeBms, FakeMqtt, FakeSerial
+from fakes import FakeBms, FakeConnection, FakeMqtt, FakeSerial
 from seplos_mqtt import app
 from seplos_mqtt import pack as pack_module
 from seplos_mqtt.config import Config
@@ -205,8 +205,9 @@ class MqttClientSpy:
 
 def init_mqtt(monkeypatch) -> dict:
     MqttClientSpy.instances.clear()
-    monkeypatch.setattr(app.mqtt, "Client", MqttClientSpy)
-    client = app.initialize_mqtt(app.AppState(config=config()))
+    from seplos_mqtt import mqtt_client
+    monkeypatch.setattr(mqtt_client.mqtt, "Client", MqttClientSpy)
+    client = app.initialize_mqtt(config()).client
     return {
         "calls": [[name, list(a), k] for name, a, k in client.calls],
         "on_connect": callable(client.on_connect),
@@ -229,6 +230,8 @@ def run_main(
     topic: str = "seplos",
     prefix: str = "homeassistant",
     seconds_per_tick: float = 0.5,
+    resync_after_polls: int | None = None,
+    signal_after_polls: int | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -238,6 +241,7 @@ def run_main(
 
     client = FakeMqtt()
     port = FakeSerial(bms)
+    connection = FakeConnection(client)
     counter = {"n": 0}
 
     def gate(adr, entry):
@@ -245,6 +249,10 @@ def run_main(
             counter["n"] += 1
             if counter["n"] > telemetry_polls:
                 raise StopLoop()
+            if resync_after_polls is not None and counter["n"] == resync_after_polls + 1:
+                connection.resync.set()
+            if signal_after_polls is not None and counter["n"] == signal_after_polls + 1:
+                handlers["SIGTERM"](15, None)
             if entry is None:
                 return b""
             return entry(req) if callable(entry) else ascii_frame(adr, 0x00, entry)
@@ -262,16 +270,18 @@ def run_main(
     import time
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     monkeypatch.setattr(time, "time", fake_time)
+    monkeypatch.setattr(time, "monotonic", fake_time)
     monkeypatch.setattr(app, "now_iso", lambda: FIXED_NOW)
     monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
-    monkeypatch.setattr(app, "initialize_mqtt", lambda _state: client)
+    monkeypatch.setattr(app, "initialize_mqtt", lambda _config: connection)
     monkeypatch.setattr(app, "initialize_serial", lambda _config: port)
     monkeypatch.setattr(app, "start_health_server", lambda _state: None)
-    monkeypatch.setattr(app.signal, "signal", lambda *_a: None)
+    handlers: dict = {}
+    monkeypatch.setattr(app.signal, "signal", lambda sig, handler: handlers.__setitem__(sig.name, handler))
     with mode(number_of_packs, ENABLE_HA_DISCOVERY_CONFIG=discovery, MQTT_TOPIC=topic, HA_DISCOVERY_PREFIX=prefix):
         try:
             app.main(config())
-        except StopLoop:
+        except (StopLoop, SystemExit):
             pass
     assert not bms.protocol_errors, bms.protocol_errors
     return client, port
@@ -325,3 +335,46 @@ def bus_trace_poll(monkeypatch, bms: FakeBms, flaky_first_42: bool = False) -> l
     pack = BatteryPack(0, bus, config())
     pack.read()
     return trace
+
+
+def publisher():
+    from seplos_mqtt.mqtt_client import Publisher
+    client = FakeMqtt()
+    return Publisher(client), client
+
+
+class _Message:
+    def __init__(self, topic, payload):
+        self.topic, self.payload = topic, payload
+
+
+def message(topic: str, payload: bytes):
+    return _Message(topic, payload)
+
+
+class _ReasonCode:
+    """Paho 2.x style reason code."""
+    def __init__(self, value):
+        self.value = value
+        self.is_failure = value >= 0x80 or value not in (0,)
+
+
+def reason_code(value: int):
+    return _ReasonCode(value)
+
+
+def mqtt_connection():
+    from seplos_mqtt import mqtt_client
+    conn = mqtt_client.MqttConnection.__new__(mqtt_client.MqttConnection)
+    conn.config = config()
+    conn.connected = False
+    import threading
+    conn.resync = threading.Event()
+    conn._connects = 0
+    conn.birth_topic = f"{config().ha_discovery_prefix}/status"
+    return conn, FakeMqtt()
+
+
+def config_from(env: dict) -> Config:
+    import os
+    return Config.from_env({**os.environ, **env})

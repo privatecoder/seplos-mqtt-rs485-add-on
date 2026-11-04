@@ -54,7 +54,6 @@ class BatteryPack:
         self.address = address
         self.bus = bus
         self.config = config
-        self.last_status: BatteryData | None = None
         self.info: dict | None = None
         self.info_attempts = 0
         self.parameters: dict | None = None
@@ -217,8 +216,8 @@ class BatteryPack:
 
     def read(self) -> tuple[BatteryData | None, bool]:
         """
-        Poll the pack. Returns (data, success): data is None if nothing changed since the last
-        poll or the poll failed.
+        Poll the pack. Returns (data, success); data is None if the poll failed. Change suppression
+        happens when publishing.
         """
         logger.info("Pack%s:Requesting data...", self.address)
         data: BatteryData = {"telemetry": {}, "telesignalization": {}}
@@ -255,10 +254,7 @@ class BatteryPack:
                 if self.parameters:
                     data["parameters"] = self.parameters
 
-            if self.last_status is None or self.last_status != data:
-                self.last_status = data
-                return data, True
-            return None, True
+            return data, True
         except Exception as e:
             logger.error("Pack%s:Error reading serial data: %s", self.address, e)
             return None, False

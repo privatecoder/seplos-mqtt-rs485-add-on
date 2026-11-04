@@ -212,9 +212,9 @@ def test_single_pack_poll(monkeypatch, golden):
         assert data["info"]["normal"]["serial_number"] == "SN-BATTERY-0001"
         assert set(data) == {"telemetry", "telesignalization", "info", "status", "parameters"}
         golden("poll_single_pack", data)
-        # unchanged second poll publishes nothing but counts as success
+        # an unchanged second poll returns the same data; the publisher suppresses the publish
         data2, ok2 = api.poll(pack, bms)
-        assert data2 is None and ok2
+        assert data2 == data and ok2
         cids = [r.cid2 for r in bms.requests if r.kind == "ascii"]
         assert cids.count(0x42) == 2 and cids.count(0x47) == 1 and cids.count(0x51) >= 1
 
@@ -521,8 +521,8 @@ def test_poll_skips_interleaved_intra_pack_frame(monkeypatch):
 
 
 def test_initialize_serial(monkeypatch):
-    assert api.init_serial(monkeypatch, 1) == {"port": "/tmp/vcom0", "baudrate": 19200, "timeout": 0.5}
-    assert api.init_serial(monkeypatch, 2) == {"port": "/tmp/vcom0", "baudrate": 9600, "timeout": 0.5}
+    assert api.init_serial(monkeypatch, 1) == {"port": "/tmp/vcom0", "baudrate": 19200, "timeout": 0.5, "write_timeout": 2}
+    assert api.init_serial(monkeypatch, 2) == {"port": "/tmp/vcom0", "baudrate": 9600, "timeout": 0.5, "write_timeout": 2}
 
 
 def test_initialize_mqtt(monkeypatch, golden):
@@ -657,3 +657,74 @@ def test_strict_envelope_rejected(monkeypatch):
 
 def test_length_field_wraps_correctly():
     assert api.length_field(46) == 0x002E and api.length_field(2) == 0xE002 and api.length_field(150) == 0x1096
+
+
+# --- step 3: MQTT delivery, resync, lifecycle, configuration ---------------------------------------
+
+def test_publisher_retries_failed_publish_and_replays():
+    """R01: a state that failed to publish is sent again with the next unchanged poll and on replay."""
+    pub, client = api.publisher()
+    client.fail_next = 1
+    assert pub.state("t/a", {"v": 1}) is False
+    assert pub.state("t/a", {"v": 1}) is True          # same payload, but the first attempt failed
+    assert pub.state("t/a", {"v": 1}) is False         # now suppressed
+    client.published.clear()
+    pub.replay()
+    assert [r.topic for r in client.published] == ["t/a"]
+
+
+def test_resync_on_ha_birth_and_reconnect():
+    conn, raw = api.mqtt_connection()
+    conn.on_connect(raw, None, {}, 0)
+    assert raw.subscriptions == ["homeassistant/status"] and not conn.resync.is_set()
+    conn.on_message(raw, None, api.message("homeassistant/status", b"online"))
+    assert conn.resync.is_set()
+    conn.resync.clear()
+    conn.on_message(raw, None, api.message("homeassistant/status", b"offline"))
+    assert not conn.resync.is_set()
+    conn.on_disconnect(raw, None, 7)                    # Paho 1.x signature
+    assert conn.connected is False
+    conn.on_connect(raw, None, {}, api.reason_code(0), None)   # Paho 2.x signature, reconnect
+    assert conn.connected and conn.resync.is_set()
+    conn.on_connect(raw, None, {}, api.reason_code(5), None)
+    assert conn.connected is False
+
+
+def test_main_loop_resync_republishes(monkeypatch):
+    client, _ = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2, resync_after_polls=1)
+    sensors = [r for r in client.as_records() if r["topic"] == "seplos/pack-0/sensors"]
+    configs = [r for r in client.as_records() if r["topic"] == "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_1/config"]
+    assert len(sensors) == 2 and len(configs) == 2     # unchanged data replayed, discovery resent
+
+
+def test_discovery_device_block_retried_after_failed_publish():
+    """E04/R01: the full device block is only considered sent after a successful publish."""
+    disc, client = api.discovery()
+    client.fail_next = 1
+    api.discovery_startup(disc, 1)
+    first_ok = next(r for r in client.as_records() if r["topic"].endswith("/voltage_cell_2/config"))
+    assert "mf" in first_ok["payload"]["dev"]
+
+
+def test_signal_handler_exits_through_cleanup(monkeypatch):
+    client, port = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=5, signal_after_polls=1)
+    assert client.calls == ["disconnect", "loop_stop"] and port.is_open is False
+    assert client.as_records()[-2] == {"topic": "seplos/availability", "payload": "offline", "qos": 0, "retain": True}
+
+
+def test_config_validation():
+    import pytest
+
+    from seplos_mqtt.config import ConfigError
+    for env in ({"NUMBER_OF_PACKS": "17"}, {"MQTT_TOPIC": "bms/#"}, {"MIN_CELL_VOLTAGE": "3.7"}, {"MQTT_PORT": "0"}):
+        with pytest.raises(ConfigError):
+            api.config_from(env)
+    assert "mqtt_password" not in api.config_from({}).loggable()
+
+
+def test_health_decision():
+    from seplos_mqtt import health
+    assert health.max_poll_age(1, 1, False) == 30.0
+    assert health.max_poll_age(4, 60, True) == (4 * 3 + 60 + 3) * 3 + 10
+    assert health.is_healthy(True, True, 5, 30) and not health.is_healthy(True, True, 31, 30)
+    assert not health.is_healthy(False, True, 5, 30) and not health.is_healthy(True, False, 5, 30)

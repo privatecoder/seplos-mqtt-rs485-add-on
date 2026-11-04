@@ -47,11 +47,13 @@ The UART1 bus only answers 0x42/0x44/0x4F/0x51/0x60-0x63 plus Modbus. Don't add 
 ### `src/seplos_mqtt/`
 
 - `framing/ascii.py`, `framing/modbus.py`: encode requests, validate answers (no I/O).
-- `transport.py`: `SerialBus`, the single owner of the serial port. Every request (ASCII, Modbus, later MAINT binary frames and commands) goes through it.
+- `transport.py`: `SerialBus`, the single owner of the serial port. Every request (ASCII, Modbus, later MAINT binary frames and commands) runs as one locked transaction and waits for the 1 s quiet gap after the last bus activity, retries included. Never `sleep` between requests elsewhere.
 - `decoders/*`: pure functions, binary INFO bytes in, JSON-ready dicts out (`telemetry` 0x42, `alarms` 0x44 incl. the `BIT_FIELDS` table, `intrapack` 0x5A, `identity` 0x51/0xA2, `parameters` 0x47, `system` Modbus 0x1000).
-- `pack.py`: `BatteryPack` (one per DIP address 0..n-1) schedules the requests of one poll and caches static data. `read()` returns `(data_or_None_if_unchanged, poll_success)`, so data is only published when it changed. Device info is fetched once; the firmware reports only major.minor, so the **patch level is derived by probing features** (`_derive_patch_pack_bus` / `_derive_patch_can_port`). On the CAN port bus only the master can be classified.
-- **A pause between consecutive BMS requests is mandatory** (`request_gap()`, 1 s). Without it the responses get corrupted, so keep it when adding requests.
-- `app.py`: composition and main loop. Polls the packs round-robin, publishes data/heartbeat/availability, after each full cycle the system data, then sleeps `MQTT_UPDATE_INTERVAL`. `health.py` serves `/health` on :8080 for the Supervisor watchdog.
+- `pack.py`: `BatteryPack` (one per DIP address 0..n-1) schedules the requests of one poll and caches static data. `read()` returns `(data_or_None_if_failed, poll_success)`; change suppression happens in the publisher. Device info is fetched once; the firmware reports only major.minor, so the **patch level is derived by probing features** (`_derive_patch_pack_bus` / `_derive_patch_can_port`). On the CAN port bus only the master can be classified.
+- **A pause between consecutive BMS requests is mandatory**; `SerialBus` enforces it (`QUIET_GAP_SECONDS`). Without it the responses get corrupted.
+- `energy.py` keeps the 0x42 energy counters continuous across the 6500 kWh fallback, persisted via `state.py` (`/data/seplos_state.json`).
+- `app.py`: composition and main loop. Polls the packs round-robin, publishes data/heartbeat/availability, after each full cycle the system data, then sleeps `MQTT_UPDATE_INTERVAL`. SIGTERM raises `SystemExit`; cleanup runs once in `main()`'s `finally`. `health.py` serves `/health` on :8080 for the Supervisor watchdog.
+- `mqtt_client.py`: `MqttConnection` supports the Paho 1.x and 2.x callback APIs (callbacks only set flags; a reconnect or the HA birth message `<prefix>/status` = `online` requests a resync in the main loop). `Publisher.state()` suppresses a payload only if the same payload was already accepted by the client, and `replay()` resends all latest states.
 - `topics.py`: MQTT state topics and HA identifiers. These are public interfaces (automations, dashboards, retained discovery); keep them stable.
 
 ### Discovery (`src/seplos_mqtt/discovery/`)

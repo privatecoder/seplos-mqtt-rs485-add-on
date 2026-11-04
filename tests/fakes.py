@@ -172,11 +172,23 @@ class FakeMqtt:
     published: list[Published] = field(default_factory=list)
     connected: bool = True
 
+    fail_next: int = 0
+    subscriptions: list = field(default_factory=list)
+
     def publish(self, topic: str, payload=None, qos: int = 0, retain: bool = False):
+        if self.fail_next > 0:
+            self.fail_next -= 1
+            info = _Info()
+            info.rc = 4   # MQTT_ERR_NO_CONN
+            return info
         if isinstance(payload, str) and payload[:1] in ("{", "["):
             payload = json.loads(payload)
         self.published.append(Published(topic, payload, qos, retain))
         return _Info()
+
+    def subscribe(self, topic, qos=0):
+        self.subscriptions.append(topic)
+        return (0, 1)
 
     # lifecycle spies
     calls: list[str] = field(default_factory=list)
@@ -193,3 +205,19 @@ class FakeMqtt:
 
     def as_records(self) -> list[dict]:
         return [{"topic": p.topic, "payload": p.payload, "qos": p.qos, "retain": p.retain} for p in self.published]
+
+
+class FakeConnection:
+    """Stand-in for MqttConnection around a FakeMqtt."""
+
+    def __init__(self, client: FakeMqtt) -> None:
+        import threading
+        self.client = client
+        self.resync = threading.Event()
+
+    def is_connected(self) -> bool:
+        return self.client.connected
+
+    def stop(self) -> None:
+        self.client.disconnect()
+        self.client.loop_stop()

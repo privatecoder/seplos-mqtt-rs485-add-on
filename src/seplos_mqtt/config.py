@@ -19,6 +19,10 @@ def _env(env: Mapping[str, str], name: str, default: Any, cast: type) -> Any:
         return default
 
 
+class ConfigError(ValueError):
+    pass
+
+
 def _baudrate(value: str | None) -> int:
     """'auto'/empty -> 0 (by mode), else 9600 or 19200."""
     try:
@@ -90,6 +94,23 @@ class Config:
             logging_level=_env(env, "LOGGING_LEVEL", "info", str).upper(),
             state_file=_env(env, "STATE_FILE", d.state_file, str),
         )
+
+    def __post_init__(self) -> None:
+        problems = []
+        if not 1 <= self.number_of_packs <= 16:
+            problems.append(f"number_of_packs {self.number_of_packs} (1-16)")
+        if not 0 < self.min_cell_voltage < self.max_cell_voltage <= 5:
+            problems.append(f"cell voltage range {self.min_cell_voltage}-{self.max_cell_voltage} V")
+        if not 1 <= self.mqtt_port <= 65535:
+            problems.append(f"mqtt_port {self.mqtt_port}")
+        if self.mqtt_update_interval < 0:
+            problems.append(f"mqtt_update_interval {self.mqtt_update_interval}")
+        for name in ("mqtt_topic", "ha_discovery_prefix"):
+            value = getattr(self, name)
+            if not value or any(c in value for c in "+#") or value.startswith("/") or value.endswith("/"):
+                problems.append(f"{name} {value!r} (no wildcards, no leading/trailing slash)")
+        if problems:
+            raise ConfigError("; ".join(problems))
 
     def loggable(self) -> dict[str, Any]:
         """All settings except secrets, for the debug log."""
