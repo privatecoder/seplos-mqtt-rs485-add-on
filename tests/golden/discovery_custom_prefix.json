@@ -9085,7 +9085,7 @@
       },
       "dev_cla": "power",
       "ic": "mdi:flash",
-      "name": "System Power (calculated)",
+      "name": "System Power",
       "obj_id": "seplos_bms_system_system_power",
       "stat_cla": "measurement",
       "stat_t": "bms/garage/system/sensors",
