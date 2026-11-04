@@ -20,6 +20,7 @@
     "lowest_cell_voltage": 3.3,
     "lowest_cell_voltage_pack": 0,
     "system_current": -15.3,
+    "system_power": -809.4,
     "system_soc": 54,
     "system_state": "Charging",
     "system_voltage": 52.9,

@@ -28,6 +28,10 @@ configuration:
   max_cell_voltage:
     name: "Maximum Cell Voltage"
     description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Upper end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
+
+  nominal_cell_voltage:
+    name: "Nominal Cell Voltage"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Nominal voltage of one cell in volts (LFP: 3.2). Used for the calculated full energy (kWh) of the packs and the system."
   
   # MQTT Configuration
   mqtt_topic:

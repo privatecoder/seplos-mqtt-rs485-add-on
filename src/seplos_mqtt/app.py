@@ -18,6 +18,7 @@ from serial.serialutil import SerialException
 from . import health, timeutil, topics
 from .bridge import BridgeError, SocatBridge
 from .config import Config, ConfigError
+from .decoders import telemetry
 from .decoders.identity import device_firmware
 from .discovery import Discovery
 from .monitoring.migration import load_or_migrate
@@ -207,6 +208,11 @@ def publish_system_data(state: AppState, reader: SystemReader) -> None:
     if not state.config.multi_pack or not state.packs:
         return
     data = reader.read(state.bus)
+    if data is not None:
+        # total full capacity (Ah, master) x series cells x configured nominal cell voltage
+        cells = next((p.pack.cell_count for p in state.packs if p.pack.cell_count), None)
+        data["normal"]["total_full_energy"] = telemetry.full_energy(
+            data["normal"].get("total_capacity"), cells, state.config.nominal_cell_voltage)
     base = state.config.mqtt_topic
     state.publisher.publish(topics.system_availability(base), "online" if data is not None else "offline")
     if data is not None and state.publisher.state(topics.system_sensors(base), data):

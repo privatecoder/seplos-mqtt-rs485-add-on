@@ -15,11 +15,15 @@ def _pack(value: int) -> int | None:
 
 def decode(regs: list[int]) -> dict:
     s = signed16
+    voltage = round(regs[4] / 10, 1)
+    current = round(s(regs[5]) / 10, 1)
     return {
         "normal": {
             "system_state": SYSTEM_STATES.get(regs[0], f"0x{regs[0]:02X}"),
-            "system_voltage": round(regs[4] / 10, 1),
-            "system_current": round(s(regs[5]) / 10, 1),
+            "system_voltage": voltage,
+            "system_current": current,
+            # calculated from the master's system voltage and current (not reported by the BMS)
+            "system_power": round(voltage * current, 1),
             "system_soc": regs[6],
             "highest_cell_temperature": round(s(regs[8]) / 10, 1),
             "highest_cell_temperature_pack": _pack(regs[9]),

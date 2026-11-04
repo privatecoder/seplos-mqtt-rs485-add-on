@@ -57,6 +57,7 @@
           "energy_charged": 1000.0,
           "energy_discharged": 900.0,
           "full_capacity": 280.01,
+          "full_energy": 14.34,
           "highest_cell": 16,
           "highest_cell_temperature": 23.4,
           "highest_cell_voltage": 3.315,

@@ -57,6 +57,7 @@
           "energy_charged": 1000.0,
           "energy_discharged": 900.0,
           "full_capacity": 280.01,
+          "full_energy": 14.34,
           "highest_cell": 16,
           "highest_cell_temperature": 23.4,
           "highest_cell_voltage": 3.315,
@@ -221,6 +222,7 @@
           "energy_charged": 1000.0,
           "energy_discharged": 900.0,
           "full_capacity": 280.01,
+          "full_energy": 14.34,
           "highest_cell": 16,
           "highest_cell_temperature": 23.4,
           "highest_cell_voltage": 3.315,
@@ -394,6 +396,7 @@
           "energy_charged": 1000.0,
           "energy_discharged": 900.0,
           "full_capacity": 280.01,
+          "full_energy": 14.34,
           "highest_cell": 16,
           "highest_cell_temperature": 23.4,
           "highest_cell_voltage": 3.315,
@@ -558,10 +561,12 @@
         "lowest_cell_voltage": 3.3,
         "lowest_cell_voltage_pack": 0,
         "system_current": -15.3,
+        "system_power": -809.4,
         "system_soc": 54,
         "system_state": "Charging",
         "system_voltage": 52.9,
-        "total_capacity": 560
+        "total_capacity": 560,
+        "total_full_energy": 28.67
       }
     },
     "qos": 0,

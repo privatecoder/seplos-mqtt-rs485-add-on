@@ -724,10 +724,19 @@ def test_config_validation():
     import pytest
 
     from seplos_mqtt.config import ConfigError
-    for env in ({"NUMBER_OF_PACKS": "17"}, {"MQTT_TOPIC": "bms/#"}, {"MIN_CELL_VOLTAGE": "3.7"}, {"MQTT_PORT": "0"}):
+    for env in ({"NUMBER_OF_PACKS": "17"}, {"MQTT_TOPIC": "bms/#"}, {"MIN_CELL_VOLTAGE": "3.7"}, {"MQTT_PORT": "0"},
+                {"NOMINAL_CELL_VOLTAGE": "0"}, {"NOMINAL_CELL_VOLTAGE": "x"}):
         with pytest.raises(ConfigError):
             api.config_from(env)
     assert "mqtt_password" not in api.config_from({}).loggable()
+    assert api.config_from({}).nominal_cell_voltage == 3.2
+
+
+def test_full_energy():
+    from seplos_mqtt.decoders.telemetry import full_energy
+    assert full_energy(280.0, 16, 3.2) == 14.34
+    assert full_energy(3360, 16, 3.2) == 172.03
+    assert full_energy(None, 16, 3.2) is None and full_energy(280.0, None, 3.2) is None
 
 
 def test_health_decision():

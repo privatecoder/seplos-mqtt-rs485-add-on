@@ -195,10 +195,11 @@ Home Assistant names describe what a value actually does (verified against the B
 | Ambient Temperature | `telemetry.normal.ambient_temperature` | "Environment temperature" (0x42) |
 | MOSFET Temperature | `telemetry.normal.components_temperature` | "Power temperature" (0x42), MOSFET/power stage |
 | Current (0 when idle) | `telemetry.normal.dis_charge_current` | "Charge/discharge current" (0x42), 0 when idle |
-| Power (calculated) | `telemetry.normal.dis_charge_power` | – (calculated: Current × pack voltage) |
+| Power | `telemetry.normal.dis_charge_power` | – (calculated: Current × pack voltage) |
 | Pack Voltage | `telemetry.normal.total_pack_voltage` | "Total battery voltage" (0x42) |
 | Rated Capacity (Setting) | `telemetry.normal.rated_capacity` | "Rated capacity" (0x42), setting P58 |
 | Full Capacity | `telemetry.normal.full_capacity` | "Battery capacity" (0x42), learned full capacity |
+| Full Energy | `telemetry.normal.full_energy` | – (calculated: Full Capacity × cell count × option `nominal_cell_voltage`, kWh) |
 | Remaining Capacity | `telemetry.normal.residual_capacity` | "Residual capacity" (0x42) |
 | State of Charge | `telemetry.normal.state_of_charge` | "SOC" (0x42) |
 | Cycle Count | `telemetry.normal.charging_cycles` | "Number of cycles" (0x42) |
@@ -283,8 +284,10 @@ Home Assistant names describe what a value actually does (verified against the B
 | System State (Aggregate) (System) | `system: normal.system_state` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System Voltage (System) | `system: normal.system_voltage` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System Current (System) | `system: normal.system_current` | – undocumented Modbus RTU FC03 0x1000 (master) |
+| System Power (System) | `system: normal.system_power` | – (calculated: System Voltage × System Current) |
 | System SOC (System) | `system: normal.system_soc` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Total Full Capacity (System) | `system: normal.total_capacity` | – undocumented Modbus RTU FC03 0x1000 (master): sum of the learned full capacities |
+| Total Full Energy (System) | `system: normal.total_full_energy` | – (calculated: Total Full Capacity × cell count × option `nominal_cell_voltage`, kWh) |
 | Charge Voltage Limit (System) | `system: normal.charge_voltage_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Charge Current Limit (System) | `system: normal.charge_current_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Discharge Current Limit (System) | `system: normal.discharge_current_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |

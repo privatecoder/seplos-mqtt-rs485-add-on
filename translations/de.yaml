@@ -28,6 +28,10 @@ configuration:
   max_cell_voltage:
     name: "Maximale Zellenspannung"
     description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Obere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
+
+  nominal_cell_voltage:
+    name: "Nennspannung je Zelle"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Nennspannung einer Zelle in Volt (LFP: 3,2). Wird für die berechnete volle Energie (kWh) der Packs und des Systems verwendet."
   
   # MQTT Konfiguration
   mqtt_topic:

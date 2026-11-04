@@ -2808,7 +2808,7 @@
       },
       "dev_cla": "power",
       "ic": "mdi:flash",
-      "name": "Power (calculated)",
+      "name": "Power",
       "obj_id": "seplos_bms_pack_0_dis_charge_power",
       "stat_cla": "measurement",
       "stat_t": "seplos/pack-0/sensors",
@@ -3076,6 +3076,36 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/full_capacity/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_full_energy",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "energy_storage",
+      "ic": "mdi:battery",
+      "name": "Full Energy",
+      "obj_id": "seplos_bms_pack_0_full_energy",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-0/sensors",
+      "sug_dsp_prc": 2,
+      "uniq_id": "seplos_bms_pack_0_full_energy",
+      "unit_of_meas": "kWh",
+      "val_tpl": "{{ value_json.telemetry.normal.full_energy }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/full_energy/config"
   },
   {
     "payload": {
