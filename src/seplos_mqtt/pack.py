@@ -100,7 +100,7 @@ class BatteryPack:
         return alarms.decode(payload)
 
     def _decode_telemetry(self, payload: bytes) -> dict:
-        feedback = telemetry.decode(payload, self.config.min_cell_voltage, self.config.max_cell_voltage)
+        feedback = telemetry.decode(payload, self.config.min_cell_voltage, self.config.max_cell_voltage, self.config.nominal_cell_voltage)
         self.energy.apply(feedback["normal"])
         self.cell_count = payload[2]
         return feedback

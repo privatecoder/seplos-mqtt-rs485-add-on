@@ -4615,6 +4615,36 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_full_energy",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "energy_storage",
+      "ic": "mdi:battery",
+      "name": "Full Energy",
+      "obj_id": "seplos_bms_pack_0_full_energy",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-0/sensors",
+      "sug_dsp_prc": 2,
+      "uniq_id": "seplos_bms_pack_0_full_energy",
+      "unit_of_meas": "kWh",
+      "val_tpl": "{{ value_json.telemetry.normal.full_energy }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/full_energy/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_highest_cell",
       "dev": {
         "ids": "seplos_bms_pack_0"
@@ -7533,6 +7563,37 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_full_energy",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "dev_cla": "energy_storage",
+      "ic": "mdi:battery",
+      "name": "Full Energy",
+      "obj_id": "seplos_bms_pack_1_full_energy",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-1/sensors",
+      "sug_dsp_prc": 2,
+      "uniq_id": "seplos_bms_pack_1_full_energy",
+      "unit_of_meas": "kWh",
+      "val_tpl": "{{ value_json.telemetry.normal.full_energy }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/full_energy/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_1_highest_cell",
       "dev": {
         "ids": "seplos_bms_pack_1",
@@ -9311,5 +9372,35 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-system/total_capacity/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/system/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_system_total_full_energy",
+      "dev": {
+        "ids": "seplos_bms_system"
+      },
+      "dev_cla": "energy_storage",
+      "ic": "mdi:battery",
+      "name": "Total Full Energy",
+      "obj_id": "seplos_bms_system_total_full_energy",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/system/sensors",
+      "sug_dsp_prc": 1,
+      "uniq_id": "seplos_bms_system_total_full_energy",
+      "unit_of_meas": "kWh",
+      "val_tpl": "{{ value_json.normal.total_full_energy }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-system/total_full_energy/config"
   }
 ]
