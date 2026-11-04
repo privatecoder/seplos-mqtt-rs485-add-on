@@ -1,0 +1,28 @@
+{
+  "binary": {
+    "charge_allowed": "ON",
+    "discharge_allowed": "ON",
+    "pack_communication_fault": "ON"
+  },
+  "normal": {
+    "alarm_word_current_voltage": "0x0101",
+    "alarm_word_temperature_misc": "0x8004",
+    "charge_current_limit": 100.0,
+    "charge_voltage_limit": 56.8,
+    "discharge_current_limit": 150.0,
+    "discharge_voltage_limit": 44.8,
+    "highest_cell_temperature": 23.4,
+    "highest_cell_temperature_pack": 1,
+    "highest_cell_voltage": 3.315,
+    "highest_cell_voltage_pack": 1,
+    "lowest_cell_temperature": -1.5,
+    "lowest_cell_temperature_pack": 0,
+    "lowest_cell_voltage": 3.3,
+    "lowest_cell_voltage_pack": 0,
+    "system_current": -15.3,
+    "system_soc": 54,
+    "system_state": "Charging",
+    "system_voltage": 52.9,
+    "total_capacity": 560
+  }
+}

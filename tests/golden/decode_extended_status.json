@@ -1,0 +1,14 @@
+{
+  "binary": {
+    "balancing_active": "ON",
+    "balancing_blocked": "OFF",
+    "balancing_temperature_blocked": "OFF",
+    "balancing_time_limit": "OFF",
+    "charge_forbidden": "ON"
+  },
+  "normal": {
+    "dis_charge_current_unfiltered": 0.37,
+    "highest_cell_temperature": 23.4,
+    "lowest_cell_temperature": 20.0
+  }
+}
