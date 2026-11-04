@@ -19,6 +19,9 @@ hassio_api: true
 homeassistant_api: false
 services:
   - mqtt:need
+ingress: true
+ingress_port: 0
+panel_title: "Seplos BMS"
 panel_icon: "mdi:battery"
 options:
   rs485_remote_ip: ""

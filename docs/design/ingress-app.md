@@ -75,7 +75,11 @@ the pack's unit. The add-on's own backup export additionally carries every refer
 1. Ingress foundation: security, store + option migration, socat/connection ownership, setup with read-only test,
    status per pack, optional pack detection on request.
 2. Parallel sets: editor, invariants, HA devices and values, reconciliation.
-3. Cell catalog + checks; computed balancer.
+3. Cell catalog + checks; computed balancer. Plus calculated full energy (kWh): per pack =
+   learned full capacity of the pack (0x42) × measured series cell count × nominal cell voltage, where the nominal
+   voltage comes from the pack's assigned cell type, else from a manual setting `nominal_cell_voltage` (V, like the
+   min/max cell voltage settings, default 3.2). "Total Full Energy" on the system device = sum of the packs; unknown
+   while any pack's value is unknown. Works with different cell types per pack.
 4. Poll order by sets, aligned cohorts, sharing/gap verdicts.
 5. Observed balancer values: MQTT bridge, then optional HA entity picker.
 6. Import/export with OpenBMS (can move earlier once 2 and 3 exist).

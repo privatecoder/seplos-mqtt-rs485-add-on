@@ -2,19 +2,27 @@
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import sys
+import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import serial
 from serial.serialutil import SerialException
 
 from . import health, timeutil, topics
+from .bridge import BridgeError, SocatBridge
 from .config import Config, ConfigError
 from .decoders.identity import device_firmware
 from .discovery import Discovery
+from .monitoring.migration import load_or_migrate
+from .monitoring.model import ConfigValidationError
+from .monitoring.store import JsonStore
 from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
 from .state import StateStore
@@ -22,6 +30,15 @@ from .system import SystemReader
 from .transport import SerialBus
 
 logger = logging.getLogger("SeplosBMS")
+
+MONITORING_FILE = "/data/monitoring.json"
+# the launcher that run.sh executes; a saved connection change re-executes it in place
+LAUNCHER = Path(__file__).resolve().parent.parent / "fetch_bms_data.py"
+_execv = os.execv      # module-level name so tests can replace it
+
+
+class RestartRequested(BaseException):
+    """A saved connection change asks for a clean restart (not caught by ``except Exception``)."""
 
 
 @dataclass
@@ -51,6 +68,18 @@ class AppState:
     cycle_start: float = 0.0          # monotonic start of the running polling cycle
     last_cycle: float = 0.0           # duration of the last complete cycle
     discovery_retry_at: float = 0.0
+    bridge: Any = None                # SocatBridge (remote gateway) or None
+    web: Any = None                   # WebThread or None
+    restart_event: threading.Event = field(default_factory=threading.Event)
+    restart_reason: str | None = None
+    bridge_dead_since: float | None = None   # monotonic time socat was first seen dead
+
+    def request_restart(self, _config: Any = None, reason: str = "connection") -> None:
+        """A clean process restart is wanted ("connection": a saved change, called from the web
+        thread; "bridge": socat is gone). The main loop notices it; the first reason is kept."""
+        if self.restart_reason is None:
+            self.restart_reason = reason
+        self.restart_event.set()
 
     def last_progress(self) -> float:
         """Latest successful core read (0x42/0x44) of any pack, also during a long first poll."""
@@ -251,13 +280,94 @@ def _raise_exit(_signum, _frame) -> None:
     raise SystemExit(0)
 
 
-def main(config: Config | None = None) -> None:
+def wait_or_restart(state: AppState, seconds: float) -> bool:
+    """Interruptible sleep: returns True as soon as a restart was requested."""
+    return state.restart_event.wait(seconds)
+
+
+BRIDGE_DEAD_RESTART_S = 30        # socat dead this long -> clean process restart
+WEB_STOP_DEADLINE_S = 30.0        # how long main() waits for the web server to stop
+
+
+def check_bridge(state: AppState, now: float) -> None:
+    """Watch socat. It is never restarted in place (the open serial descriptor would still point at
+    the old pty): after a persistent outage the whole process restarts and rebuilds everything."""
+    if state.bridge is None:
+        return
+    if state.bridge.alive():
+        if state.bridge_dead_since is not None:
+            logger.info("RS485 gateway bridge (socat) is running again")
+        state.bridge_dead_since = None
+        return
+    if state.bridge_dead_since is None:
+        state.bridge_dead_since = now
+        logger.warning("RS485 gateway bridge (socat) is not running; restarting in %s s unless it recovers", BRIDGE_DEAD_RESTART_S)
+    elif now - state.bridge_dead_since >= BRIDGE_DEAD_RESTART_S:
+        state.request_restart(reason="bridge")
+
+
+def stop_web(web: Any, *, deadline_s: float | None = None, clock: Any = None) -> bool:
+    """Stop the web thread and wait until it is really gone (a running save is durable and must
+    finish, also its callback). Returns False if it was still running at the deadline."""
+    deadline_s = WEB_STOP_DEADLINE_S if deadline_s is None else deadline_s
+    clock = clock or time.monotonic
+    started = clock()
+    while True:
+        if web.stop(timeout=5.0):
+            return True
+        if clock() - started >= deadline_s:
+            return False
+        logger.warning("Settings app is still shutting down, waiting")
+
+
+def startup_config(env: Mapping[str, str]) -> tuple[Config, JsonStore | None]:
+    """Config for this start: the saved monitoring document (created once from the add-on options).
+
+    A corrupt document does not stop the polling: the add-on options are used and the app shows
+    the problem. Invalid options exit with status 1 like before.
+    """
+    path = Path(env.get("MONITORING_FILE") or MONITORING_FILE)
+    store: JsonStore | None = None
     try:
-        config = config or Config.from_env()
-    except ConfigError as e:
+        try:
+            mon, store = load_or_migrate(path, env)
+        except OSError as e:
+            logging.basicConfig()
+            logger.error("Cannot create %s (%s); using the add-on options without the settings app", path, e)
+            return Config.from_env(env), None
+        if mon is None:
+            logging.basicConfig()
+            logger.error(
+                "%s is not usable (%s): the settings app shows the problem; polling continues with the add-on options",
+                path, store.problem,
+            )
+            return Config.from_env(env), store
+        return Config.from_monitoring(mon, env), store
+    except (ConfigError, ConfigValidationError) as e:
         logging.basicConfig()
         logger.error("Invalid configuration: %s", e)
         sys.exit(1)
+
+
+def start_web(state: AppState, store: JsonStore, port: str) -> None:
+    """The Ingress app in its own thread; a failure only costs the UI, never the polling."""
+    try:
+        from .web.server import WebApp, WebSettings, WebThread
+
+        web = WebThread(WebApp(WebSettings(port=int(port)), store, on_connection_saved=state.request_restart))
+        bound = web.start()
+    except Exception as e:
+        logger.error("Settings app could not be started: %s", e)
+        return
+    state.web = web
+    logger.info("Settings app listening on port %s", bound)
+
+
+def main(config: Config | None = None) -> None:
+    store: JsonStore | None = None
+    standalone = config is None       # started by run.sh (a given config = tests: no bridge, no web)
+    if config is None:
+        config, store = startup_config(os.environ)
     configure_logging(config)
     logger.info("Starting Seplos BMS Data Fetcher")
     logger.debug("Configuration loaded: %s", config.loggable())
@@ -266,9 +376,17 @@ def main(config: Config | None = None) -> None:
     signal.signal(signal.SIGTERM, _raise_exit)
     signal.signal(signal.SIGINT, _raise_exit)
 
+    restart = False
     try:
         state.mqtt = initialize_mqtt(config)
         state.publisher = Publisher(state.mqtt.client)
+        if standalone and config.remote_host:
+            try:
+                state.bridge = SocatBridge(config.remote_host, config.remote_port, config.serial_interface)
+                state.bridge.start()
+            except BridgeError as e:
+                logger.error("RS485 gateway bridge failed: %s", e)
+                sys.exit(1)
         state.bus = SerialBus(initialize_serial(config))
         state.store = StateStore.default(config.state_file)
         state.packs = [
@@ -281,6 +399,10 @@ def main(config: Config | None = None) -> None:
         # initial grace: healthy until the first poll had a chance to succeed
         state.last_poll = time.monotonic()
         state.health_server = start_health_server(state)
+
+        ingress_port = os.environ.get("INGRESS_PORT")
+        if standalone and ingress_port and store is not None:
+            start_web(state, store, ingress_port)
 
         if config.enable_ha_discovery:
             logger.info("Sending Home Assistant Auto-Discovery configurations")
@@ -297,6 +419,9 @@ def main(config: Config | None = None) -> None:
         state.cycle_start = time.monotonic()
         while True:
             try:
+                check_bridge(state, time.monotonic())
+                if state.restart_event.is_set():
+                    raise RestartRequested
                 if state.mqtt.resync.is_set():
                     state.mqtt.resync.clear()
                     resync(state)
@@ -311,11 +436,40 @@ def main(config: Config | None = None) -> None:
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
                     if config.mqtt_update_interval > 0:
                         logger.info("Waiting %s seconds before next cycle", config.mqtt_update_interval)
-                        time.sleep(config.mqtt_update_interval)
+                        if wait_or_restart(state, config.mqtt_update_interval):
+                            raise RestartRequested
             except Exception:
                 logger.exception("Error in main loop")
-                time.sleep(10)
+                wait_or_restart(state, 10)
     except KeyboardInterrupt:
         logger.info("Shutdown requested via keyboard interrupt")
+    except RestartRequested:
+        if state.restart_reason == "bridge":
+            logger.warning("socat bridge exited, restarting")
+        else:
+            logger.info("Connection changed, restarting")
+        restart = True
     finally:
-        graceful_exit(state)
+        # each step on its own: one failure never skips the next
+        web_stopped = True
+        if state.web is not None:
+            # first: no new saves, running ones finish (their callbacks only set the restart event)
+            try:
+                web_stopped = stop_web(state.web)
+            except Exception as e:
+                logger.error("Stopping the settings app failed: %s", e)
+                web_stopped = False
+        try:
+            graceful_exit(state)
+        except Exception as e:
+            logger.error("Error during graceful exit: %s", e)
+        if state.bridge is not None:
+            try:
+                state.bridge.stop()
+            except Exception as e:
+                logger.error("Stopping the bridge failed: %s", e)
+    if restart:
+        if not web_stopped:
+            logger.error("web server did not stop, exiting instead of restarting")
+            sys.exit(1)
+        _execv(sys.executable, [sys.executable, "-u", str(LAUNCHER)])

@@ -38,21 +38,11 @@ else
     exit 1
 fi
 
-# Bridge a remote RS485-to-Ethernet gateway to a local pty
-if bashio::var.has_value "${RS485_REMOTE_IP}"; then
-    bashio::log.info "Configuring remote RS485 connection to ${RS485_REMOTE_IP}:${RS485_REMOTE_PORT}"
-    socat "pty,link=${SERIAL_INTERFACE},raw" "tcp:${RS485_REMOTE_IP}:${RS485_REMOTE_PORT},retry,interval=.2,forever" &
-    SOCAT_PID=$!
-    # wait (bounded) for the pty link
-    for _ in $(seq 1 50); do
-        [ -e "${SERIAL_INTERFACE}" ] && break
-        kill -0 "${SOCAT_PID}" 2>/dev/null || { bashio::log.error "socat exited"; exit 1; }
-        sleep 0.1
-    done
-    [ -e "${SERIAL_INTERFACE}" ] || { bashio::log.error "pty ${SERIAL_INTERFACE} not created"; exit 1; }
-else
-    bashio::log.info "Using local serial interface: ${SERIAL_INTERFACE}"
-fi
+# The connection options above are only read once, to create /data/monitoring.json; afterwards the
+# settings app (Ingress) owns them. Python starts the socat bridge for a remote RS485 gateway.
+INGRESS_PORT=$(bashio::addon.ingress_port)
+export INGRESS_PORT
+export MONITORING_FILE=/data/monitoring.json
 
 if [[ "${LOGGING_LEVEL}" == "debug" ]]; then
     bashio::log.debug "Configuration loaded:"

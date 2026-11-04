@@ -56,6 +56,9 @@ class Config:
     serial_interface: str = "/tmp/vcom0"
     # 0 = by mode (single pack 19200, multi pack 9600); firmware 16.04.x uses 9600 on RS485-1/2 too
     serial_baudrate: int = 0
+    # RS485-to-Ethernet gateway bridged to serial_interface by socat (empty = local serial device)
+    remote_host: str = ""
+    remote_port: int = 4196
     # MQTT
     mqtt_host: str = "192.168.1.100"
     mqtt_port: int = 1883
@@ -92,7 +95,10 @@ class Config:
     def from_env(cls, env: Mapping[str, str] | None = None) -> Config:
         env = os.environ if env is None else env
         d = cls()
+        remote_host = (env.get("RS485_REMOTE_IP") or "").strip()
         return cls(
+            remote_host=remote_host,
+            remote_port=_env(env, "RS485_REMOTE_PORT", d.remote_port, int) if remote_host else d.remote_port,
             min_cell_voltage=_env(env, "MIN_CELL_VOLTAGE", d.min_cell_voltage, float),
             max_cell_voltage=_env(env, "MAX_CELL_VOLTAGE", d.max_cell_voltage, float),
             number_of_packs=_env(env, "NUMBER_OF_PACKS", d.number_of_packs, int),
@@ -121,6 +127,8 @@ class Config:
         d = cls()
         conn = mon.connection
         return cls(
+            remote_host=conn.host if conn.transport == "tcp" else "",
+            remote_port=conn.port if conn.transport == "tcp" else d.remote_port,
             min_cell_voltage=conn.min_cell_voltage,
             max_cell_voltage=conn.max_cell_voltage,
             number_of_packs=conn.pack_count,
