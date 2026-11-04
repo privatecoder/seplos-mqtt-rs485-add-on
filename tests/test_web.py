@@ -609,7 +609,7 @@ def test_every_text_the_code_asks_for_exists():
         [f"settings.opt.transport.{v}" for v in ("tcp", "serial")]
         + [f"settings.opt.baud.{v}" for v in ("auto", "9600", "19200")]
         + [f"avail.{v}" for v in ("online", "offline", "unknown")]
-        + [f"maint.{v}" for v in ("present", "absent", "pending", "disabled")]
+        + ["maint.pending"]
         + [f"bridge.{v}" for v in ("alive", "dead", "none")]
         + [f"mode.{v}" for v in ("single", "multi")]
         + [f"job.state.{v}" for v in ("queued", "running", "done", "failed", "cancelled")]

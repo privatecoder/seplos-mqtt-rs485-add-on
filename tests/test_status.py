@@ -20,7 +20,7 @@ from seplos_mqtt.web.server import WebApp, WebSettings
 
 PACK_KEYS = {
     "address", "availability", "last_success_age_s", "device_name", "firmware_version", "firmware_patch", "cell_count",
-    "maint", "state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage",
+    "maint", "maint_version", "state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage",
 }
 SYSTEM_KEYS = {"system_soc", "system_voltage", "system_current", "system_power", "total_capacity", "total_full_energy", "system_state"}
 
@@ -69,6 +69,7 @@ def test_before_the_first_poll_everything_is_unknown():
     assert pack["address"] == 0 and pack["availability"] == "offline"
     assert pack["maint"] == "disabled"
     assert all(v is None for k, v in pack.items() if k not in ("address", "availability", "maint"))
+    assert pack["maint_version"] is None
     json.dumps(status)                                   # JSON-ready
 
 
@@ -130,6 +131,11 @@ def test_bridge_and_maint_fields():
     for maint_state, expected in (("pending", "pending"), ("present", "present"), ("absent", "absent"), ("unknown", "pending")):
         pack.maint.state = maint_state
         assert build_status(state, 0.0, "t")["packs"][0]["maint"] == expected
+    pack.maint.state = "present"
+    pack.maint.identity = type("I", (), {"patch_version": "1.6.4"})()
+    assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] == "1.6.4"
+    pack.maint.state = "absent"
+    assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] is None
 
 
 def test_a_defect_in_the_snapshot_does_not_stop_the_polling(monkeypatch):

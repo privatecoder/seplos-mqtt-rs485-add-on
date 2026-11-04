@@ -28,6 +28,14 @@ def _maint(pack: Any) -> str:
     return pack.maint.state if pack.maint.state in ("present", "absent") else "pending"
 
 
+def _maint_version(pack: Any) -> str | None:
+    """The MAINT patch version (e.g. "1.6.4") once a MAINT board was identified."""
+    maint = pack.maint
+    if maint is None or maint.state != "present" or maint.identity is None:
+        return None
+    return maint.identity.patch_version
+
+
 def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
     pack = pack_state.pack
     info = _normal(pack.info) if pack.info else {}
@@ -42,6 +50,7 @@ def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
         "firmware_patch": info.get("firmware_patch"),
         "cell_count": pack.cell_count,
         "maint": _maint(pack),
+        "maint_version": _maint_version(pack),
         **{key: values.get(key) for key in _PACK_VALUES},
     }
 

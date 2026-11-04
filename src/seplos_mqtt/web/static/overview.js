@@ -33,14 +33,17 @@ function availabilityChip(value) {
   return chip(t(`avail.${known ? value : 'unknown'}`), known ? `avail-${value}` : 'avail-unknown');
 }
 
-function maintText(value) {
-  return t(`maint.${['present', 'absent', 'pending', 'disabled'].includes(value) ? value : 'pending'}`);
+// MAINT row: the version when present, "being determined" while pending; no row for OEM firmware
+// or with MAINT reads switched off.
+function maintRow(pack) {
+  if (pack.maint === 'present') return kv(t('pack.maint'), orDash(pack.maint_version));
+  if (pack.maint === 'pending') return kv(t('pack.maint'), t('maint.pending'));
+  return null;
 }
 
+// The most precise known base firmware: the derived patch level, else major.minor.
 function firmware(pack) {
-  if (!pack.firmware_version) return orDash(null);
-  const patch = pack.firmware_patch && pack.firmware_patch !== pack.firmware_version ? ` (${pack.firmware_patch})` : '';
-  return `${pack.firmware_version}${patch}`;
+  return orDash(pack.firmware_patch || pack.firmware_version || null);
 }
 
 function snapshotAge(status) {
@@ -96,7 +99,7 @@ function packCard(pack, multi, snapshotSeconds) {
       kv(t('pack.device'), orDash(pack.device_name)),
       kv(t('pack.firmware'), firmware(pack)),
       kv(t('pack.cells'), orDash(pack.cell_count)),
-      kv(t('pack.maint'), maintText(pack.maint)),
+      maintRow(pack),
       kv(t('pack.soc'), fmt(pack.state_of_charge, '%', 1)),
       kv(t('pack.voltage'), fmt(pack.total_pack_voltage, 'V', 2)),
       kv(t('pack.current'), fmt(pack.current, 'A', 2)),
