@@ -1,8 +1,11 @@
 """Startup configuration (monitoring store), restart on a saved connection change, bridge supervision."""
 from __future__ import annotations
 
+import logging
 import os
+import re
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -93,6 +96,50 @@ def test_unwritable_location_falls_back_without_store(tmp_path):
         locked.chmod(0o700)
     assert store is None
     assert config == Config.from_env(env)
+
+
+# ---------------------------------------------------------------- logging
+
+
+def test_first_start_logs_the_migration_under_seplos_settings(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("MONITORING_FILE", str(tmp_path / "monitoring.json"))
+    monkeypatch.delenv("RS485_REMOTE_IP", raising=False)
+    monkeypatch.delenv("INGRESS_PORT", raising=False)
+    root = logging.getLogger("SeplosBMS")
+    old_level = root.level
+    root.setLevel(logging.WARNING)                  # as if nothing had configured the level yet
+    try:
+        caplog.set_level(logging.DEBUG)
+        api.run_main(monkeypatch, single_pack_bms(), number_of_packs=1, telemetry_polls=2, startup=True)
+    finally:
+        root.setLevel(old_level)
+    messages = [(r.name, r.levelno, r.getMessage()) for r in caplog.records]
+    created = ("SeplosBMS.settings", logging.INFO, "created monitoring.json from the add-on options")
+    assert created in messages
+    # logging was configured before the startup config ran: the line comes before the first start message
+    assert messages.index(created) < messages.index(("SeplosBMS", logging.INFO, "Starting Seplos BMS Data Fetcher"))
+
+
+def test_every_logger_is_below_seplosbms():
+    src = Path(app.__file__).parent
+    for path in src.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "getLogger(__name__)" not in text, path.name          # would not inherit the add-on's level
+        for name in re.findall(r'getLogger\("([^"]+)"\)', text):
+            assert name == "SeplosBMS" or name.startswith("SeplosBMS."), f"{path.name}: {name}"
+
+
+def test_setup_logging_sets_the_level_of_the_whole_tree():
+    root = logging.getLogger("SeplosBMS")
+    old = root.level
+    try:
+        app.setup_logging("debug")
+        assert logging.getLogger("SeplosBMS.settings").getEffectiveLevel() == logging.DEBUG
+        assert logging.getLogger("SeplosBMS.web").getEffectiveLevel() == logging.DEBUG
+        app.setup_logging("nonsense")
+        assert logging.getLogger("SeplosBMS.web").getEffectiveLevel() == logging.INFO
+    finally:
+        root.setLevel(old)
 
 
 # ---------------------------------------------------------------- restart

@@ -31,7 +31,7 @@ from ..jobs import Job, JobBusy, JobQueue
 from ..monitoring.model import ConfigValidationError, MonitoringConfig
 from ..monitoring.store import JsonStore, LoadStatus, StaleRevision, StoreCorrupt
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("SeplosBMS.web")
 
 SUPERVISOR_PEER = "172.30.32.2"
 MAX_BODY = 64 * 1024

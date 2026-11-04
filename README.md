@@ -7,7 +7,9 @@ This Home Assistant add-on reads one or more Seplos V2/V16 BMS packs over RS485 
 - MQTT telemetry and alarm data per pack (cell voltages and temperatures, current, voltages, capacities, SOC, cycles, protection/alarm states, MOSFET and balancing states)
 - Device info per pack: device name, firmware version, derived firmware patch level, active CAN inverter protocol, battery and BMS serial number (single pack mode)
 - Single pack mode only: extended status (balancing, charge blocked request, current limiter reasons, precharge, external voltage/charger detected, current incl. idle) and all BMS parameters and named function switches as attributes
-- Multiple pack mode only: a "Seplos BMS System" device with the master's aggregate over all packs via Modbus (charge/discharge voltage and current limits, charge/discharge allowed, force charge requests, system SOC/voltage/current, min/max cell per pack)
+- Multiple pack mode only: a "Seplos BMS System" device with the master's aggregate over all packs via Modbus (charge/discharge voltage and current limits, charge/discharge allowed, force charge requests, system SOC/voltage/current, min/max cell per pack) plus the calculated System Power and Total Full Energy
+- Calculated values: power and full energy (kWh, from the option `nominal_cell_voltage`) per pack and for the system
+- A settings app in the Home Assistant sidebar: overview of all packs, connection settings, read-only pack detection
 - Packs with 7 to 16 cells
 - Home Assistant MQTT discovery (optional)
 - Per-pack heartbeat and availability
@@ -117,12 +119,12 @@ Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one
      With the option `serial_baudrate: auto` (default) the add-on derives the baud rate from the number of packs. Firmware 16.04.06 (`..._9600.ehex`) uses 9600 baud on RS485-1/2 as well: set `serial_baudrate: "9600"` for a single pack with that firmware.
 3. Install the add-on.
 4. Open the add-on configuration and set:
-   - RS485 connection (remote IP/port or local serial interface)
-   - Number of packs
+   - RS485 connection (remote IP/port or local serial interface), number of packs, cell voltages: only read once on
+     the first start, see "Settings app" below
    - MQTT topic prefix (default: seplos)
-   - Optional: HA discovery, update interval, logging level
+   - Optional: HA discovery, logging level
 5. Save and start the add-on.
-6. Check the logs for successful startup.
+6. Check the logs for successful startup, then open **Seplos BMS** in the sidebar.
 
 ### Settings app (sidebar)
 
@@ -140,21 +142,24 @@ Example log output:
 [13:03:09] INFO: Starting Seplos MQTT RS485 Add-on...
 [13:03:09] INFO: MQTT service configured: core-mosquitto:1883
 [13:03:11] INFO: Starting Seplos BMS data fetcher...
-2025-11-15 13:03:11 INFO:SeplosBMS:Bridging RS485 gateway 192.168.100.58:4196 to /tmp/vcom0
+2025-11-15 13:03:11 INFO:SeplosBMS.settings:created monitoring.json from the add-on options
 2025-11-15 13:03:11 INFO:SeplosBMS:Starting Seplos BMS Data Fetcher
-2025-11-15 13:03:11 INFO:SeplosBMS:Connected to MQTT broker (core-mosquitto:1883)
+2025-11-15 13:03:11 INFO:SeplosBMS.mqtt:Connected to MQTT broker (core-mosquitto:1883)
+2025-11-15 13:03:11 INFO:SeplosBMS:Bridging RS485 gateway 192.168.100.58:4196 to /tmp/vcom0
 2025-11-15 13:03:11 INFO:SeplosBMS:Initializing serial interface /tmp/vcom0 at 9600 baud
 2025-11-15 13:03:11 INFO:SeplosBMS:Initialized 2 battery pack(s)
+2025-11-15 13:03:11 INFO:SeplosBMS:Health endpoint started on http://0.0.0.0:8080/health
+2025-11-15 13:03:11 INFO:SeplosBMS:Settings app listening on port 63412
 2025-11-15 13:03:11 INFO:SeplosBMS:Sending Home Assistant Auto-Discovery configurations
 2025-11-15 13:03:11 INFO:SeplosBMS:Auto-Discovery configurations sent
-2025-11-15 13:03:11 INFO:SeplosBMS:Pack0:Requesting data...
-2025-11-15 13:03:11 INFO:SeplosBMS:Pack0:Telemetry received
-2025-11-15 13:03:12 INFO:SeplosBMS:Pack0:Telesignalization received
-2025-11-15 13:03:13 INFO:SeplosBMS:Pack0:DeviceInfo received
-2025-11-15 13:03:16 INFO:SeplosBMS:Pack0:Publishing updated data to MQTT
-2025-11-15 13:03:13 INFO:SeplosBMS:Pack1:Requesting data...
-2025-11-15 13:03:14 INFO:SeplosBMS:Pack1:Telemetry received
-2025-11-15 13:03:15 INFO:SeplosBMS:Pack1:Telesignalization received
+2025-11-15 13:03:11 INFO:SeplosBMS.pack:Pack0:Requesting data...
+2025-11-15 13:03:11 INFO:SeplosBMS.pack:Pack0:Telemetry received
+2025-11-15 13:03:12 INFO:SeplosBMS.pack:Pack0:Telesignalization received
+2025-11-15 13:03:13 INFO:SeplosBMS.pack:Pack0:DeviceInfo received
+2025-11-15 13:03:13 INFO:SeplosBMS:Pack0:Publishing updated data to MQTT
+2025-11-15 13:03:13 INFO:SeplosBMS.pack:Pack1:Requesting data...
+2025-11-15 13:03:14 INFO:SeplosBMS.pack:Pack1:Telemetry received
+2025-11-15 13:03:15 INFO:SeplosBMS.pack:Pack1:Telesignalization received
 2025-11-15 13:03:15 INFO:SeplosBMS:Pack1:Publishing updated data to MQTT
 2025-11-15 13:03:17 INFO:SeplosBMS:System:Publishing updated data to MQTT
 2025-11-15 13:03:17 INFO:SeplosBMS:Waiting 60 seconds before next cycle

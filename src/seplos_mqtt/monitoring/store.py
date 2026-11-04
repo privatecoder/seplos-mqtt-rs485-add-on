@@ -23,7 +23,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("SeplosBMS.settings")
 
 Validator = Callable[[dict[str, Any]], bool]
 

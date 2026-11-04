@@ -11,7 +11,7 @@ from ..config import _baudrate, _env
 from .model import TCP_PTY_PATH, ConfigValidationError, MonitoringConfig
 from .store import JsonStore, LoadStatus
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("SeplosBMS.settings")
 
 
 def from_legacy_env(env: Mapping[str, str]) -> MonitoringConfig:

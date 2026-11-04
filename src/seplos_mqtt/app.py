@@ -104,10 +104,15 @@ class AppState:
         )
 
 
-def configure_logging(config: Config) -> None:
+def setup_logging(level_name: str) -> None:
+    """Format and level of every "SeplosBMS.*" logger (they inherit from "SeplosBMS")."""
     logging.basicConfig(format="%(asctime)s %(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     levels = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
-    logger.setLevel(levels.get(config.logging_level, logging.INFO))
+    logger.setLevel(levels.get(level_name.upper(), logging.INFO))
+
+
+def configure_logging(config: Config) -> None:
+    setup_logging(config.logging_level)
 
 
 def initialize_mqtt(config: Config) -> MqttConnection:
@@ -371,11 +376,9 @@ def startup_config(env: Mapping[str, str]) -> tuple[Config, JsonStore | None]:
         try:
             mon, store = load_or_migrate(path, env)
         except OSError as e:
-            logging.basicConfig()
             logger.error("Cannot create %s (%s); using the add-on options without the settings app", path, e)
             return Config.from_env(env), None
         if mon is None:
-            logging.basicConfig()
             logger.error(
                 "%s is not usable (%s): the settings app shows the problem; polling continues with the add-on options",
                 path, store.problem,
@@ -383,7 +386,6 @@ def startup_config(env: Mapping[str, str]) -> tuple[Config, JsonStore | None]:
             return Config.from_env(env), store
         return Config.from_monitoring(mon, env), store
     except (ConfigError, ConfigValidationError) as e:
-        logging.basicConfig()
         logger.error("Invalid configuration: %s", e)
         sys.exit(1)
 
@@ -410,6 +412,8 @@ def main(config: Config | None = None) -> None:
     store: JsonStore | None = None
     standalone = config is None       # started by run.sh (a given config = tests: no bridge, no web)
     if config is None:
+        # logging first: the migration and the startup errors are logged before the config exists
+        setup_logging(os.environ.get("LOGGING_LEVEL") or "info")
         config, store = startup_config(os.environ)
     configure_logging(config)
     logger.info("Starting Seplos BMS Data Fetcher")
