@@ -300,6 +300,60 @@ def test_store_concurrent_commits_one_wins(tmp_path, monkeypatch):
     assert json.loads(path.read_text())["revision"] == 2
 
 
+def test_store_snapshot_is_coherent_copy(tmp_path):
+    s = JsonStore(tmp_path / "m.json")
+    assert s.snapshot() == (LoadStatus.MISSING, None, 0, {})
+    s.commit({"a": {"b": 1}}, 0)
+    status, problem, revision, data = s.snapshot()
+    assert (status, problem, revision, data) == (LoadStatus.VALID, None, 1, {"a": {"b": 1}})
+    data["a"]["b"] = 99
+    assert s.data == {"a": {"b": 1}}
+    (tmp_path / "c.json").write_bytes(b"{x")
+    assert JsonStore(tmp_path / "c.json").snapshot() == (LoadStatus.CORRUPT, "invalid JSON", 0, {})
+
+
+def test_store_snapshot_waits_for_adoption(tmp_path, monkeypatch):
+    s = JsonStore(tmp_path / "m.json")
+    s.commit({"a": 1}, 0)
+    in_adopt, release = threading.Event(), threading.Event()
+
+    def slow_adopt(new, revision):
+        s.data = {"a": 2}  # data first ...
+        in_adopt.set()
+        release.wait(5)  # ... revision only after the release
+        s.revision = revision
+        s.status = LoadStatus.VALID
+        s.problem = None
+
+    monkeypatch.setattr(s, "_adopt", slow_adopt)
+    committer = threading.Thread(target=lambda: s.commit({"a": 2}, 1))
+    committer.start()
+    assert in_adopt.wait(5)
+    result = []
+    reader = threading.Thread(target=lambda: result.append(s.snapshot()))
+    reader.start()
+    reader.join(0.3)
+    assert reader.is_alive()  # blocked by the store lock, not reading a torn state
+    assert result == []
+    release.set()
+    reader.join(5)
+    committer.join(5)
+    assert result == [(LoadStatus.VALID, None, 2, {"a": 2})]
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_store_rejects_non_finite_numbers(tmp_path, bad):
+    path = tmp_path / "m.json"
+    s = JsonStore(path)
+    s.commit({"a": 1}, 0)
+    before = path.read_bytes()
+    with pytest.raises(ValueError):
+        s.commit({"a": {"deep": [bad]}}, 1)
+    assert (s.data, s.revision) == ({"a": 1}, 1)
+    assert path.read_bytes() == before
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["m.json"]
+
+
 # ---------------------------------------------------------------- model
 
 

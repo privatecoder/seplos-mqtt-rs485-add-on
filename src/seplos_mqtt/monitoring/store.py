@@ -101,6 +101,12 @@ class JsonStore:
         self.revision = revision
         self.status = LoadStatus.VALID
 
+    def snapshot(self) -> tuple[LoadStatus, str | None, int, dict[str, Any]]:
+        """Coherent ``(status, problem, revision, deep copy of data)`` taken under the store lock
+        (blocks while a commit is in progress: call it off the event loop)."""
+        with self._lock:
+            return self.status, self.problem, self.revision, copy.deepcopy(self.data)
+
     def mark_corrupt(self, problem: str) -> None:
         """Flag the loaded document as unusable (the file itself is left untouched)."""
         self.status = LoadStatus.CORRUPT
@@ -114,7 +120,9 @@ class JsonStore:
         after this returned."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         text = json.dumps(
-            {"schema_version": self.schema_version, "revision": revision, "data": new}, indent=1
+            {"schema_version": self.schema_version, "revision": revision, "data": new},
+            indent=1,
+            allow_nan=False,  # ValueError for NaN/inf: nothing is written or adopted
         )
         fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=f".{self.path.name}.")
         try:
