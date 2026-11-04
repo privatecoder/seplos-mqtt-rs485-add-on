@@ -76,7 +76,7 @@ h2:focus, #view:focus { outline: none; }
 /* header and tabs */
 .app-header { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: 1rem 0 .5rem; }
 .brand { display: inline-flex; align-items: center; gap: .6rem; margin: 0; }
-.brand-mark { width: 1.2rem; height: 1.2rem; border-radius: 6px; background: linear-gradient(135deg, var(--primary), var(--ok)); }
+.brand-mark { width: 1.75rem; height: 1.75rem; display: block; }
 .tabs { display: flex; flex-wrap: wrap; gap: .25rem; }
 .tabs a { padding: .45rem 1rem; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); text-decoration: none; min-height: 2.5rem; display: inline-flex; align-items: center; }
 .tabs a[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }

@@ -22,7 +22,7 @@ services:
 ingress: true
 ingress_port: 0
 panel_title: "Seplos BMS"
-panel_icon: "mdi:battery"
+panel_icon: "mdi:battery-high"
 options:
   rs485_remote_ip: ""
   rs485_remote_port: 4196

@@ -492,10 +492,10 @@ def _get_json(url, headers=None):
 # ---------------------------------------------------------------- the UI files
 
 STATIC_DIR = Path(server_module.__file__).parent / "static"
-CONTENT_TYPES = {".html": "text/html", ".css": "text/css", ".js": "javascript", ".json": "application/json"}
+CONTENT_TYPES = {".html": "text/html", ".css": "text/css", ".js": "javascript", ".json": "application/json", ".svg": "image/svg+xml"}
 UI_FILES = {
     "index.html", "app.css", "api.js", "ui.js", "i18n.js", "app.js", "overview.js", "settings.js", "detect.js",
-    "i18n/de.json", "i18n/en.json",
+    "i18n/de.json", "i18n/en.json", "icon.svg",
 }
 JS_FILES = sorted(STATIC_DIR.glob("*.js"))
 
@@ -560,7 +560,8 @@ def test_referenced_files_exist_and_urls_are_relative():
 
 def test_no_absolute_urls_no_external_resources_no_inline_code():
     for path in static_files():
-        text = path.read_text(encoding="utf-8")
+        # the SVG namespace is an identifier, not a resource that is loaded
+        text = path.read_text(encoding="utf-8").replace('xmlns="http://www.w3.org/2000/svg"', "")
         name = rel(path)
         assert "http://" not in text and "https://" not in text, name
         assert not re.search(r"(?:fetch|import)\(\s*['\"`]/", text), name
