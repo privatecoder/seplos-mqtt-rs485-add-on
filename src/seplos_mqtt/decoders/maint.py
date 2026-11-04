@@ -71,7 +71,8 @@ def decode_identity(info: bytes) -> Identity:
     """
     MNT05 (21 bytes, current releases), MNT04 (19 bytes, no capability mask) or MNT03 (18 bytes,
     two-part patch version, e.g. the MAINT 1.5/1.6 builds of October 2026). MNT02 (no image flags)
-    is not supported.
+    is not supported. DEPRECATED: MNT03/MNT04 (builds before 1.5.4/1.6.4) will be removed in an
+    upcoming version; supported releases are MAINT 1.5.4 / 1.6.4 (MNT05) and newer.
     """
     formats = ((IDENTITY_LEN, b"\x05"), (IDENTITY_LEN_MNT04, b"\x04"), (IDENTITY_LEN_MNT03, b"\x03"))
     if info[:3] != b"MNT" or (len(info), info[3:4]) not in formats:

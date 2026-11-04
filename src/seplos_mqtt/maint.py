@@ -109,6 +109,11 @@ class MaintSupport:
             logger.warning("Pack%s:Unsupported MAINT identity, MAINT reads disabled: %s", self.address, e)
             return
         self.state = "present"
+        if self.identity.info_format < 5:
+            logger.warning(
+                "Pack%s:MAINT %s reports the old identity format MNT%02d. Only MAINT 1.5.4 / 1.6.4 and newer are "
+                "supported; support for older builds is deprecated and will be removed in an upcoming version",
+                self.address, self.identity.patch_version, self.identity.info_format)
         logger.info("Pack%s:MAINT %s on OEM %s (build %s, flags 0x%02X, capabilities 0x%04X)", self.address,
                     self.identity.patch_version, self.identity.base_version, self.identity.build_id,
                     self.identity.image_flags, self.identity.capabilities)
