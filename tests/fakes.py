@@ -23,8 +23,36 @@ class Request:
     count: int | None = None
 
 
+class ProtocolError(AssertionError):
+    pass
+
+
+def check_ascii_request(raw: bytes) -> None:
+    """Independent validation of an outbound Seplos ASCII request (SOI/EOI, VER, CID1, LENGTH, CHKSUM)."""
+    if raw[:1] != b"~" or raw[-1:] != b"\r":
+        raise ProtocolError(f"bad SOI/EOI: {raw!r}")
+    body = raw[1:-5]
+    if (-sum(body)) & 0xFFFF != int(raw[-5:-1], 16):
+        raise ProtocolError(f"bad checksum: {raw!r}")
+    if raw[1:3] != b"20" or raw[5:7] != b"46":
+        raise ProtocolError(f"bad VER/CID1: {raw!r}")
+    length = int(raw[9:13], 16)
+    lenid = length & 0x0FFF
+    info = raw[13:-5]
+    if lenid != len(info):
+        raise ProtocolError(f"LENGTH {lenid} != INFO {len(info)}: {raw!r}")
+    if lenid:
+        nibble = (-(lenid & 0xF) - ((lenid >> 4) & 0xF) - ((lenid >> 8) & 0xF)) & 0xF
+        if length >> 12 != nibble:
+            raise ProtocolError(f"bad LENGTH check nibble: {raw!r}")
+    elif length != 0:
+        raise ProtocolError(f"bad empty LENGTH: {raw!r}")
+    bytes.fromhex(info.decode())
+
+
 def parse_request(raw: bytes) -> Request:
     if raw[:1] == b"~":
+        check_ascii_request(raw)
         info_ascii = raw[13:-5]
         return Request(raw=raw, kind="ascii", adr=int(raw[3:5], 16), cid2=int(raw[7:9], 16),
                        info=bytes.fromhex(info_ascii.decode()))
@@ -44,9 +72,19 @@ class FakeBms:
         self.ascii: dict[tuple[int, int], object] = {}
         self.modbus: dict[tuple[int, int, int], object] = {}
         self.requests: list[Request] = []
+        self.protocol_errors: list[str] = []
+        self.noise: bytes = b""        # bytes put on the wire before the next answer (e.g. intra-pack traffic)
 
     def respond(self, raw: bytes) -> bytes:
-        req = parse_request(raw)
+        try:
+            req = parse_request(raw)
+        except (ProtocolError, ValueError) as e:
+            self.protocol_errors.append(str(e))
+            return b""
+        noise, self.noise = self.noise, b""
+        return noise + self._answer(req)
+
+    def _answer(self, req: Request) -> bytes:
         self.requests.append(req)
         if req.kind == "ascii":
             entry = self.ascii.get((req.adr, req.cid2))
@@ -137,6 +175,16 @@ class FakeMqtt:
             payload = json.loads(payload)
         self.published.append(Published(topic, payload, qos, retain))
         return _Info()
+
+    # lifecycle spies
+    calls: list[str] = field(default_factory=list)
+
+    def disconnect(self, *args, **kwargs):
+        self.calls.append("disconnect")
+        self.connected = False
+
+    def loop_stop(self, *args, **kwargs):
+        self.calls.append("loop_stop")
 
     def is_connected(self) -> bool:
         return self.connected

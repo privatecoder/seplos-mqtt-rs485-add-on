@@ -1,0 +1,203 @@
+{
+  "ambient": {
+    "ambient_temperature_alarm": "Alarm (high)"
+  },
+  "current": {
+    "dis_charging_current_alarm": "Alarm (high)"
+  },
+  "event1_bit0": {
+    "voltage_sensing_failure": "Fault"
+  },
+  "event1_bit1": {
+    "temperature_sensing_failure": "Fault"
+  },
+  "event1_bit2": {
+    "current_sensing_failure": "Fault"
+  },
+  "event1_bit3": {
+    "power_switch_failure": "Fault"
+  },
+  "event1_bit4": {
+    "cell_voltage_difference_fault": "Fault"
+  },
+  "event1_bit5": {
+    "charging_switch_failure": "Fault"
+  },
+  "event1_bit6": {
+    "discharging_switch_failure": "Fault"
+  },
+  "event1_bit7": {
+    "current_limit_switch_failure": "Fault"
+  },
+  "event2_bit0": {
+    "cell_overvoltage": "Alarm"
+  },
+  "event2_bit1": {
+    "cell_overvoltage": "Protection"
+  },
+  "event2_bit2": {
+    "cell_voltage_low": "Alarm"
+  },
+  "event2_bit3": {
+    "cell_voltage_low": "Protection"
+  },
+  "event2_bit4": {
+    "pack_overvoltage": "Alarm"
+  },
+  "event2_bit5": {
+    "pack_overvoltage": "Protection"
+  },
+  "event2_bit6": {
+    "pack_voltage_low": "Alarm"
+  },
+  "event2_bit7": {
+    "pack_voltage_low": "Protection"
+  },
+  "event3_bit0": {
+    "charging_temperature_high": "Alarm"
+  },
+  "event3_bit1": {
+    "charging_temperature_high": "Protection"
+  },
+  "event3_bit2": {
+    "charging_temperature_low": "Alarm"
+  },
+  "event3_bit3": {
+    "charging_temperature_low": "Protection"
+  },
+  "event3_bit4": {
+    "discharging_temperature_high": "Alarm"
+  },
+  "event3_bit5": {
+    "discharging_temperature_high": "Protection"
+  },
+  "event3_bit6": {
+    "discharging_temperature_low": "Alarm"
+  },
+  "event3_bit7": {
+    "discharging_temperature_low": "Protection"
+  },
+  "event4_bit0": {
+    "ambient_temperature_high": "Alarm"
+  },
+  "event4_bit1": {
+    "ambient_temperature_high": "Protection"
+  },
+  "event4_bit2": {
+    "ambient_temperature_low": "Alarm"
+  },
+  "event4_bit3": {
+    "ambient_temperature_low": "Protection"
+  },
+  "event4_bit4": {
+    "component_temperature_high": "Protection"
+  },
+  "event4_bit5": {
+    "component_temperature_high": "Alarm"
+  },
+  "event4_bit6": {
+    "low_temperature_heating": "ON"
+  },
+  "event4_bit7": {},
+  "event5_bit0": {
+    "charging_overcurrent": "Alarm"
+  },
+  "event5_bit1": {
+    "charging_overcurrent": "Protection"
+  },
+  "event5_bit2": {
+    "discharging_overcurrent": "Alarm"
+  },
+  "event5_bit3": {
+    "discharging_overcurrent": "Protection"
+  },
+  "event5_bit4": {
+    "transient_overcurrent": "Protection"
+  },
+  "event5_bit5": {
+    "output_short_circuit": "Protection"
+  },
+  "event5_bit6": {
+    "transient_overcurrent": "Lockout"
+  },
+  "event5_bit7": {
+    "output_short_circuit": "Lockout"
+  },
+  "event6_bit0": {
+    "charging_high_voltage_protection": "Protection"
+  },
+  "event6_bit1": {
+    "intermittent_power_supplement": "Warning"
+  },
+  "event6_bit2": {
+    "soc_low": "Alarm"
+  },
+  "event6_bit3": {
+    "soc_low": "Protection"
+  },
+  "event6_bit4": {
+    "cell_low_voltage_forbidden_charging": "Protection"
+  },
+  "event6_bit5": {
+    "output_reverse_polarity_protection": "Protection"
+  },
+  "event6_bit6": {
+    "output_connection_failure": "Fault"
+  },
+  "event6_bit7": {},
+  "event7_bit0": {},
+  "event7_bit1": {},
+  "event7_bit2": {},
+  "event7_bit3": {},
+  "event7_bit4": {
+    "auto_charging_wait": "Warning"
+  },
+  "event7_bit5": {
+    "manual_charging_wait": "Warning"
+  },
+  "event7_bit6": {},
+  "event7_bit7": {},
+  "event8_bit0": {
+    "eep_storage_failure": "Fault"
+  },
+  "event8_bit1": {
+    "rtc_clock_failure": "Fault"
+  },
+  "event8_bit2": {
+    "no_calibration_of_voltage": "Warning"
+  },
+  "event8_bit3": {
+    "no_calibration_of_current": "Warning"
+  },
+  "event8_bit4": {
+    "no_calibration_of_null_point": "Warning"
+  },
+  "event8_bit5": {},
+  "event8_bit6": {},
+  "event8_bit7": {},
+  "on_off_bit0": {
+    "discharge_switch": "ON"
+  },
+  "on_off_bit1": {
+    "charge_switch": "ON"
+  },
+  "on_off_bit2": {
+    "current_limit_switch": "ON"
+  },
+  "on_off_bit3": {
+    "heating_switch": "ON"
+  },
+  "on_off_bit4": {},
+  "on_off_bit5": {},
+  "on_off_bit6": {},
+  "on_off_bit7": {},
+  "other": {
+    "component_temperature_alarm": "Alarm (other)"
+  },
+  "pack_voltage": {
+    "pack_voltage_alarm": "Alarm (low)"
+  },
+  "power": {
+    "component_temperature_alarm": "Alarm (low)"
+  }
+}

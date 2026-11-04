@@ -67,6 +67,7 @@ DEFAULT_CELLS_MV = [3300 + i for i in range(16)]  # 3300..3315 mV, unique extrem
 
 def telemetry_info(
     cells_mv: list[int] | None = None,
+    adr: int = 0,
     cell_temps_c: tuple[float, float, float, float] = (21.0, 22.5, 20.0, 23.4),
     ambient_c: float = 19.5,
     power_c: float = 25.1,
@@ -85,7 +86,7 @@ def telemetry_info(
     energy_discharged: int = 9000,
 ) -> bytes:
     cells = DEFAULT_CELLS_MV if cells_mv is None else cells_mv
-    out = u8(0x00) + u8(0x01) + u8(len(cells))
+    out = u8(0x00) + u8(adr) + u8(len(cells))   # DATA FLAG, own address, M
     out += b"".join(u16(v) for v in cells)
     out += u8(6)  # number of temperatures: 4 cell + ambient + power
     out += b"".join(kelvin(t) for t in cell_temps_c)
@@ -101,6 +102,7 @@ def telemetry_info(
 
 def telesignal_info(
     cell_alarms: list[int] | None = None,
+    adr: int = 0,
     temp_alarms: tuple[int, int, int, int] = (0, 0, 0, 0),
     ambient_alarm: int = 0,
     power_alarm: int = 0,
@@ -115,13 +117,13 @@ def telesignal_info(
     event8: int = 0,
 ) -> bytes:
     alarms = [0] * 16 if cell_alarms is None else cell_alarms
-    out = u8(0x00) + u8(0x01) + u8(len(alarms)) + bytes(alarms)
+    out = u8(0x00) + u8(adr) + u8(len(alarms)) + bytes(alarms)   # DATA FLAG, own address, M
     out += u8(6) + bytes(temp_alarms) + u8(ambient_alarm) + u8(power_alarm)
     out += u8(current_alarm) + u8(pack_voltage_alarm)
     out += u8(20)  # custom count
     out += bytes(events_1_6) + u8(on_off) + bytes(balancing) + u8(system_status)
     out += bytes(disconnection) + u8(event7) + u8(event8)
-    out += bytes(6)  # reserved
+    out += bytes(5) + u8(system_status & 0x33)  # reserved, then a masked copy of the system status
     return out
 
 
@@ -138,13 +140,14 @@ def serial_info(serial: str = "SN-BATTERY-0001") -> bytes:
 # --- 0x47 parameters (169 bytes, ASCII path incl. address) --------------------------------
 
 def parameter_values() -> tuple[list[int], list[int]]:
-    """Distinguishable plausible values P0..P59 (u16) and P60..P86 (u8)."""
+    """Distinguishable values P0..P59 (u16) and P60..P86 (u8)."""
     words = [
         3550, 3450, 2900, 3000, 3650, 3500, 2700, 2900, 3400, 2000,   # P0-P9 mV
         5680, 5520, 4640, 4800, 5840, 5600, 4320, 4640, 5900, 5800,   # P10-P19 10mV
     ]
     words += [2731 + 450 + i for i in range(36)]                       # P20-P55 0.1K / mixed
     words[50:56] = [15000, 14500, 15500, 15000, 16000, 16500]           # P50-P55 10mA
+    words[52:54] = [(-15000) & 0xFFFF, (-14500) & 0xFFFF]                # P52/P53 discharge thresholds are negative
     words += [30000, 300, 28000, 14000]                                 # P56 10mA, P57 raw, P58/P59 10mAh
     bytes_ = [20, 15, 30, 10, 12, 16, 5, 6, 30, 60, 4, 10, 30, 12, 3, 10, 60, 24, 10, 5, 80, 70, 50, 8, 12, 9, 15]
     assert len(words) == 60 and len(bytes_) == 27

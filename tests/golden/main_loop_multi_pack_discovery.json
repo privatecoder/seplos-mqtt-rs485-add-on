@@ -4284,12 +4284,7 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_firmware_version",
       "dev": {
-        "hw": "10C / 10E",
-        "ids": "seplos_bms_pack_0",
-        "mdl": "BMS V14 / V16",
-        "mf": "Seplos",
-        "name": "Seplos BMS Pack-0 (Master)",
-        "sw": "16.06.13+"
+        "ids": "seplos_bms_pack_0"
       },
       "ent_cat": "diagnostic",
       "ic": "mdi:chip",
@@ -4316,7 +4311,12 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_firmware_version",
       "dev": {
-        "ids": "seplos_bms_pack_0"
+        "hw": "10C / 10E",
+        "ids": "seplos_bms_pack_0",
+        "mdl": "BMS V14 / V16",
+        "mf": "Seplos",
+        "name": "Seplos BMS Pack-0 (Master)",
+        "sw": "16.06.13+"
       },
       "ent_cat": "diagnostic",
       "ic": "mdi:chip",
@@ -7120,12 +7120,7 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_1_firmware_version",
       "dev": {
-        "hw": "10C / 10E",
         "ids": "seplos_bms_pack_1",
-        "mdl": "BMS V14 / V16",
-        "mf": "Seplos",
-        "name": "Seplos BMS Pack-1 (Slave)",
-        "sw": "16.06",
         "via_device": "seplos_bms_pack_0"
       },
       "ent_cat": "diagnostic",
@@ -7153,7 +7148,12 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_1_firmware_version",
       "dev": {
+        "hw": "10C / 10E",
         "ids": "seplos_bms_pack_1",
+        "mdl": "BMS V14 / V16",
+        "mf": "Seplos",
+        "name": "Seplos BMS Pack-1 (Slave)",
+        "sw": "16.06",
         "via_device": "seplos_bms_pack_0"
       },
       "ent_cat": "diagnostic",
@@ -8792,7 +8792,7 @@
         "mdl": "BMS V14 / V16",
         "mf": "Seplos",
         "name": "Seplos BMS System",
-        "sw": "16.06.13+",
+        "sw": "2.x / 16.x",
         "via_device": "seplos_bms_pack_0"
       },
       "ic": "mdi:information-outline",
@@ -8824,7 +8824,7 @@
         "mdl": "BMS V14 / V16",
         "mf": "Seplos",
         "name": "Seplos BMS System",
-        "sw": "2.x / 16.x",
+        "sw": "16.06.13+",
         "via_device": "seplos_bms_pack_0"
       },
       "ic": "mdi:information-outline",

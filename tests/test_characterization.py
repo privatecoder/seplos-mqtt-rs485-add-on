@@ -45,9 +45,7 @@ def test_telemetry_idle_current_merge():
 
 
 def test_telemetry_energy_fallback_within_process():
-    pack = api.make_pack(0)
-    first = pack.decode_telemetry_feedback_frame(f.telemetry_info(energy_charged=64999).hex().upper().encode())
-    second = pack.decode_telemetry_feedback_frame(f.telemetry_info(energy_charged=6500).hex().upper().encode())
+    first, second = api.decode_telemetry_sequence([f.telemetry_info(energy_charged=64999), f.telemetry_info(energy_charged=6500)])
     assert first["normal"]["energy_charged"] == 6499.9
     assert second["normal"]["energy_charged"] == 6499.9
 
@@ -157,10 +155,22 @@ def test_system_decoder(golden):
 
 # --- complete pack poll against a fake bus ----------------------------------------------------
 
+def _multi_pack_bms() -> FakeBms:
+    bms = FakeBms()
+    for adr in (0, 1):
+        bms.ascii[(adr, 0x42)] = f.telemetry_info(adr=adr)
+        bms.ascii[(adr, 0x44)] = f.telesignal_info(adr=adr)
+        bms.ascii[(adr, 0x51)] = f.device_info_info()
+    bms.ascii[(0x02, 0x60)] = ("rtn", 0x00)
+    bms.modbus[(0x03, 0x001F, 9)] = [0] * 9
+    bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
+    return bms
+
+
 def _single_pack_bms(adr: int = 0) -> FakeBms:
     bms = FakeBms()
-    bms.ascii[(adr, 0x42)] = f.telemetry_info()
-    bms.ascii[(adr, 0x44)] = f.telesignal_info()
+    bms.ascii[(adr, 0x42)] = f.telemetry_info(adr=adr)
+    bms.ascii[(adr, 0x44)] = f.telesignal_info(adr=adr)
     bms.ascii[(adr, 0x51)] = f.device_info_info()
     bms.ascii[(adr, 0xA2)] = f.serial_info()
     bms.ascii[(adr, 0xAA)] = None          # 16.06.13+: silent
@@ -204,12 +214,7 @@ def test_multi_pack_poll(monkeypatch, golden):
     api.no_sleep(monkeypatch)
     with api.mode(2):
         bms = FakeBms()
-        for adr in (0, 1):
-            bms.ascii[(adr, 0x42)] = f.telemetry_info()
-            bms.ascii[(adr, 0x44)] = f.telesignal_info()
-            bms.ascii[(adr, 0x51)] = f.device_info_info()
-        bms.ascii[(0x02, 0x60)] = ("rtn", 0x00)
-        bms.modbus[(0x03, 0x001F, 9)] = [0] * 9
+        bms = _multi_pack_bms()
         results = {}
         for adr in (0, 1):
             data, ok = api.poll(api.make_pack(adr), bms)
@@ -275,7 +280,8 @@ def _discovery(records):
             first_dev[dev["ids"]] = dev
     for ids, dev in first_dev.items():
         assert "name" in dev and "mf" in dev, f"first config of {ids} lacks the full device block"
-    return sorted(records, key=lambda r: (r["topic"], json.dumps(r["payload"], sort_keys=True)))
+    # stable sort: repeated retained writes to one topic keep their order (the last one wins)
+    return sorted(records, key=lambda r: r["topic"])
 
 
 def test_discovery_single_pack(golden):
@@ -317,7 +323,7 @@ def _runtime_records(client):
 
 
 def test_main_loop_single_pack(monkeypatch, golden):
-    client = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2)
+    client, port = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2)
     records = _runtime_records(client)
     topics = [r["topic"] for r in records]
     assert "seplos/pack-0/sensors" in topics and "seplos/pack-0/heartbeat" in topics
@@ -328,15 +334,8 @@ def test_main_loop_single_pack(monkeypatch, golden):
 
 
 def test_main_loop_multi_pack(monkeypatch, golden):
-    bms = FakeBms()
-    for adr in (0, 1):
-        bms.ascii[(adr, 0x42)] = f.telemetry_info()
-        bms.ascii[(adr, 0x44)] = f.telesignal_info()
-        bms.ascii[(adr, 0x51)] = f.device_info_info()
-    bms.ascii[(0x02, 0x60)] = ("rtn", 0x00)
-    bms.modbus[(0x03, 0x001F, 9)] = [0] * 9
-    bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
-    client = api.run_main(monkeypatch, bms, number_of_packs=2, telemetry_polls=4)
+    bms = _multi_pack_bms()
+    client, port = api.run_main(monkeypatch, bms, number_of_packs=2, telemetry_polls=4)
     records = _runtime_records(client)
     topics = [r["topic"] for r in records]
     assert "seplos/system/sensors" in topics and "seplos/system/availability" in topics
@@ -344,3 +343,169 @@ def test_main_loop_multi_pack(monkeypatch, golden):
     # discovery as published by main() equals the startup sequence + firmware refresh
     disc_records = [r for r in client.as_records() if r["topic"].startswith("homeassistant/")]
     golden("main_loop_multi_pack_discovery", _discovery(disc_records))
+
+
+# --- review step 0 additions ------------------------------------------------------------------------
+
+def test_fixture_layouts():
+    assert len(f.telemetry_info()) == 75 and len(f.telesignal_info()) == 49
+    assert len(f.parameter_info()) == 169 and len(f.intra_pack_info()) == 32
+    assert f.ascii_frame(1, 0, f.telemetry_info())[9:13] == b"1096"
+    assert f.ascii_frame(1, 0, f.telesignal_info())[9:13] == b"8062"
+    assert f.telesignal_info(system_status=0x13)[48] == 0x13 & 0x33
+
+
+def test_outbound_requests_match_kb_literals():
+    # seplos-ascii.md examples (pack address 1)
+    assert api.encode_request(1, 0x42) == b"~20014642E00201FD35\r"
+    assert api.encode_request(1, 0x44) == b"~20014644E00201FD33\r"
+    assert api.encode_request(1, 0x51, b"") == b"~200146510000FDAD\r"
+    assert api.encode_request(1, 0x47, b"") == b"~200146470000FDA8\r"
+
+
+def test_checksum_vectors():
+    assert f.modbus_crc(b"123456789") == 0x4B37
+    assert api.modbus_crc(b"123456789") == 0x4B37
+
+
+def test_fake_rejects_invalid_ascii_request():
+    from fakes import ProtocolError, check_ascii_request
+    good = api.encode_request(0, 0x42)
+    check_ascii_request(good)
+    for bad in (good[:-5] + b"0000\r", good.replace(b"~20", b"~21"), good[:9] + b"F002" + good[13:]):
+        try:
+            check_ascii_request(bad)
+        except ProtocolError:
+            continue
+        raise AssertionError(f"accepted {bad!r}")
+
+
+def test_intra_pack_record_decoder(golden):
+    out = api.decode_intra_pack_record(f.intra_pack_info(events_1_6=bytes([1, 2, 3, 4, 5, 6]), status=0x12))
+    assert out["highest_cell_voltage"] == 3.315 and out["lowest_cell_voltage"] == 3.3
+    assert out["pack_voltage"] == 52.93 and out["full_capacity"] == 280.01 and out["state_of_charge"] == 53.6
+    assert out["alarm_events_1_6"] == "01 02 03 04 05 06" and out["system_status"] == "12"
+    golden("decode_intra_pack_record", out)
+
+
+def test_extended_status_bits_cleared():
+    out = api.decode_extended_status(f.intra_pack_info(event7=0x0E, event8=0x00, max_t=-5.0, min_t=-12.3, current_10ma=-250))
+    assert out["normal"] == {"dis_charge_current_unfiltered": -2.5, "highest_cell_temperature": -5.0, "lowest_cell_temperature": -12.3}
+    assert out["binary"] == {"balancing_active": "OFF", "balancing_blocked": "ON", "balancing_time_limit": "ON",
+                             "balancing_temperature_blocked": "ON", "charge_forbidden": "OFF"}
+
+
+def test_negative_temperatures_and_parameter_currents():
+    out = api.decode_telemetry(f.telemetry_info(cell_temps_c=(-5.0, -0.1, 0.0, 1.5), ambient_c=-12.3))
+    assert out["normal"]["cell_temperature_1"] == -5.0 and out["normal"]["cell_temperature_2"] == -0.1
+    assert out["normal"]["ambient_temperature"] == -12.3 and out["normal"]["delta_cell_temperature"] == 6.5
+    params = api.decode_parameters(f.parameter_info())
+    assert params["discharging_overcurrent_alarm_a"] == -150.0 and params["discharging_overcurrent_recovery_a"] == -145.0
+
+
+def test_every_alarm_field_individually(golden):
+    """Set one byte alarm / one event byte at a time; the golden pins which keys react."""
+    results = {}
+    for idx, (name, kwargs) in enumerate([
+        ("ambient", dict(ambient_alarm=2)), ("power", dict(power_alarm=1)), ("current", dict(current_alarm=2)),
+        ("pack_voltage", dict(pack_voltage_alarm=1)), ("other", dict(power_alarm=0xF0)),
+    ]):
+        n = api.decode_telesignal(f.telesignal_info(**kwargs))["normal"]
+        results[name] = {k: v for k, v in n.items() if v not in ("OK",) and k != "system_status"}
+    for event in range(6):
+        for bit in range(8):
+            events = [0] * 6
+            events[event] = 1 << bit
+            out = api.decode_telesignal(f.telesignal_info(events_1_6=tuple(events)))
+            changed = {k: v for grp in ("normal", "binary") for k, v in out[grp].items()
+                       if v not in ("OK", "OFF") and k not in ("system_status", "discharge_switch", "charge_switch")}
+            results[f"event{event + 1}_bit{bit}"] = changed
+    for name, kwargs in (("event7", "event7"), ("event8", "event8"), ("on_off", "on_off")):
+        for bit in range(8):
+            out = api.decode_telesignal(f.telesignal_info(**{"on_off": 0, kwargs: 1 << bit}))
+            results[f"{name}_bit{bit}"] = {k: v for grp in ("normal", "binary") for k, v in out[grp].items()
+                                           if v not in ("OK", "OFF") and k != "system_status"}
+    assert results["event1_bit0"] == {"voltage_sensing_failure": "Fault"}
+    assert results["event6_bit4"] == {"cell_low_voltage_forbidden_charging": "Protection"}
+    assert results["event8_bit4"] == {"no_calibration_of_null_point": "Warning"}
+    assert results["other"] == {"component_temperature_alarm": "Alarm (other)"}
+    golden("alarm_field_matrix", results)
+
+
+def test_poll_changed_second_payload(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        pack = api.make_pack(0)
+        bms = _single_pack_bms()
+        api.poll(pack, bms)
+        bms.ascii[(0, 0x42)] = f.telemetry_info(cycles=43)
+        data, ok = api.poll(pack, bms)
+        assert ok and data["telemetry"]["normal"]["charging_cycles"] == 43
+
+
+def test_poll_fails_when_44_fails(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x44)] = None
+        assert api.poll(api.make_pack(0), bms) == (None, False)
+
+
+def test_poll_rejects_wrong_address_answer(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = lambda req: f.ascii_frame(1, 0, f.telemetry_info(adr=1))
+        assert api.poll(api.make_pack(0), bms) == (None, False)
+
+
+def test_poll_skips_interleaved_intra_pack_frame(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        noise = f.ascii_frame(3, 0x5A, f.intra_pack_info())
+        good = f.ascii_frame(0, 0, f.telemetry_info())
+        bms.ascii[(0, 0x42)] = lambda req: noise + good
+        data, ok = api.poll(api.make_pack(0), bms)
+        assert ok and data["telemetry"]["normal"]["charging_cycles"] == 42
+
+
+def test_initialize_serial(monkeypatch):
+    assert api.init_serial(monkeypatch, 1) == {"port": "/tmp/vcom0", "baudrate": 19200, "timeout": 0.5}
+    assert api.init_serial(monkeypatch, 2) == {"port": "/tmp/vcom0", "baudrate": 9600, "timeout": 0.5}
+
+
+def test_initialize_mqtt(monkeypatch, golden):
+    golden("initialize_mqtt", api.init_mqtt(monkeypatch))
+
+
+def test_main_loop_cleanup(monkeypatch):
+    client, port = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=1)
+    assert client.calls == ["disconnect", "loop_stop"]
+    assert port.is_open is False
+
+
+def test_main_loop_failing_pack_and_ageing(monkeypatch, golden):
+    """Pack 1 never answers; large time steps age the availability of pack 0 between its polls."""
+    bms = _multi_pack_bms()
+    bms.ascii[(1, 0x42)] = None
+    bms.modbus.pop((0x03, 0x1000, 21))
+    client, _ = api.run_main(monkeypatch, bms, number_of_packs=2, telemetry_polls=6, seconds_per_tick=7)
+    golden("main_loop_failing_pack", _runtime_records(client))
+
+
+def test_main_loop_no_discovery_custom_topic(monkeypatch, golden):
+    client, _ = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=1,
+                             discovery=False, topic="bms/garage", prefix="ha")
+    records = client.as_records()
+    assert not any(r["topic"].startswith(("ha/", "homeassistant/")) for r in records)
+    assert all(r["topic"].startswith("bms/garage/") for r in records)
+    golden("main_loop_custom_topic", records)
+
+
+def test_discovery_custom_prefix_topic(golden):
+    disc, client = api.discovery(topic="bms/garage", prefix="ha")
+    api.discovery_startup(disc, 2)
+    records = client.as_records()
+    assert all(r["topic"].startswith("ha/") for r in records)
+    golden("discovery_custom_prefix", _discovery(records))

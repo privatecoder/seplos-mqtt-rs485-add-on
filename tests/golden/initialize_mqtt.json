@@ -1,0 +1,40 @@
+{
+  "calls": [
+    [
+      "username_pw_set",
+      [
+        "user",
+        "secret"
+      ],
+      {}
+    ],
+    [
+      "will_set",
+      [
+        "seplos/availability"
+      ],
+      {
+        "payload": "offline",
+        "qos": 2,
+        "retain": false
+      }
+    ],
+    [
+      "connect",
+      [
+        "broker.test",
+        1883
+      ],
+      {
+        "keepalive": 60
+      }
+    ],
+    [
+      "loop_start",
+      [],
+      {}
+    ]
+  ],
+  "on_connect": "on_mqtt_connect",
+  "on_disconnect": "on_mqtt_disconnect"
+}
