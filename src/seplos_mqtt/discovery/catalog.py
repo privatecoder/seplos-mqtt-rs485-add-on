@@ -82,7 +82,7 @@ TELEMETRY: list[Entity] = [
     _sensor("ambient_temperature", "Ambient Temperature", T_, precision=1, icon="mdi:thermometer", **T),
     _sensor("components_temperature", "MOSFET Temperature", T_, precision=1, icon="mdi:thermometer", **T),
     _sensor("dis_charge_current", "Current (0 when idle)", T_, invert=True, precision=2, icon="mdi:current-dc", **A),
-    _sensor("dis_charge_power", "Power (calculated)", T_, invert=True, device_class="power", state_class="measurement", unit="W",
+    _sensor("dis_charge_power", "Power", T_, invert=True, device_class="power", state_class="measurement", unit="W",
             precision=2, icon="mdi:flash"),
     _sensor("total_pack_voltage", "Pack Voltage", T_, precision=2, icon="mdi:server", **V),
     _sensor("rated_capacity", "Rated Capacity (Setting)", T_, unit="Ah", precision=2, icon="mdi:battery"),

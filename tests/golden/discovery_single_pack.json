@@ -3091,7 +3091,7 @@
       },
       "dev_cla": "power",
       "ic": "mdi:flash",
-      "name": "Power (calculated)",
+      "name": "Power",
       "obj_id": "seplos_bms_pack_0_dis_charge_power",
       "stat_cla": "measurement",
       "stat_t": "seplos/pack-0/sensors",

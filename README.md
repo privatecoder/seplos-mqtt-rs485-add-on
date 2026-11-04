@@ -185,7 +185,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | Ambient Temperature | `telemetry.normal.ambient_temperature` | "Environment temperature" (0x42) |
 | MOSFET Temperature | `telemetry.normal.components_temperature` | "Power temperature" (0x42), MOSFET/power stage |
 | Current (0 when idle) | `telemetry.normal.dis_charge_current` | "Charge/discharge current" (0x42), 0 when idle |
-| Power (calculated) | `telemetry.normal.dis_charge_power` | – (calculated: Current × pack voltage) |
+| Power | `telemetry.normal.dis_charge_power` | – (calculated: Current × pack voltage) |
 | Pack Voltage | `telemetry.normal.total_pack_voltage` | "Total battery voltage" (0x42) |
 | Rated Capacity (Setting) | `telemetry.normal.rated_capacity` | "Rated capacity" (0x42), setting P58 |
 | Full Capacity | `telemetry.normal.full_capacity` | "Battery capacity" (0x42), learned full capacity |
