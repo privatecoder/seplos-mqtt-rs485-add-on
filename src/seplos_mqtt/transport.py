@@ -79,9 +79,11 @@ class SerialBus:
             self.port.close()
 
     def flush(self) -> None:
+        """Discard buffered input; counts as bus activity, so the next request waits a full quiet gap."""
         with self._lock:
             self.port.flushOutput()
             self.port.flushInput()
+            self._mark_activity()
 
     # --- timing ---------------------------------------------------------------------------
 
@@ -117,9 +119,9 @@ class SerialBus:
         self._last_activity = self._clock()
 
     def _send(self, data: bytes, reset_input: bool = False) -> None:
+        # _wait_quiet() returns only with an empty input buffer (everything received was drained and
+        # restarted the gap), so no separate input reset is needed; `reset_input` is kept for callers
         self._wait_quiet()
-        if reset_input:
-            self.port.flushInput()
         try:
             self.port.write(data)
         except Exception:

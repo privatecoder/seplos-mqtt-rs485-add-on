@@ -67,7 +67,7 @@ class BatteryPack:
         self.info_attempts = 0
         self.info_revision = 0          # incremented when the cached device info changes
         self.parameters: dict | None = None
-        self.parameters_ts = 0.0
+        self.parameters_next = 0.0       # monotonic deadline of the next 0x47 read (0: due now)
         self.extended_status: dict | None = None
         self.extended_status_ts = 0.0
         self.cell_count: int | None = None
@@ -223,9 +223,10 @@ class BatteryPack:
 
     def _fetch_parameters(self) -> None:
         """Fetch the parameters (CID2 0x47) at startup and then every PARAMETER_REFRESH_SECONDS."""
-        if time.monotonic() - self.parameters_ts < self.PARAMETER_REFRESH_SECONDS:
+        now = time.monotonic()
+        if now < self.parameters_next:
             return
-        self.parameters_ts = time.monotonic()
+        self.parameters_next = now + self.PARAMETER_REFRESH_SECONDS
         try:
             feedback = self._request(
                 0x47, PARAMETER_LEN, lambda raw: {"normal": parameters.decode_ascii_answer(raw)}, "Parameters", info=b""
@@ -237,7 +238,7 @@ class BatteryPack:
             self.parameters = {**feedback["normal"], "read_at": timeutil.now_iso()}
         else:
             # retry after a minute instead of waiting for the next regular refresh
-            self.parameters_ts = time.monotonic() - self.PARAMETER_REFRESH_SECONDS + 60
+            self.parameters_next = time.monotonic() + 60
 
     # --- MAINT custom firmware (optional, read-only) ----------------------------------------------
 
@@ -255,7 +256,7 @@ class BatteryPack:
         maint = self.maint
         store = self.energy.store
         if maint.state == "absent" and store.get(self._energy_source_key()):
-            store.set(self._energy_source_key(), None)       # confirmed OEM now (e.g. replaced pack)
+            store.set(self._energy_source_key(), None, durable=True)   # confirmed OEM now (e.g. replaced pack)
         if maint.identity is None:
             if store.get(self._energy_source_key()) == "maint":
                 # the totals came from the wide MAINT counters before: never fall back to the narrow
@@ -275,9 +276,11 @@ class BatteryPack:
         data["maint"] = payload
         energy = maint.live_energy()
         if energy is not None:
+            # the source choice must be on disk before the first wide value is published
+            if not store.set(self._energy_source_key(), "maint", durable=True):
+                logger.warning("Pack%s:Could not persist the MAINT energy source", self.address)
             # full-width counters replace the 0x42 values with their 6500 kWh fallback
             data["telemetry"]["normal"].update(energy)
-            store.set(self._energy_source_key(), "maint")
         if self.config.multi_pack:
             if maint.parameters.value is not None:
                 if maint.parameters.ts != self._uart1_parameters_ts:
@@ -294,7 +297,7 @@ class BatteryPack:
     def _clock_readable(self) -> bool:
         if not self.config.multi_pack:
             return True
-        return self.maint is not None and self.maint.identity is not None
+        return self.maint is not None and "maint_rtc" in self.maint.capabilities
 
     def _read_clock(self) -> None:
         now = time.monotonic()
@@ -338,8 +341,6 @@ class BatteryPack:
         logger.info("Pack%s:Requesting data...", self.address)
         data: BatteryData = {"telemetry": {}, "telesignalization": {}}
         try:
-            self.bus.flush()
-
             telemetry_feedback = self._request(0x42, TELEMETRY_LEN, self._decode_telemetry, "Telemetry")
             if telemetry_feedback is None:
                 return None, False

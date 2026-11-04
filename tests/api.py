@@ -522,3 +522,84 @@ def health_progress_during_slow_poll(monkeypatch) -> bool:
     clock["t"] = 10.0
     pack.read()
     return seen["healthy"]
+
+
+def capabilities_resolved(pack) -> bool:
+    return pack.capabilities_resolved
+
+
+def poll_pack(state, pack_state) -> None:
+    app.poll_pack(state, pack_state)
+
+
+def poll_after_idle_with_buffered_byte() -> list[tuple[str, float]]:
+    """A completed exchange at t=1, idle until t=10, a foreign byte buffered at t=9.999, then a poll."""
+    clock = {"t": 0.0}
+    events: list[tuple[str, float]] = []
+    from frames import telemetry_info, telesignal_info
+    bms = FakeBms()
+    bms.ascii[(0, 0x42)] = telemetry_info()
+    bms.ascii[(0, 0x44)] = telesignal_info()
+
+    class TracingSerial(FakeSerial):
+        def write(self, data):
+            events.append(("write", clock["t"]))
+            return super().write(data)
+
+    port = TracingSerial(bms)
+    bus = SerialBus(port, clock=lambda: clock["t"], sleep=lambda s: clock.__setitem__("t", clock["t"] + s))
+    bus._last_activity = 1.0
+    clock["t"] = 10.0
+    port.rx += b"\x00"                       # received at 9.999, still buffered
+    bus._last_activity = 1.0
+    events.clear()
+    pack = BatteryPack(0, bus, config())
+    pack.info, pack.info_attempts = {"normal": {}}, 99
+    pack.read()
+    return events
+
+
+def simulated_bank_cycle(packs: int, seconds_per_pack: float) -> list[int]:
+    """First polling cycle of a bank where each pack poll takes long; returns packs published offline."""
+    import time as _time
+    clock = {"t": 100.0}
+    client = FakeMqtt()
+    from seplos_mqtt.mqtt_client import Publisher
+    cfg = dataclasses.replace(config(), number_of_packs=packs)
+    state = app.AppState(config=cfg)
+    state.publisher = Publisher(client)
+
+    class SlowPack:
+        def __init__(self, address):
+            self.address, self.cell_count, self.info, self.info_revision, self.capabilities_resolved = address, None, None, 0, False
+            self.core_success = 0.0
+
+        def read(self):
+            clock["t"] += seconds_per_pack
+            return {"telemetry": {"normal": {"a": self.address}}}, True
+
+    state.packs = [app.PackState(SlowPack(i), i) for i in range(packs)]
+    original = _time.monotonic
+    _time.monotonic = lambda: clock["t"]
+    try:
+        state.cycle_start = clock["t"]
+        for pack_state in state.packs:
+            app.poll_pack(state, pack_state)
+    finally:
+        _time.monotonic = original
+    return sorted({int(r.topic.split("pack-")[1].split("/")[0]) for r in client.published
+                   if r.topic.endswith("/availability") and r.payload == "offline"})
+
+
+def app_with_discovery(monkeypatch):
+    from seplos_mqtt.mqtt_client import Publisher
+    client = FakeMqtt()
+    state = app.AppState(config=config())
+    state.publisher = Publisher(client)
+    state.discovery = Discovery(state.publisher, "seplos", "homeassistant", False, maint_enabled=True)
+    state.packs = [app.PackState(BatteryPack(0, None, config()), 0)]
+    return state, state.discovery, client
+
+
+def retry_discovery(state) -> None:
+    app.retry_discovery(state)

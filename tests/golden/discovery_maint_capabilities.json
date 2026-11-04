@@ -2519,33 +2519,7 @@
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/charging_temperature_low/config"
   },
   {
-    "payload": {
-      "avty": [
-        {
-          "t": "seplos/availability"
-        },
-        {
-          "t": "seplos/pack-0/availability"
-        }
-      ],
-      "avty_mode": "all",
-      "default_entity_id": "sensor.seplos_bms_pack_0_clock_offset",
-      "dev": {
-        "ids": "seplos_bms_pack_0"
-      },
-      "dev_cla": "duration",
-      "ent_cat": "diagnostic",
-      "ic": "mdi:clock-alert-outline",
-      "json_attr_t": "seplos/pack-0/sensors",
-      "json_attr_tpl": "{{ value_json.get('clock', {}).get('normal', {}) | tojson }}",
-      "name": "BMS Clock Offset",
-      "obj_id": "seplos_bms_pack_0_clock_offset",
-      "stat_cla": "measurement",
-      "stat_t": "seplos/pack-0/sensors",
-      "uniq_id": "seplos_bms_pack_0_clock_offset",
-      "unit_of_meas": "s",
-      "val_tpl": "{{ value_json.clock.normal.clock_offset }}"
-    },
+    "payload": "",
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/clock_offset/config"

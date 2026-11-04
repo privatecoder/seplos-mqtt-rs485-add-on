@@ -160,8 +160,9 @@ def decode_group0(group0: int, ident: Identity) -> dict:
     out: dict = {
         "uart1_parameter_write_allowed": bool(group0 & 0x01),
         "uart1_maintenance_start_allowed": bool(group0 & 0x04),
-        # bit 3 = 1 means "permitted" only with positive polarity (image flag 0x08)
-        "uart1_power_rtc_allowed": bool(group0 & 0x08) if ident.has_flag(FLAG_POSITIVE_POLARITY) else None,
+        # bit 3 = 1 means "permitted" only if the image has the feature (0x02) with positive polarity (0x08)
+        "uart1_power_rtc_allowed": (bool(group0 & 0x08)
+                                    if ident.has_flag(FLAG_UART1_POWER_RTC) and ident.has_flag(FLAG_POSITIVE_POLARITY) else None),
     }
     if ident.has_flag(FLAG_PACK_LOCK) and ident.has_flag(FLAG_POSITIVE_POLARITY):
         out["extended_off_enabled"] = bool(group0 & 0x10)

@@ -49,11 +49,13 @@ class StateStore:
     def get(self, key: str, default=None):
         return self.data.get(key, default)
 
-    def set(self, key: str, value) -> None:
+    def set(self, key: str, value, durable: bool = False) -> bool:
+        """Store a value; durable=True writes it to disk right away (not throttled). False if that write failed."""
         if self.data.get(key) != value:
             self.data[key] = value
             self._dirty = True
-            self.flush(force=False)
+            self.flush(force=durable)
+        return not (durable and self._dirty and self.path is not None)
 
     def flush(self, force: bool = True) -> None:
         if not self._dirty or self.path is None:

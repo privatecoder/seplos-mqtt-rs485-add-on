@@ -48,6 +48,9 @@ class AppState:
     # monotonic time of the last successful BMS poll (startup counts as grace period)
     last_poll: float = 0.0
     next_replay: float = 0.0
+    cycle_start: float = 0.0          # monotonic start of the running polling cycle
+    last_cycle: float = 0.0           # duration of the last complete cycle
+    discovery_retry_at: float = 0.0
 
     def last_progress(self) -> float:
         """Latest successful core read (0x42/0x44) of any pack, also during a long first poll."""
@@ -129,6 +132,21 @@ def resync(state: AppState) -> None:
     state.next_replay = now + REPLAY_DELAY_SECONDS
 
 
+DISCOVERY_RETRY_SECONDS = 60
+
+
+def retry_discovery(state: AppState) -> None:
+    """A discovery config/tombstone wasn't accepted by the client: reconcile everything again (bounded)."""
+    discovery = state.discovery
+    if discovery is None or not discovery.failed:
+        return
+    now = time.monotonic()
+    if now >= state.discovery_retry_at:
+        discovery.failed = False
+        state.discovery_retry_at = now + DISCOVERY_RETRY_SECONDS
+        resync(state)
+
+
 def refresh_states(state: AppState) -> None:
     """Delayed/periodic replay of the latest states (non-retained)."""
     now = time.monotonic()
@@ -137,9 +155,18 @@ def refresh_states(state: AppState) -> None:
         state.next_replay = now + REPLAY_INTERVAL_SECONDS
 
 
+def pack_max_age(state: AppState, now: float) -> float:
+    """
+    Per-pack freshness allowance: the nominal budget, but at least three observed full cycles and the
+    running cycle (optional/startup reads of the other packs on the shared bus can make a cycle long).
+    """
+    running = now - state.cycle_start if state.cycle_start else 0.0
+    return max(state.max_age(), 3 * state.last_cycle + 10, running + state.max_age())
+
+
 def publish_pack_availability(state: AppState, pack_state: PackState, now: float) -> None:
     """Publish a changed availability; the change only counts as sent once the client accepted it."""
-    online = pack_state.last_success is not None and now - pack_state.last_success <= state.max_age()
+    online = pack_state.last_success is not None and now - pack_state.last_success <= pack_max_age(state, now)
     desired = "online" if online else "offline"
     if pack_state.availability != desired:
         if state.publisher.publish(topics.pack_availability(state.config.mqtt_topic, pack_state.address), desired):
@@ -169,8 +196,8 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
         pack_state.publish_counter += 1
         heartbeat = {"last_publish": timeutil.now_iso(), "publish_counter": pack_state.publish_counter}
         state.publisher.publish(topics.pack_heartbeat(base, address), heartbeat)
-        state.publisher.publish(topics.pack_availability(base, address), "online")
-        pack_state.availability = "online"
+        if state.publisher.publish(topics.pack_availability(base, address), "online"):
+            pack_state.availability = "online"
 
     if discovery and pack_state.pack.capabilities_resolved:
         if discovery.set_capabilities(address, pack_state.pack.capabilities, pack_bus=not state.config.multi_pack):
@@ -267,17 +294,21 @@ def main(config: Config | None = None) -> None:
         index = 0
         system_reader = SystemReader()
         state.next_replay = time.monotonic() + REPLAY_DELAY_SECONDS
+        state.cycle_start = time.monotonic()
         while True:
             try:
                 if state.mqtt.resync.is_set():
                     state.mqtt.resync.clear()
                     resync(state)
                 refresh_states(state)
+                retry_discovery(state)
                 poll_pack(state, state.packs[index])
                 index += 1
                 if index >= len(state.packs):
                     index = 0
                     publish_system_data(state, system_reader)
+                    now = time.monotonic()
+                    state.last_cycle, state.cycle_start = now - state.cycle_start, now
                     if config.mqtt_update_interval > 0:
                         logger.info("Waiting %s seconds before next cycle", config.mqtt_update_interval)
                         time.sleep(config.mqtt_update_interval)

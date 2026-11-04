@@ -614,7 +614,11 @@ def test_baudrate_override(monkeypatch):
     """F17: 16.04.x uses 9600 on RS485-1/2 as well."""
     assert api.init_serial(monkeypatch, 1, SERIAL_BAUDRATE="9600")["baudrate"] == 9600
     assert api.init_serial(monkeypatch, 1, SERIAL_BAUDRATE="auto")["baudrate"] == 19200
-    assert api.init_serial(monkeypatch, 2, SERIAL_BAUDRATE="12345")["baudrate"] == 9600
+    import pytest
+
+    from seplos_mqtt.config import ConfigError
+    with pytest.raises(ConfigError):
+        api.init_serial(monkeypatch, 2, SERIAL_BAUDRATE="1920O")
 
 
 def test_inconsistent_cell_count_rejected(monkeypatch):
@@ -858,7 +862,8 @@ def test_maint_multi_pack_mixed_bank(monkeypatch, golden):
     assert ok0 and ok1
     assert m["parameters"]["cells_in_series"] == 16 and m["parameters"]["read_at"] == api.FIXED_NOW
     assert m["info"]["normal"]["serial_number"] == "BAT-SN-0" and m["info"]["normal"]["bms_serial_number"] == "BMS-SN-0"
-    assert api.capabilities(master) == {"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop"}
+    assert api.capabilities(master) == {"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop",
+                                        "maint_rtc"}
     assert "maint" not in s and "parameters" not in s and api.capabilities(slave) == set()
     golden("poll_maint_multi_pack", {"master": m, "slave": s})
 
@@ -1207,3 +1212,99 @@ def test_config_rejects_malformed_values():
         with pytest.raises(ConfigError):
             api.config_from(env)
     assert api.config_from({"MQTT_TOPIC": "/seplos"}).mqtt_topic == "/seplos"     # leading slash stays legal
+
+
+# --- final review (L01-L08) ---------------------------------------------------------------------------
+
+def test_energy_source_on_disk_before_first_wide_value(monkeypatch, tmp_path):
+    """L01: ordinary OEM totals write the store first; the source marker must still reach the disk at once."""
+    api.no_sleep(monkeypatch)
+    import json
+    state_file = tmp_path / "state.json"
+    state_file.write_text(json.dumps({"pack0.energy_charged": 6499.9, "pack0.energy_discharged": 1234.5}))
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500, energy_discharged=12346)
+        bms.ascii[(0, 0x64)] = _maint_responder(energy=f.maint_energy(charged=70001, discharged=12346))
+        data, _ = api.poll(api.make_pack(0, state_file=state_file), bms)
+        assert data["telemetry"]["normal"]["energy_charged"] == 7000.1
+        assert json.loads(state_file.read_text())["pack0.energy_source"] == "maint"     # no graceful flush needed
+        bms.ascii[(0, 0x64)] = None
+        data, _ = api.poll(api.make_pack(0, state_file=state_file), bms)                # unclean restart
+    assert data["telemetry"]["normal"]["energy_charged"] is None
+
+
+def test_unsupported_identity_keeps_wide_source(monkeypatch, tmp_path):
+    """L02: an unknown MAINT format or a non-empty RTN 04 is not 'OEM'."""
+    api.no_sleep(monkeypatch)
+    state_file = tmp_path / "state.json"
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500)
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        api.poll(api.make_pack(0, state_file=state_file), bms)
+        for answer in (_maint_responder(identity=f.maint_identity(caps=0x0010)),
+                       lambda req: f.ascii_frame(0, 0x04, b"\x01")):
+            bms.ascii[(0, 0x64)] = answer
+            pack = api.make_pack(0, state_file=state_file)
+            for _ in range(4):
+                data, _ = api.poll(pack, bms)
+            assert pack.maint.state in ("unsupported", "unknown") and not api.capabilities_resolved(pack)
+            assert data["telemetry"]["normal"]["energy_charged"] is None
+
+
+def test_poll_waits_full_gap_after_buffered_traffic():
+    """L03: buffered foreign bytes at the start of a poll restart the quiet gap (no flush bypass)."""
+    events = api.poll_after_idle_with_buffered_byte()
+    first_write = next(t for kind, t in events if kind == "write")
+    assert first_write - 9.999 >= 1.0 - 1e-9, events
+
+
+def test_parameters_read_right_after_host_boot(monkeypatch):
+    """L04: the first 0x47 read is due immediately, also when monotonic time is small."""
+    api.no_sleep(monkeypatch)
+    import time
+    monkeypatch.setattr(time, "monotonic", lambda: 1000.0)
+    with api.mode(1):
+        data, ok = api.poll(api.make_pack(0), _single_pack_bms())
+    assert ok and "parameters" in data
+
+
+def test_failed_online_publish_not_cached(monkeypatch):
+    """L05."""
+    state, pack_state, client = api.availability_state(monkeypatch)
+    pack_state.availability = "offline"
+    pack_state.pack.read = lambda: ({"telemetry": {}}, True)
+    client.fail_next = 4                           # heartbeat, online, sensors and the availability retry rejected
+    api.poll_pack(state, pack_state)
+    assert pack_state.availability == "offline"
+
+
+def test_bank_startup_keeps_successful_packs_online():
+    """L06: a long first cycle (slow optional reads of other packs) doesn't age out successful packs."""
+    offline = api.simulated_bank_cycle(packs=16, seconds_per_pack=19.5)
+    assert offline == [], offline
+
+
+def test_uart1_clock_needs_power_rtc_flag(monkeypatch):
+    """L07: MNT04 without image flag 0x02 -> no UART1 4D request, no clock entity."""
+    api.no_sleep(monkeypatch)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        mnt04 = b"MNT\x04" + bytes([16, 6, 13, 1, 5, 2]) + bytes(8) + b"\x00"
+        bms.ascii[(0, 0x64)] = _maint_responder(identity=mnt04)
+        pack = api.make_pack(0)
+        data, ok = api.poll(pack, bms)
+    assert ok and "clock" not in data and "maint_rtc" not in api.capabilities(pack)
+    assert not any(r.cid2 == 0x4D for r in bms.requests)
+
+
+def test_failed_discovery_publish_is_reconciled(monkeypatch):
+    """L08: a config the client rejected is published again by a later reconciliation."""
+    state, disc, client = api.app_with_discovery(monkeypatch)
+    client.fail_next = 1
+    api.set_capabilities(disc, 0, {"maint"}, pack_bus=True)
+    assert disc.failed
+    api.retry_discovery(state)
+    assert any(r["topic"].endswith("/maint_version/config") and r["payload"] for r in client.as_records())
+    assert not disc.failed

@@ -234,7 +234,7 @@ MAINT: list[Entity] = [
 # BMS real time clock (0x4D): OEM on RS485-1/2, with MAINT also on the CAN port
 CLOCK: list[Entity] = [
     Entity("clock_offset", "BMS Clock Offset", "clock", device_class="duration", state_class="measurement", unit="s",
-           icon="mdi:clock-alert-outline", category=DIAG, when=PACK_BUS_OR_MAINT_UART1,
+           icon="mdi:clock-alert-outline", category=DIAG, when=frozenset({"pack_bus", "maint_rtc"}),
            attributes="{{ value_json.get('clock', {}).get('normal', {}) | tojson }}"),
 ]
 

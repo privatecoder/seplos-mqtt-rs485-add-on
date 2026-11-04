@@ -30,7 +30,7 @@ _OPTIONAL = {
 }
 
 SYSTEM_SCOPE = "system"
-MAINT_CONDITIONS = frozenset({"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop"})
+MAINT_CONDITIONS = frozenset({"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc"})
 
 
 class Discovery:
@@ -49,6 +49,8 @@ class Discovery:
         # MAINT capabilities per pack (discovery conditions)
         self._caps: dict[int, set[str]] = {}
         self._system_active = False
+        # a publish was not accepted: the app reconciles everything again later
+        self.failed = False
 
     # --- rendering ----------------------------------------------------------------------------
 
@@ -126,9 +128,13 @@ class Discovery:
             info = self.client.publish(topic, json.dumps(config) if config is not None else "", retain=True, qos=1)
         except Exception as e:
             logger.error("Failed to publish discovery config %s: %s", topic, e)
+            self.failed = True
             return False
         # Publisher returns a bool, a Paho client an info object with rc
-        return info if isinstance(info, bool) else getattr(info, "rc", 0) == 0
+        ok = info if isinstance(info, bool) else getattr(info, "rc", 0) == 0
+        if not ok:
+            self.failed = True
+        return ok
 
     def _publish_entity(self, entity: Entity, scope) -> None:
         """The full device block travels with the first successfully published config of a device."""

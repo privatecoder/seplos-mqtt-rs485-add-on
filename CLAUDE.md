@@ -8,7 +8,7 @@ A Home Assistant add-on that polls Seplos V2/V16 BMS packs (protocol "SEPLOS BMS
 
 ## Development commands
 
-The add-on is built by the HA Supervisor from `Dockerfile` + `build.json` (HA base images per arch).
+The add-on is built by the HA Supervisor from `Dockerfile` + `build.json` (HA base images per arch, pinned: Alpine 3.24 for amd64/aarch64, 3.22 for armv7/armhf/i386, the last ones published for those architectures).
 
 - Test env: `uv venv -p python3.12 .venv && uv pip install -p .venv pytest "paho-mqtt<2" pyserial ruff`
 - Tests (no hardware, no broker): `.venv/bin/pytest`; one test: `.venv/bin/pytest tests/test_characterization.py::test_single_pack_poll`

@@ -30,11 +30,15 @@ def _env(env: Mapping[str, str], name: str, default: Any, cast: type) -> Any:
 
 def _baudrate(value: str | None) -> int:
     """'auto'/empty -> 0 (by mode), else 9600 or 19200."""
-    try:
-        baud = int(value or 0)
-    except ValueError:
+    if value is None or str(value).strip().lower() in ("", "auto", "0"):
         return 0
-    return baud if baud in (9600, 19200) else 0
+    try:
+        baud = int(value)
+    except ValueError:
+        baud = -1
+    if baud not in (9600, 19200):
+        raise ConfigError(f"SERIAL_BAUDRATE={value!r} (auto, 9600 or 19200)")
+    return baud
 
 
 @dataclass(frozen=True)

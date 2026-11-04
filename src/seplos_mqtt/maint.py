@@ -45,6 +45,7 @@ CAP_UART1 = "maint_uart1"
 CAP_LOCK = "maint_lock"
 CAP_MARKER = "maint_marker"
 CAP_HARD_STOP = "maint_hard_stop"
+CAP_RTC = "maint_rtc"
 
 
 @dataclass
@@ -62,7 +63,7 @@ class Timed:
 class MaintSupport:
     address: int
     multi_pack: bool
-    state: str = "pending"            # pending | present | absent | unknown
+    state: str = "pending"            # pending | present | absent | unknown | unsupported
     attempts: int = 0
     identity: md.Identity | None = None
     energy: Timed = field(default_factory=Timed)
@@ -87,13 +88,14 @@ class MaintSupport:
                 self.state = "unknown"
                 logger.info("Pack%s:No answer to the MAINT identity request, MAINT reads disabled", self.address)
             return
-        if answer.code in UNSUPPORTED_RTN:
+        if answer.code in UNSUPPORTED_RTN and not answer.info:
             # OEM firmware: unknown command / subcommand
             self.state = "absent"
             logger.info("Pack%s:No MAINT firmware (identity request answered with RTN %02X)", self.address, answer.code)
             return
         if answer.code != 0x00:
-            # checksum/device errors (RTN 02, 08, ...) say nothing about the firmware: try again
+            # checksum/device errors (RTN 02, 08, ...) or a rejection that isn't the exact empty form
+            # say nothing about the firmware: try again
             logger.debug("Pack%s:MAINT identity request: RTN %02X", self.address, answer.code)
             if self.attempts >= DETECT_ATTEMPTS:
                 self.state = "unknown"
@@ -101,7 +103,8 @@ class MaintSupport:
         try:
             self.identity = md.decode_identity(answer.info)
         except md.MaintFormatError as e:
-            self.state = "absent"
+            # a MAINT board we don't understand is not an OEM board: no reads, but nothing resolved
+            self.state = "unsupported"
             logger.warning("Pack%s:Unsupported MAINT identity, MAINT reads disabled: %s", self.address, e)
             return
         self.state = "present"
@@ -119,6 +122,8 @@ class MaintSupport:
             caps.add(CAP_STORAGE)
         if self.multi_pack:
             caps.add(CAP_UART1)
+            if self.identity.has_flag(md.FLAG_UART1_POWER_RTC):
+                caps.add(CAP_RTC)
         if self.identity.has_flag(md.FLAG_PACK_LOCK) and self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
             caps.add(CAP_LOCK)
         if self._marker_readable:
@@ -158,7 +163,7 @@ class MaintSupport:
         if self.identity is None:
             return
         now = time.monotonic()
-        if self.identity.has_capability(md.CAP_LIVE_ENERGY):
+        if self.identity.capabilities & (md.CAP_LIVE_ENERGY | md.CAP_PERSISTED_SOC):
             self._due(self.energy, now, ENERGY_INTERVAL,
                       lambda: self._decode(bus, md.INFO_ENERGY, md.ENERGY_LEN, md.decode_energy))
         if self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
@@ -224,8 +229,9 @@ class MaintSupport:
         normal: dict = {"maint_version": self.identity.patch_version}
         binary: dict = {}
         attributes: dict = {"identity": self.identity.as_dict()}
-        if self.energy.value is not None:
+        if self.energy.value is not None and self.identity.has_capability(md.CAP_LIVE_ENERGY):
             attributes["live_snapshot"] = {**self.energy.value["live"], "read_at": self.energy.read_at}
+        if self.energy.value is not None:
             if self.identity.has_capability(md.CAP_PERSISTED_SOC):
                 attributes["checkpoint"] = {**self.energy.value["persisted"], "read_at": self.energy.read_at}
         if self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
