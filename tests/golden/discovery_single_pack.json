@@ -4654,6 +4654,12 @@
     "payload": "",
     "qos": 1,
     "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-system/system_power/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-system/system_soc/config"
   },
   {

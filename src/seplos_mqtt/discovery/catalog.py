@@ -247,6 +247,8 @@ SYSTEM: list[Entity] = [
     Entity("system_state", "System State (Aggregate)", Y, icon="mdi:information-outline"),
     Entity("system_voltage", "System Voltage", Y, precision=1, **V),
     Entity("system_current", "System Current", Y, precision=1, invert=True, **A),
+    Entity("system_power", "System Power (calculated)", Y, precision=0, invert=True, device_class="power",
+           state_class="measurement", unit="W", icon="mdi:flash"),
     Entity("system_soc", "System SOC", Y, device_class="battery", state_class="measurement", unit="%"),
     Entity("total_capacity", "Total Full Capacity", Y, unit="Ah", state_class="measurement", icon="mdi:battery"),
     Entity("charge_voltage_limit", "Charge Voltage Limit", Y, precision=1, **V),

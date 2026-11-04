@@ -273,6 +273,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | System State (Aggregate) (System) | `system: normal.system_state` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System Voltage (System) | `system: normal.system_voltage` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | System Current (System) | `system: normal.system_current` | – undocumented Modbus RTU FC03 0x1000 (master) |
+| System Power (calculated) (System) | `system: normal.system_power` | – calculated: System Voltage × System Current |
 | System SOC (System) | `system: normal.system_soc` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Total Full Capacity (System) | `system: normal.total_capacity` | – undocumented Modbus RTU FC03 0x1000 (master): sum of the learned full capacities |
 | Charge Voltage Limit (System) | `system: normal.charge_voltage_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |

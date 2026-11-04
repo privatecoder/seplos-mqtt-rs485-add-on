@@ -9079,6 +9079,36 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_system_system_power",
+      "dev": {
+        "ids": "seplos_bms_system"
+      },
+      "dev_cla": "power",
+      "ic": "mdi:flash",
+      "name": "System Power (calculated)",
+      "obj_id": "seplos_bms_system_system_power",
+      "stat_cla": "measurement",
+      "stat_t": "bms/garage/system/sensors",
+      "sug_dsp_prc": 0,
+      "uniq_id": "seplos_bms_system_system_power",
+      "unit_of_meas": "W",
+      "val_tpl": "{{ value_json.normal.system_power }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/sensor/seplos-mqtt-system/system_power/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "bms/garage/availability"
+        },
+        {
+          "t": "bms/garage/system/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_system_system_soc",
       "dev": {
         "ids": "seplos_bms_system"
