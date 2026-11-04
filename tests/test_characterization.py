@@ -8,12 +8,9 @@ fix commit for that id updates the expectation.
 """
 from __future__ import annotations
 
-import json
-
 import api
 import frames as f
 from fakes import FakeBms
-
 
 # --- decoders --------------------------------------------------------------------------------
 
@@ -406,7 +403,7 @@ def test_negative_temperatures_and_parameter_currents():
 def test_every_alarm_field_individually(golden):
     """Set one byte alarm / one event byte at a time; the golden pins which keys react."""
     results = {}
-    for idx, (name, kwargs) in enumerate([
+    for name, kwargs in ([
         ("ambient", dict(ambient_alarm=2)), ("power", dict(power_alarm=1)), ("current", dict(current_alarm=2)),
         ("pack_voltage", dict(pack_voltage_alarm=1)), ("other", dict(power_alarm=0xF0)),
     ]):

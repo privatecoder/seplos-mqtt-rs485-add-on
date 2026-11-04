@@ -35,6 +35,6 @@
       {}
     ]
   ],
-  "on_connect": "on_mqtt_connect",
-  "on_disconnect": "on_mqtt_disconnect"
+  "on_connect": true,
+  "on_disconnect": true
 }

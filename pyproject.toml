@@ -9,6 +9,9 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.ruff]
-line-length = 140
+line-length = 150
 target-version = "py312"
 src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

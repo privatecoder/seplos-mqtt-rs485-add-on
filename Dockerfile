@@ -15,9 +15,8 @@ RUN apk add --no-cache \
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Application files kopieren
-COPY src/fetch_bms_data.py ./
-COPY src/ha_auto_discovery.py ./
+# Application: launcher + seplos_mqtt package
+COPY src/ ./
 COPY run.sh /
 
 # Make sure entrypoint is executable

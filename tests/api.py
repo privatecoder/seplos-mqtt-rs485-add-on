@@ -5,132 +5,143 @@ delegates; it must not re-implement production composition.
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime as _dt
 from contextlib import contextmanager
 
-import fetch_bms_data as fb
-from ha_auto_discovery import AutoDiscoveryConfig
-
 from fakes import FakeBms, FakeMqtt, FakeSerial
+from seplos_mqtt import app
+from seplos_mqtt.config import Config
+from seplos_mqtt.decoders import alarms, identity, intrapack, parameters, system
+from seplos_mqtt.decoders.identity import device_firmware
+from seplos_mqtt.discovery import Discovery
+from seplos_mqtt.framing import ascii as af
+from seplos_mqtt.framing import modbus
+from seplos_mqtt.pack import BatteryPack
+from seplos_mqtt.system import SystemReader
+from seplos_mqtt.transport import SerialBus
+
+_CONFIG = {"config": Config.from_env()}
+
+# legacy Config attribute names used by the tests -> Config fields
+_FIELDS = {
+    "NUMBER_OF_PACKS": "number_of_packs",
+    "ENABLE_HA_DISCOVERY_CONFIG": "enable_ha_discovery",
+    "MQTT_TOPIC": "mqtt_topic",
+    "HA_DISCOVERY_PREFIX": "ha_discovery_prefix",
+}
 
 
-def _ascii(info: bytes) -> bytes:
-    return info.hex().upper().encode()
+def config() -> Config:
+    return _CONFIG["config"]
 
 
 @contextmanager
 def mode(number_of_packs: int, **overrides):
-    """Run with a given pack count and Config overrides (attribute names of the legacy Config)."""
+    """Run with a given pack count and Config overrides (legacy attribute names)."""
+    old = _CONFIG["config"]
     values = {"NUMBER_OF_PACKS": number_of_packs, **overrides}
-    old = {k: getattr(fb.Config, k) for k in values}
-    for k, v in values.items():
-        setattr(fb.Config, k, v)
+    _CONFIG["config"] = dataclasses.replace(old, **{_FIELDS[k]: v for k, v in values.items()})
     try:
         yield
     finally:
-        for k, v in old.items():
-            setattr(fb.Config, k, v)
+        _CONFIG["config"] = old
 
 
 def no_sleep(monkeypatch) -> None:
-    monkeypatch.setattr(fb.time, "sleep", lambda _s: None)
+    import time
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
 
 
 # --- framing ----------------------------------------------------------------------------------
 
 def encode_request(address: int, cid2: int, info: bytes = b"01") -> bytes:
-    return fb.SeplosBatteryPack(address).encode_cmd(address=address, cid2=cid2, info=info)
+    return af.encode(address, cid2, info)
 
 
 def modbus_crc(data: bytes) -> int:
-    return fb.SeplosBatteryPack.modbus_crc16(data)
+    return modbus.crc16(data)
 
 
 # --- decoders ---------------------------------------------------------------------------------
 
 def decode_telemetry(info: bytes) -> dict:
-    return fb.SeplosBatteryPack(0).decode_telemetry_feedback_frame(_ascii(info))
+    return decode_telemetry_sequence([info])[0]
 
 
 def decode_telemetry_sequence(infos: list[bytes]) -> list[dict]:
     """Several 0x42 answers decoded by the same pack (stateful energy handling)."""
-    pack = fb.SeplosBatteryPack(0)
-    return [pack.decode_telemetry_feedback_frame(_ascii(i)) for i in infos]
+    pack = BatteryPack(0, None, config())
+    return [pack._decode_telemetry(i) for i in infos]
 
 
 def decode_telesignal(info: bytes) -> dict:
-    return fb.SeplosBatteryPack(0).decode_telesignalization_feedback_frame(_ascii(info))
+    return alarms.decode(info)
 
 
 def decode_device_info(info: bytes) -> dict:
-    return fb.SeplosBatteryPack.decode_device_info_frame(_ascii(info))
+    return identity.decode_device_info(info)
 
 
 def decode_serial(info: bytes) -> dict:
-    return fb.SeplosBatteryPack.decode_serial_number_frame(_ascii(info))
+    return identity.decode_serial_number(info)
 
 
 def decode_parameters(info: bytes) -> dict:
-    return fb.SeplosBatteryPack.decode_parameter_frame(_ascii(info))
+    return parameters.decode_ascii_answer(info)
 
 
 def decode_intra_pack_record(info: bytes) -> dict:
-    return fb.SeplosBatteryPack.decode_intra_pack_frame(_ascii(info))
+    return intrapack.decode_record(info)
 
 
 def decode_extended_status(info: bytes) -> dict:
-    return fb.SeplosBatteryPack.decode_extended_status(_ascii(info))
+    return intrapack.decode_extended_status(info)
 
 
 def decode_system(regs: list[int]) -> dict:
-    return fb.SystemData.decode(regs)
+    return system.decode(regs)
 
 
 # --- polling ----------------------------------------------------------------------------------
 
 def make_pack(address: int):
-    return fb.SeplosBatteryPack(address)
+    return BatteryPack(address, None, config())
 
 
 def poll(pack, bms: FakeBms):
-    """One read_serial_data() call against the fake bus; outbound frames must be valid."""
-    fb.app_state.serial_instance = FakeSerial(bms)
-    result = pack.read_serial_data()
+    """One poll against the fake bus; outbound frames must be valid."""
+    pack.bus = SerialBus(FakeSerial(bms))
+    pack.config = config()
+    result = pack.read()
     assert not bms.protocol_errors, bms.protocol_errors
     return result
 
 
 def read_system(master, bms: FakeBms):
-    fb.app_state.serial_instance = FakeSerial(bms)
-    return fb.SystemData().read(master)
+    return SystemReader().read(SerialBus(FakeSerial(bms)))
 
 
 # --- discovery --------------------------------------------------------------------------------
 
-def discovery(invert: bool = False, topic: str = "seplos", prefix: str = "homeassistant") -> tuple[AutoDiscoveryConfig, FakeMqtt]:
+def discovery(invert: bool = False, topic: str = "seplos", prefix: str = "homeassistant") -> tuple[Discovery, FakeMqtt]:
     client = FakeMqtt()
-    disc = AutoDiscoveryConfig(
-        mqtt_topic=topic,
-        discovery_prefix=prefix,
-        invert_ha_dis_charge_measurements=invert,
-        mqtt_client=client,
-    )
-    return disc, client
+    return Discovery(client, topic, prefix, invert), client
 
 
-def discovery_startup(disc: AutoDiscoveryConfig, number_of_packs: int) -> None:
+def discovery_startup(disc: Discovery, number_of_packs: int) -> None:
     """The discovery calls main() makes at startup."""
     multi = number_of_packs > 1
     for pack_no in range(number_of_packs):
-        disc.create_autodiscovery_sensors(pack_no=pack_no, pack_bus=not multi)
+        disc.publish_pack(pack_no, pack_bus=not multi)
     if multi:
-        disc.create_system_sensors()
+        disc.publish_system()
     else:
-        disc.remove_system_sensors()
+        disc.remove_system()
 
 
-def firmware_refresh(disc: AutoDiscoveryConfig, pack_no: int, info: dict) -> None:
-    disc.update_firmware_version(pack_no, fb.device_firmware(info))
+def firmware_refresh(disc: Discovery, pack_no: int, info: dict) -> None:
+    disc.update_firmware(pack_no, device_firmware(info))
 
 
 # --- initialization -----------------------------------------------------------------------------
@@ -142,13 +153,13 @@ class SerialSpy:
 
 
 def init_serial(monkeypatch, number_of_packs: int) -> dict:
-    monkeypatch.setattr(fb.serial, "Serial", SerialSpy)
+    monkeypatch.setattr(app.serial, "Serial", SerialSpy)
     with mode(number_of_packs):
-        return fb.initialize_serial().kwargs
+        return app.initialize_serial(config()).kwargs
 
 
 class MqttClientSpy:
-    instances: list["MqttClientSpy"] = []
+    instances: list[MqttClientSpy] = []
 
     def __init__(self, *args, **kwargs):
         self.args, self.kwargs = args, kwargs
@@ -170,12 +181,12 @@ class MqttClientSpy:
 
 def init_mqtt(monkeypatch) -> dict:
     MqttClientSpy.instances.clear()
-    monkeypatch.setattr(fb.mqtt, "Client", MqttClientSpy)
-    client = fb.initialize_mqtt()
+    monkeypatch.setattr(app.mqtt, "Client", MqttClientSpy)
+    client = app.initialize_mqtt(app.AppState(config=config()))
     return {
         "calls": [[name, list(a), k] for name, a, k in client.calls],
-        "on_connect": client.on_connect.__name__,
-        "on_disconnect": client.on_disconnect.__name__,
+        "on_connect": callable(client.on_connect),
+        "on_disconnect": callable(client.on_disconnect),
     }
 
 
@@ -229,17 +240,17 @@ def run_main(
         clock["t"] += seconds_per_tick
         return clock["t"]
 
-    monkeypatch.setattr(fb.time, "sleep", lambda _s: None)
-    monkeypatch.setattr(fb.time, "time", fake_time)
-    monkeypatch.setattr(fb, "datetime", FixedDatetime)
-    monkeypatch.setattr(fb, "initialize_mqtt", lambda: client)
-    monkeypatch.setattr(fb, "initialize_serial", lambda: port)
-    monkeypatch.setattr(fb, "_start_health_server", lambda: None)
-    monkeypatch.setattr(fb.sys, "exit", lambda *_a: None)
-    monkeypatch.setenv("MQTT_TOPIC", topic)
+    import time
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    monkeypatch.setattr(time, "time", fake_time)
+    monkeypatch.setattr(app, "datetime", FixedDatetime)
+    monkeypatch.setattr(app, "initialize_mqtt", lambda _state: client)
+    monkeypatch.setattr(app, "initialize_serial", lambda _config: port)
+    monkeypatch.setattr(app, "start_health_server", lambda _state: None)
+    monkeypatch.setattr(app.signal, "signal", lambda *_a: None)
     with mode(number_of_packs, ENABLE_HA_DISCOVERY_CONFIG=discovery, MQTT_TOPIC=topic, HA_DISCOVERY_PREFIX=prefix):
         try:
-            fb.main()
+            app.main(config())
         except StopLoop:
             pass
     assert not bms.protocol_errors, bms.protocol_errors
