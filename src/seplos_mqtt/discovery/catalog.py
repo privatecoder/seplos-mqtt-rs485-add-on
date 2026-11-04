@@ -277,6 +277,30 @@ SYSTEM: list[Entity] = [
     Entity("force_charge_2", "Force Charge Request II (SOC <= 9 %)", Y, "binary_sensor", category=DIAG),
 ]
 
+E = "set"
+# Values of a parallel set, computed from its members' 0x42 data (sets.py), topic <topic>/set-<id>/sensors
+SET_ENTITIES: list[Entity] = [
+    Entity("current", "Current", E, precision=2, invert=True, **A),
+    Entity("power", "Power", E, precision=0, invert=True, device_class="power",
+           state_class="measurement", unit="W", icon="mdi:flash"),
+    Entity("soc", "SOC", E, device_class="battery", state_class="measurement", unit="%", precision=1),
+    Entity("voltage_median", "Voltage Median", E, precision=2, **V),
+    Entity("voltage_range", "Voltage Range", E, precision=3, **V),
+    Entity("highest_cell_voltage", "Highest Cell Voltage", E, precision=3, **V),
+    Entity("highest_cell_voltage_pack", "Highest Cell Voltage Pack", E, icon="mdi:numeric"),
+    Entity("lowest_cell_voltage", "Lowest Cell Voltage", E, precision=3, **V),
+    Entity("lowest_cell_voltage_pack", "Lowest Cell Voltage Pack", E, icon="mdi:numeric"),
+    Entity("highest_cell_temperature", "Highest Cell Temperature", E, precision=1, **T),
+    Entity("highest_cell_temperature_pack", "Highest Cell Temperature Pack", E, icon="mdi:numeric"),
+    Entity("lowest_cell_temperature", "Lowest Cell Temperature", E, precision=1, **T),
+    Entity("lowest_cell_temperature_pack", "Lowest Cell Temperature Pack", E, icon="mdi:numeric"),
+    # the membership (name, packs, wiring, taps) travels as attributes of this entity
+    Entity("members_reporting", "Members Reporting", E, category=DIAG, icon="mdi:battery-sync",
+           attributes="{{ value_json.get('set', {}) | tojson }}"),
+    Entity("sample_age", "Sample Age", E, category=DIAG, unit="s", state_class="measurement", precision=1,
+           icon="mdi:timer-outline"),
+]
+
 # Retained discovery configs of earlier versions that must be cleared: (domain, key)
 OBSOLETE: list[tuple[str, str]] = [
     # state of health: the firmware always sends 100 %

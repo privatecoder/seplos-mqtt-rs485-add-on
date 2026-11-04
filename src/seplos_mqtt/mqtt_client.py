@@ -56,6 +56,11 @@ class Publisher:
             return True
         return False
 
+    def forget(self, topic: str) -> None:
+        """Drop a topic that is gone (a deleted parallel set): replay() must not resend it."""
+        self._latest.pop(topic, None)
+        self._sent.pop(topic, None)
+
     def replay(self) -> None:
         """Resend the latest state of every topic (after a reconnect or an HA restart)."""
         self._sent.clear()

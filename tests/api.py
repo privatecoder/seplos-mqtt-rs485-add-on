@@ -246,7 +246,7 @@ def run_main(
     restart_after_polls: int | None = None,
     startup: bool = False,
     job_after_polls: int | None = None,
-    sets_after_polls: tuple[int, tuple] | None = None,
+    sets_after_polls: list[tuple[int, tuple]] | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -255,7 +255,7 @@ def run_main(
     execv calls and the AppState instances of the run are left in LAST_RUN. `startup=True` runs
     main() without a config (startup_config(os.environ), bridge): the caller sets the environment.
     `job_after_polls` submits a "detect" job (like the web thread would); it is left in LAST_RUN["job"].
-    `sets_after_polls=(n, sets)` hands over saved parallel sets like the web thread would (AppState.request_sets).
+    `sets_after_polls=[(n, sets), ...]` hands over saved parallel sets like the web thread would (AppState.request_sets).
     """
     from frames import ascii_frame
 
@@ -277,8 +277,9 @@ def run_main(
                 LAST_RUN["states"][0].request_restart()
             if job_after_polls is not None and counter["n"] == job_after_polls + 1:
                 LAST_RUN["job"] = LAST_RUN["states"][0].jobs.submit("detect")
-            if sets_after_polls is not None and counter["n"] == sets_after_polls[0] + 1:
-                LAST_RUN["states"][0].request_sets(types.SimpleNamespace(parallel_sets=sets_after_polls[1]))
+            for after, handed_over in sets_after_polls or []:
+                if counter["n"] == after + 1:
+                    LAST_RUN["states"][0].request_sets(types.SimpleNamespace(parallel_sets=handed_over))
             if entry is None:
                 return b""
             return entry(req) if callable(entry) else ascii_frame(adr, 0x00, entry)

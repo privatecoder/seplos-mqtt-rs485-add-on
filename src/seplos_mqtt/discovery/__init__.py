@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from .. import topics
-from .catalog import CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SYSTEM, Entity
+from .catalog import CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SET_ENTITIES, SYSTEM, Entity
 
 logger = logging.getLogger("SeplosBMS.discovery")
 
@@ -33,6 +33,11 @@ SYSTEM_SCOPE = "system"
 MAINT_CONDITIONS = frozenset({"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc"})
 
 
+def _is_set(scope: Any) -> bool:
+    """Parallel set scopes are ``("set", id)``; packs are ints, the system device is a string."""
+    return isinstance(scope, tuple)
+
+
 class Discovery:
     def __init__(self, client, mqtt_topic: str, prefix: str, invert: bool, maint_enabled: bool = False) -> None:
         self.maint_enabled = maint_enabled
@@ -49,6 +54,8 @@ class Discovery:
         # MAINT capabilities per pack (discovery conditions)
         self._caps: dict[int, set[str]] = {}
         self._system_active = False
+        # names of the published parallel sets (device name)
+        self._set_names: dict[int, str] = {}
         # a publish was not accepted: the app reconciles everything again later
         self.failed = False
 
@@ -62,13 +69,20 @@ class Discovery:
         if entity.kind == "parameters":
             return "{{ value_json.get('parameters', {}).get('read_at') }}"
         state = "binary" if entity.domain == "binary_sensor" else "normal"
-        path = f"value_json.{state}.{entity.key}" if scope == SYSTEM_SCOPE else f"value_json.{entity.group}.{state}.{entity.key}"
+        flat = scope == SYSTEM_SCOPE or _is_set(scope)       # system and set payloads have no group level
+        path = f"value_json.{state}.{entity.key}" if flat else f"value_json.{entity.group}.{state}.{entity.key}"
         if entity.invert and self.invert and entity.domain == "sensor":
             # keep unknown (null) values unknown instead of a template error
             return f"{{{{ none if {path} is none else ({path} | float) * -1 }}}}"
         return f"{{{{ {path} }}}}"
 
     def _device(self, scope, full: bool) -> dict:
+        if _is_set(scope):
+            device: dict[str, Any] = {"ids": topics.set_device_id(scope[1])}
+            if full:
+                device = {**DEVICE_BASE, "name": f"Seplos Parallel Set {self._set_names.get(scope[1], scope[1])}", **device,
+                          "via_device": topics.pack_device_id(0)}
+            return device
         if scope == SYSTEM_SCOPE:
             if not full:
                 return {"ids": topics.SYSTEM_DEVICE_ID}
@@ -84,7 +98,11 @@ class Discovery:
 
     def render(self, entity: Entity, scope, full_device: bool = False) -> dict:
         """Discovery config of `entity` for a pack number or the system device (pure)."""
-        if scope == SYSTEM_SCOPE:
+        if _is_set(scope):
+            object_id = f"{topics.set_device_id(scope[1])}_{entity.key}"
+            state_topic = topics.set_sensors(self.topic, scope[1])
+            availability = topics.set_availability(self.topic, scope[1])
+        elif scope == SYSTEM_SCOPE:
             object_id = f"{topics.SYSTEM_DEVICE_ID}_{entity.key}"
             state_topic = topics.system_sensors(self.topic)
             availability = topics.system_availability(self.topic)
@@ -110,7 +128,7 @@ class Discovery:
             config["json_attr_t"] = topics.pack_sensors(self.topic, scope)
             config["json_attr_tpl"] = "{{ value_json.get('parameters', {}) | tojson }}"
         elif entity.attributes:
-            config["json_attr_t"] = topics.pack_sensors(self.topic, scope)
+            config["json_attr_t"] = state_topic if _is_set(scope) else topics.pack_sensors(self.topic, scope)
             config["json_attr_tpl"] = entity.attributes
         # newer HA versions derive the entity ID from device and entity name; default_entity_id keeps
         # the IDs stable (seplos_bms_pack_<n>_<key>)
@@ -120,6 +138,8 @@ class Discovery:
     # --- publishing ---------------------------------------------------------------------------
 
     def _node(self, scope) -> str:
+        if _is_set(scope):
+            return topics.set_node(scope[1])
         return topics.SYSTEM_NODE if scope == SYSTEM_SCOPE else topics.pack_node(scope)
 
     def _publish(self, domain: str, scope, key: str, config: dict | None) -> bool:
@@ -181,6 +201,23 @@ class Discovery:
     def remove_system(self) -> None:
         for entity in SYSTEM:
             self._remove(entity.domain, SYSTEM_SCOPE, entity.key)
+
+    def publish_set(self, item: Any) -> None:
+        """All entities of a parallel set (a ``ParallelSet``); also republishes the device block, so a
+        rename shows up."""
+        scope = ("set", item.id)
+        self._set_names[item.id] = item.name
+        self._device_sent.discard(scope)
+        for entity in SET_ENTITIES:
+            self._publish_entity(entity, scope)
+
+    def remove_set(self, set_id: int) -> bool:
+        """Clear every config of a set; True only if the client accepted all of them."""
+        scope = ("set", set_id)
+        self._device_sent.discard(scope)
+        self._set_names.pop(set_id, None)
+        results = [self._publish(entity.domain, scope, entity.key, None) for entity in SET_ENTITIES]
+        return all(results)
 
     def set_capabilities(self, pack_no: int, caps: set[str], pack_bus: bool) -> bool:
         """

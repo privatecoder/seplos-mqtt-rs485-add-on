@@ -419,9 +419,13 @@ class MonitoringConfig:
 def set_activity(config: MonitoringConfig) -> list[tuple[bool, str | None]]:
     """``(active, reason)`` per stored set: a set works only in multi pack mode and when all its
     packs are configured. Inactive sets stay stored (not a validation error)."""
-    count = config.connection.pack_count
+    return activity(config.parallel_sets, config.connection.pack_count)
+
+
+def activity(sets: tuple[ParallelSet, ...], count: int) -> list[tuple[bool, str | None]]:
+    """``set_activity`` for a set list and the configured pack count."""
     out: list[tuple[bool, str | None]] = []
-    for item in config.parallel_sets:
+    for item in sets:
         if count == 1:
             out.append((False, "single_pack"))
         elif any(address >= count for address in item.packs):

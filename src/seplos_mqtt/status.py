@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .monitoring.model import activity
+
 # fields of the last pack data (decoder keys, canonical values: the HA inversion is not applied)
 _PACK_VALUES = ("state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage")
 _SYSTEM_VALUES = ("system_soc", "system_voltage", "system_current", "system_power", "total_capacity", "total_full_energy", "system_state")
@@ -66,6 +68,15 @@ def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
     if multi and state.system_data is not None:
         values = _normal(state.system_data)
         system = {key: values.get(key) for key in _SYSTEM_VALUES}
+    flags = activity(state.parallel_sets, state.config.number_of_packs)
+    sets = [
+        {
+            "id": item.id, "name": item.name, "packs": list(item.packs), "wiring": item.wiring,
+            "plus": item.plus, "minus": item.minus, "active": active, "reason": reason,
+            "values": state.set_values.get(item.id) if active else None,
+        }
+        for item, (active, reason) in zip(state.parallel_sets, flags, strict=True)
+    ]
     return {
         "generated_at": now_wall,
         "mode": "multi" if multi else "single",
@@ -74,4 +85,5 @@ def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
         "last_cycle_s": round(state.last_cycle, 1) if state.last_cycle else None,
         "packs": [_pack_status(p, now_mono) for p in state.packs],
         "system": system,
+        "sets": sets,
     }

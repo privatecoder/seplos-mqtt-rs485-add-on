@@ -23,10 +23,11 @@ from .decoders.identity import device_firmware
 from .discovery import Discovery
 from .jobs import JobQueue, step_detect
 from .monitoring.migration import load_or_migrate
-from .monitoring.model import ConfigValidationError, MonitoringConfig
+from .monitoring.model import ConfigValidationError, MonitoringConfig, activity
 from .monitoring.store import JsonStore
 from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
+from .sets import Member, set_values
 from .state import StateStore
 from .status import build_status
 from .system import SystemReader
@@ -84,6 +85,9 @@ class AppState:
     # latest saved sets, replaced as a whole by the web thread; never cleared, the loop adopts it
     # when it is not the tuple in use (no lost update between reading and clearing)
     pending_sets: tuple | None = None
+    set_values: dict[int, dict] = field(default_factory=dict)       # last computed values per active set id
+    published_sets: dict[int, Any] = field(default_factory=dict)    # ParallelSet as published to HA, per id
+    set_inventory: set[int] = field(default_factory=set)            # ids with state in HA (kept in the state file)
 
     def request_sets(self, config: Any) -> None:
         """A saved set change (web thread): picked up at the next cycle boundary, no restart."""
@@ -166,6 +170,8 @@ def publish_discovery(state: AppState) -> None:
         discovery.publish_system()
     else:
         discovery.remove_system()
+    for item in state.published_sets.values():
+        discovery.publish_set(item)
 
 
 # states are refreshed shortly after discovery (HA subscribes after processing the configs)
@@ -178,6 +184,7 @@ def resync(state: AppState) -> None:
     """After a reconnect or an HA restart: discovery, availability and the latest states again."""
     logger.info("Resending discovery configs and states")
     publish_discovery(state)
+    reconcile_sets(state)                  # removals that were not accepted before
     now = time.monotonic()
     for pack_state in state.packs:
         pack_state.availability = "unknown"          # current (freshness-derived) value goes out again
@@ -219,9 +226,13 @@ def pack_max_age(state: AppState, now: float) -> float:
     return max(state.max_age(), 3 * state.last_cycle + 10, running + state.max_age())
 
 
+def pack_online(state: AppState, pack_state: PackState, now: float) -> bool:
+    return pack_state.last_success is not None and now - pack_state.last_success <= pack_max_age(state, now)
+
+
 def publish_pack_availability(state: AppState, pack_state: PackState, now: float) -> None:
     """Publish a changed availability; the change only counts as sent once the client accepted it."""
-    online = pack_state.last_success is not None and now - pack_state.last_success <= pack_max_age(state, now)
+    online = pack_online(state, pack_state, now)
     desired = "online" if online else "offline"
     if pack_state.availability != desired:
         if state.publisher.publish(topics.pack_availability(state.config.mqtt_topic, pack_state.address), desired):
@@ -243,6 +254,82 @@ def publish_system_data(state: AppState, reader: SystemReader) -> None:
     state.publisher.publish(topics.system_availability(base), "online" if data is not None else "offline")
     if data is not None and state.publisher.state(topics.system_sensors(base), data):
         logger.info("System:Publishing updated data to MQTT")
+
+
+def active_sets(state: AppState) -> list:
+    """The adopted sets that can work: multi pack mode and all members configured."""
+    flags = activity(state.parallel_sets, state.config.number_of_packs)
+    return [item for item, (ok, _reason) in zip(state.parallel_sets, flags, strict=True) if ok]
+
+
+def set_members(state: AppState, item: Any, now: float) -> list[Member]:
+    packs = {p.address: p for p in state.packs}
+    members = []
+    for address in item.packs:
+        pack_state = packs.get(address)
+        data = pack_state.last_data if pack_state is not None else None
+        normal = data.get("telemetry", {}).get("normal") if isinstance(data, dict) else None
+        online = pack_state is not None and pack_online(state, pack_state, now)
+        age = now - pack_state.last_success if pack_state is not None and pack_state.last_success is not None else None
+        members.append(Member(address, online and isinstance(normal, dict), age, normal))
+    return members
+
+
+def save_set_inventory(state: AppState) -> bool:
+    """Write the inventory (also retries a write that failed before); True once it is on disk."""
+    if state.store is None:
+        return True
+    return state.store.set_durable("published_sets", sorted(state.set_inventory))
+
+
+def remove_set(state: AppState, set_id: int) -> bool:
+    """A deleted or inactive set: its HA entities and states go away, availability is retained offline.
+    True only if the client accepted every message; otherwise the caller keeps the id and retries."""
+    base = state.config.mqtt_topic
+    ok = state.discovery.remove_set(set_id) if state.discovery is not None else True
+    state.publisher.forget(topics.set_sensors(base, set_id))
+    state.publisher.forget(topics.set_availability(base, set_id))
+    ok = state.publisher.publish(topics.set_availability(base, set_id), "offline", retain=True) and ok
+    state.published_sets.pop(set_id, None)
+    state.set_values.pop(set_id, None)
+    return ok
+
+
+def reconcile_sets(state: AppState) -> list:
+    """Keep the inventory (ids that may still have retained data on the broker) in step: every id that
+    is not an active set is removed again until the client accepted the cleanup (also a set deleted
+    while the add-on was stopped, or any set in single pack mode). Returns the sets that may publish:
+    the active ones whose id is durably recorded."""
+    active = active_sets(state)
+    state.set_inventory |= {item.id for item in active}
+    recorded = save_set_inventory(state)             # before anything of a new set is published
+    wanted = {item.id for item in active}
+    for set_id in sorted(state.set_inventory - wanted):
+        if remove_set(state, set_id):
+            state.set_inventory.discard(set_id)
+    save_set_inventory(state)                        # no-op unless a removal succeeded or the last write failed
+    return active if recorded else [item for item in active if item.id in state.published_sets]
+
+
+def publish_sets(state: AppState) -> None:
+    """Values and HA devices of the active parallel sets (after a full poll cycle)."""
+    base, now = state.config.mqtt_topic, time.monotonic()
+    for item in reconcile_sets(state):
+        if state.published_sets.get(item.id) != item:
+            if state.discovery is not None:
+                state.discovery.publish_set(item)
+            state.published_sets[item.id] = item
+            state.next_replay = now + REPLAY_DELAY_SECONDS
+        values = set_values(set_members(state, item, now))
+        state.set_values[item.id] = values
+        payload = {
+            "normal": values,
+            "set": {"name": item.name, "packs": list(item.packs), "wiring": item.wiring,
+                    "plus": item.plus, "minus": item.minus},
+        }
+        if state.publisher.state(topics.set_sensors(base, item.id), payload):
+            logger.debug("Set %s:Publishing updated data to MQTT", item.id)
+        state.publisher.state(topics.set_availability(base, item.id), "online")
 
 
 def poll_pack(state: AppState, pack_state: PackState) -> None:
@@ -486,6 +573,8 @@ def main(config: Config | None = None) -> None:
             )
             publish_discovery(state)
             logger.info("Auto-Discovery configurations sent")
+        state.set_inventory = {i for i in state.store.get("published_sets", []) if isinstance(i, int)}
+        reconcile_sets(state)          # sets deleted while the add-on was stopped, or single pack mode
 
         index = 0
         system_reader = SystemReader()
@@ -513,6 +602,7 @@ def main(config: Config | None = None) -> None:
                     index = 0
                     publish_system_data(state, system_reader)
                     state.adopt_sets()
+                    publish_sets(state)
                     now = time.monotonic()
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
                     update_status(state)

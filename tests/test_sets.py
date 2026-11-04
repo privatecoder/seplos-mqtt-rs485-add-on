@@ -415,7 +415,7 @@ def test_state_adopts_pending_sets_only_when_asked(caplog):
 def test_main_loop_adopts_saved_sets_at_the_cycle_boundary(monkeypatch, caplog):
     sets = _sets(1)
     with caplog.at_level(logging.INFO, logger="SeplosBMS"):
-        api.run_main(monkeypatch, _multi_pack_bms(), number_of_packs=2, telemetry_polls=8, sets_after_polls=(2, sets))
+        api.run_main(monkeypatch, _multi_pack_bms(), number_of_packs=2, telemetry_polls=8, sets_after_polls=[(2, sets)])
     state = api.LAST_RUN["states"][0]
     assert state.parallel_sets == sets
     assert caplog.text.count("Parallel sets updated: 1 set(s)") == 1

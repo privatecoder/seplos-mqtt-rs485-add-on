@@ -30,6 +30,26 @@ def system_availability(base: str) -> str:
     return f"{base}/system/availability"
 
 
+def set_base(base: str, set_id: int) -> str:
+    return f"{base}/set-{set_id}"
+
+
+def set_sensors(base: str, set_id: int) -> str:
+    return f"{set_base(base, set_id)}/sensors"
+
+
+def set_availability(base: str, set_id: int) -> str:
+    return f"{set_base(base, set_id)}/availability"
+
+
+def set_device_id(set_id: int) -> str:
+    return f"seplos_bms_set_{set_id}"
+
+
+def set_node(set_id: int) -> str:
+    return f"seplos-mqtt-set-{set_id}"
+
+
 def pack_device_id(pack_no: int) -> str:
     return f"seplos_bms_pack_{pack_no}"
 
