@@ -9,6 +9,7 @@ RUN apk add --no-cache \
     socat \
     bash \
     jq \
+    py3-aiohttp \
     py3-paho-mqtt \
     py3-pyserial
 

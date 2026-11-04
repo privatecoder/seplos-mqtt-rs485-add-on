@@ -165,18 +165,28 @@ class SerialBus:
                 logger.debug("Intra-pack: invalid frame %s", raw)
         return True
 
-    def request(self, address: int, cid2: int, expected: af.ExpectedLength, label: str, info: bytes = b"\x01") -> bytes | None:
-        """Request a normal answer whose binary INFO has the expected length; returns that INFO."""
+    def request(
+        self, address: int, cid2: int, expected: af.ExpectedLength, label: str, info: bytes = b"\x01", retries: int | None = None
+    ) -> bytes | None:
+        """Request a normal answer whose binary INFO has the expected length; returns that INFO.
+
+        `retries` limits the attempts (None: FRAME_READ_RETRIES). A caller that sets it handles the
+        failure itself (e.g. probing addresses), so it is only debug-logged then.
+        """
+        attempts = self.FRAME_READ_RETRIES if retries is None else retries
         command = af.encode(address, cid2, info)
         logger.debug("Pack%s:%s_command: %s", address, label, command)
         with self._lock:
-            for attempt in range(self.FRAME_READ_RETRIES):
+            for attempt in range(attempts):
                 self._send(command)
                 payload = af.validate_response(self._receive_frame(), address, expected)
                 if payload is not None:
                     return payload
                 logger.debug("Pack%s:%s attempt %s: no valid answer", address, label, attempt + 1)
-        logger.error("Pack%s:Failed to read %s after %s retries", address, label.lower(), self.FRAME_READ_RETRIES)
+        if retries is None:
+            logger.error("Pack%s:Failed to read %s after %s retries", address, label.lower(), attempts)
+        else:
+            logger.debug("Pack%s:No valid %s answer", address, label.lower())
         return None
 
     def request_rtn(self, address: int, cid2: int) -> int | None:

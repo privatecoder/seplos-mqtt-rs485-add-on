@@ -227,6 +227,10 @@ class StopLoop(BaseException):
     """Raised from the fake bus to leave main()'s endless loop (not caught by `except Exception`)."""
 
 
+# execv calls ((path, argv) tuples) and AppState instances of the last run_main()
+LAST_RUN: dict = {"execs": [], "states": [], "exit": None, "job": None}   # "exit": SystemExit code, None if none
+
+
 def run_main(
     monkeypatch,
     bms: FakeBms,
@@ -238,10 +242,17 @@ def run_main(
     seconds_per_tick: float = 0.5,
     resync_after_polls: int | None = None,
     signal_after_polls: int | None = None,
+    restart_after_polls: int | None = None,
+    startup: bool = False,
+    job_after_polls: int | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
     (answered or not), then stop it on the next one. Returns the fake MQTT client and serial port.
+    `restart_after_polls` simulates a saved connection change (AppState.request_restart); the
+    execv calls and the AppState instances of the run are left in LAST_RUN. `startup=True` runs
+    main() without a config (startup_config(os.environ), bridge): the caller sets the environment.
+    `job_after_polls` submits a "detect" job (like the web thread would); it is left in LAST_RUN["job"].
     """
     from frames import ascii_frame
 
@@ -259,6 +270,10 @@ def run_main(
                 connection.resync.set()
             if signal_after_polls is not None and counter["n"] == signal_after_polls + 1:
                 handlers["SIGTERM"](15, None)
+            if restart_after_polls is not None and counter["n"] == restart_after_polls + 1:
+                LAST_RUN["states"][0].request_restart()
+            if job_after_polls is not None and counter["n"] == job_after_polls + 1:
+                LAST_RUN["job"] = LAST_RUN["states"][0].jobs.submit("detect")
             if entry is None:
                 return b""
             return entry(req) if callable(entry) else ascii_frame(adr, 0x00, entry)
@@ -283,11 +298,27 @@ def run_main(
     monkeypatch.setattr(app, "start_health_server", lambda _state: None)
     handlers: dict = {}
     monkeypatch.setattr(app.signal, "signal", lambda sig, handler: handlers.__setitem__(sig.name, handler))
+    # no real waiting: the interruptible sleep only reports a requested restart
+    monkeypatch.setattr(app, "wait_or_restart", lambda state, _s: state.restart_event.is_set())
+    LAST_RUN["execs"].clear()
+    LAST_RUN["states"].clear()
+    LAST_RUN["job"] = None
+    monkeypatch.setattr(app, "_execv", lambda path, argv: LAST_RUN["execs"].append((path, argv)))
+
+    @dataclasses.dataclass
+    class SpyState(app.AppState):      # a dataclass again, so the generated __init__ calls __post_init__
+        def __post_init__(self):
+            LAST_RUN["states"].append(self)
+
+    monkeypatch.setattr(app, "AppState", SpyState)
     with mode(number_of_packs, ENABLE_HA_DISCOVERY_CONFIG=discovery, MQTT_TOPIC=topic, HA_DISCOVERY_PREFIX=prefix):
+        LAST_RUN["exit"] = None
         try:
-            app.main(config())
-        except (StopLoop, SystemExit):
+            app.main(None if startup else config())
+        except StopLoop:
             pass
+        except SystemExit as e:
+            LAST_RUN["exit"] = e.code
     assert not bms.protocol_errors, bms.protocol_errors
     return client, port
 

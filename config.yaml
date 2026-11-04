@@ -1,6 +1,6 @@
 name: "Seplos MQTT RS485 Add-on"
 description: "Read Seplos V2/V16 BMS data via RS485 and publish it to HA via MQTT"
-version: "2.0.0-beta8"
+version: "2.0.0-beta9"
 slug: "seplos_mqtt_rs485_add-on"
 init: false
 arch:
@@ -19,6 +19,9 @@ hassio_api: true
 homeassistant_api: false
 services:
   - mqtt:need
+ingress: true
+ingress_port: 0
+panel_title: "Seplos BMS"
 panel_icon: "mdi:battery"
 options:
   rs485_remote_ip: ""

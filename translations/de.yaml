@@ -2,36 +2,36 @@ configuration:
   # RS485 Verbindung
   rs485_remote_ip:
     name: "Remote RS485 IP-Adresse"
-    description: "IP-Adresse des Remote RS485-Geräts (z.B. Waveshare RS485-to-ETH). Leer lassen für lokale serielle Verbindung."
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. IP-Adresse des Remote RS485-Geräts (z.B. Waveshare RS485-to-ETH). Leer lassen für lokale serielle Verbindung."
   
   rs485_remote_port:
     name: "Remote RS485 Port"
-    description: "TCP-Port des Remote RS485-Geräts (Standard: 4196)"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. TCP-Port des Remote RS485-Geräts (Standard: 4196)"
   
   serial_interface:
     name: "Serielle Schnittstelle"
-    description: "Pfad zum seriellen Gerät (z.B. /dev/ttyUSB0 für lokal oder /tmp/vcom0 für remote via socat)"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Pfad zum seriellen Gerät (z.B. /dev/ttyUSB0 für lokal oder /tmp/vcom0 für remote via socat)"
 
   serial_baudrate:
     name: "Baudrate"
-    description: "auto = 19200 bei einem Pack (RS485-1/2), 9600 bei mehreren Packs (CAN-Port). Firmware 16.04.x braucht auch an RS485-1/2 9600."
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. auto = 19200 bei einem Pack (RS485-1/2), 9600 bei mehreren Packs (CAN-Port). Firmware 16.04.x braucht auch an RS485-1/2 9600."
   
   # Batterie-Konfiguration
   number_of_packs:
     name: "Anzahl Batteriepakete"
-    description: "Gesamtanzahl der zu überwachenden Batteriepakete (1 = Einzelpack, 2+ = Master + Slaves)"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Gesamtanzahl der zu überwachenden Batteriepakete (1 = Einzelpack, 2+ = Master + Slaves)"
   
   min_cell_voltage:
     name: "Minimale Zellenspannung"
-    description: "Untere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Untere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
   
   max_cell_voltage:
     name: "Maximale Zellenspannung"
-    description: "Obere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Obere Grenze des Zellspannungsbereichs in Volt (nur für Anzeigebereiche, wird nicht aus dem BMS gelesen)"
 
   nominal_cell_voltage:
     name: "Nennspannung je Zelle"
-    description: "Nennspannung einer Zelle in Volt (LFP: 3,2). Wird für die berechnete volle Energie (kWh) der Packs und des Systems verwendet."
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Nennspannung einer Zelle in Volt (LFP: 3,2). Wird für die berechnete volle Energie (kWh) der Packs und des Systems verwendet."
   
   # MQTT Konfiguration
   mqtt_topic:
@@ -40,7 +40,7 @@ configuration:
   
   mqtt_update_interval:
     name: "MQTT Update-Intervall"
-    description: "Sekunden zwischen MQTT-Updates (0 = kontinuierliche Updates)"
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Sekunden zwischen MQTT-Updates (0 = kontinuierliche Updates)"
   
   # Home Assistant Integration
   enable_ha_discovery:
@@ -59,7 +59,7 @@ configuration:
 
   maint_firmware:
     name: "MAINT-Custom-Firmware"
-    description: "Zusätzlich die Daten der MAINT-Custom-Firmware 1.5.4 / 1.6.4 lesen, wo ein Pack sie meldet (Energiezähler in voller Breite, Flash-Speicherdiagnose, am CAN-Port: Parameter und Seriennummern jedes Packs). Nur lesend. Packs mit OEM-Firmware sind nicht betroffen."
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Zusätzlich die Daten der MAINT-Custom-Firmware 1.5.4 / 1.6.4 lesen, wo ein Pack sie meldet (Energiezähler in voller Breite, Flash-Speicherdiagnose, am CAN-Port: Parameter und Seriennummern jedes Packs). Nur lesend. Packs mit OEM-Firmware sind nicht betroffen."
   logging_level:
     name: "Log-Level"
     description: "Detailgrad der Logs (debug zeigt die meisten Details)"

@@ -27,9 +27,9 @@ Each release bumps `version` in `config.yaml` (currently `2.0.0-betaN`) and is c
 
 ## Architecture
 
-Startup chain: `run.sh` (bashio) reads the add-on options and the MQTT service credentials, exports them as env vars, optionally starts `socat` to bridge a remote RS485-to-Ethernet gateway to a local pty, then `exec`s `src/fetch_bms_data.py`, a thin launcher for `seplos_mqtt.app.main()`. The `Dockerfile` copies all of `src/`.
+Startup chain: `run.sh` (bashio) reads the add-on options and the MQTT service credentials, exports them as env vars (plus `INGRESS_PORT` and `MONITORING_FILE`), then `exec`s `src/fetch_bms_data.py`, a thin launcher for `seplos_mqtt.app.main()`. `main()` calls `startup_config()`: the connection settings come from `/data/monitoring.json` (`monitoring/`), created once from the legacy add-on options (they stay in `config.yaml`, deprecated, only as migration input); a corrupt file falls back to the options so polling continues. Python starts the `socat` bridge for a remote gateway (`bridge.py`, supervised in the main loop), and the Ingress web server (`web/server.py`, aiohttp) runs in its own thread. A saved connection change calls `AppState.request_restart`; the main loop leaves at the next pack boundary, runs `graceful_exit` and re-executes the launcher with `os.execv`. The `Dockerfile` copies all of `src/`.
 
-**Adding a config option** means touching `config.yaml` (`options` + `schema`), `run.sh` (export), `Config.from_env()` in `src/seplos_mqtt/config.py`, and both `translations/en.yaml` and `translations/de.yaml`.
+**Adding a config option**: connection settings live in `monitoring/model.py` (`ConnectionSettings`), `monitoring/migration.py` (legacy env), `Config.from_monitoring()` and the app UI; they need no `config.yaml` entry. Options that stay in the add-on configuration (MQTT, discovery, logging) mean touching `config.yaml` (`options` + `schema`), `run.sh` (export), `Config.from_env()` and `Config.from_monitoring()` in `src/seplos_mqtt/config.py`, and both `translations/en.yaml` and `translations/de.yaml`.
 
 ### Two operating modes, decided by `NUMBER_OF_PACKS`
 

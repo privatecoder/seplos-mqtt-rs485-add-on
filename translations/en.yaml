@@ -2,36 +2,36 @@ configuration:
   # RS485 Connection
   rs485_remote_ip:
     name: "Remote RS485 IP Address"
-    description: "IP address of the remote RS485 device (e.g., Waveshare RS485-to-ETH). Leave empty for local serial connection."
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. IP address of the remote RS485 device (e.g., Waveshare RS485-to-ETH). Leave empty for local serial connection."
   
   rs485_remote_port:
     name: "Remote RS485 Port"
-    description: "TCP port of the remote RS485 device (default: 4196)"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. TCP port of the remote RS485 device (default: 4196)"
   
   serial_interface:
     name: "Serial Interface"
-    description: "Serial device path (e.g., /dev/ttyUSB0 for local or /tmp/vcom0 for remote via socat)"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Serial device path (e.g., /dev/ttyUSB0 for local or /tmp/vcom0 for remote via socat)"
 
   serial_baudrate:
     name: "Baud Rate"
-    description: "auto = 19200 for a single pack (RS485-1/2), 9600 for multiple packs (CAN port). Firmware 16.04.x needs 9600 on RS485-1/2 as well."
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. auto = 19200 for a single pack (RS485-1/2), 9600 for multiple packs (CAN port). Firmware 16.04.x needs 9600 on RS485-1/2 as well."
   
   # Battery Configuration
   number_of_packs:
     name: "Number of Battery Packs"
-    description: "Total number of battery packs to monitor (1 = single pack, 2+ = master + slaves)"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Total number of battery packs to monitor (1 = single pack, 2+ = master + slaves)"
   
   min_cell_voltage:
     name: "Minimum Cell Voltage"
-    description: "Lower end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Lower end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
   
   max_cell_voltage:
     name: "Maximum Cell Voltage"
-    description: "Upper end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Upper end of the cell voltage range in volts (only used for display ranges, not read from the BMS)"
 
   nominal_cell_voltage:
     name: "Nominal Cell Voltage"
-    description: "Nominal voltage of one cell in volts (LFP: 3.2). Used for the calculated full energy (kWh) of the packs and the system."
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Nominal voltage of one cell in volts (LFP: 3.2). Used for the calculated full energy (kWh) of the packs and the system."
   
   # MQTT Configuration
   mqtt_topic:
@@ -40,7 +40,7 @@ configuration:
   
   mqtt_update_interval:
     name: "MQTT Update Interval"
-    description: "Seconds between MQTT updates (0 = continuous updates)"
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Seconds between MQTT updates (0 = continuous updates)"
   
   # Home Assistant Integration
   enable_ha_discovery:
@@ -57,7 +57,7 @@ configuration:
   
   maint_firmware:
     name: "MAINT Custom Firmware"
-    description: "Also read the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware where a pack reports it (full-width energy counters, flash storage diagnostics, on the CAN port: parameters and serial numbers of every pack). Read-only. Packs with OEM firmware are not affected."
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Also read the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware where a pack reports it (full-width energy counters, flash storage diagnostics, on the CAN port: parameters and serial numbers of every pack). Read-only. Packs with OEM firmware are not affected."
 
   # System Settings
   logging_level:

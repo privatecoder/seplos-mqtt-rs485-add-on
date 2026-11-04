@@ -124,13 +124,23 @@ Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one
 5. Save and start the add-on.
 6. Check the logs for successful startup.
 
+### Settings app (sidebar)
+
+The add-on adds a **Seplos BMS** entry to the Home Assistant sidebar (Ingress). The connection settings
+(remote gateway or serial device, baud rate, number of packs, cell voltage range, update interval, MAINT
+firmware) are stored in `/data/monitoring.json`. The corresponding add-on options in step 4 are only used once,
+to create these initial settings on the first start with this version (they are deprecated); afterwards change
+them in the Seplos BMS app. Saving a changed connection restarts the add-on's process in place, so all packs,
+discovery entities and the gateway bridge are rebuilt from the saved settings. The MQTT, discovery and logging
+options stay in the add-on configuration.
+
 Example log output:
 
 ```text
 [13:03:09] INFO: Starting Seplos MQTT RS485 Add-on...
 [13:03:09] INFO: MQTT service configured: core-mosquitto:1883
-[13:03:09] INFO: Configuring remote RS485 connection to 192.168.100.58:4196
 [13:03:11] INFO: Starting Seplos BMS data fetcher...
+2025-11-15 13:03:11 INFO:SeplosBMS:Bridging RS485 gateway 192.168.100.58:4196 to /tmp/vcom0
 2025-11-15 13:03:11 INFO:SeplosBMS:Starting Seplos BMS Data Fetcher
 2025-11-15 13:03:11 INFO:SeplosBMS:Connected to MQTT broker (core-mosquitto:1883)
 2025-11-15 13:03:11 INFO:SeplosBMS:Initializing serial interface /tmp/vcom0 at 9600 baud
