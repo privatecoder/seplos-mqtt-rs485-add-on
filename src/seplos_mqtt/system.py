@@ -8,7 +8,7 @@ import logging
 
 from .decoders import system as system_decoder
 from .framing.modbus import UNSUPPORTED_CODES, Status
-from .transport import SerialBus
+from .transport import BusBusy, SerialBus
 
 logger = logging.getLogger("SeplosBMS.system")
 
@@ -42,6 +42,13 @@ class SystemReader:
         """Read the system values; disables itself if the firmware doesn't know the block."""
         if self.unsupported:
             return None
+        try:
+            return self._read(bus)
+        except BusBusy as e:
+            logger.warning("System:%s", e)
+            return None
+
+    def _read(self, bus: SerialBus) -> dict | None:
         status, regs = bus.read_modbus(0x03, system_decoder.REGISTER, system_decoder.COUNT)
         if status is Status.EXCEPTION:
             if regs not in UNSUPPORTED_CODES:

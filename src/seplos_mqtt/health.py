@@ -19,7 +19,7 @@ def max_poll_age(number_of_packs: int, update_interval: int, multi_pack: bool) -
     """Acceptable age of the last successful poll (of any pack), derived from the polling cadence."""
     per_pack = SECONDS_PER_PACK_MULTI if multi_pack else SECONDS_PER_PACK_SINGLE
     cycle = max(number_of_packs, 1) * per_pack + max(update_interval, 0) + (SYSTEM_SECONDS if multi_pack else 0)
-    return max(30.0, cycle * 3 + 10.0)
+    return max(60.0, cycle * 3 + 10.0)
 
 
 def is_healthy(mqtt_connected: bool, serial_open: bool, poll_age: float, max_age: float) -> bool:

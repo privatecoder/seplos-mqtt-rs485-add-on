@@ -23,8 +23,16 @@ logger = logging.getLogger("SeplosBMS.bus")
 # request_rtn(): nothing received at all (distinct from an invalid answer)
 NO_ANSWER = -1
 
-# minimum quiet time between the end of one exchange and the next transmission
+# minimum continuous quiet time on the bus (no received byte) before a transmission
 QUIET_GAP_SECONDS = 1.0
+# give up establishing quiet after this long (busy bus, foreign traffic): the request is not sent
+MAX_QUIET_WAIT_SECONDS = 10.0
+# upper bound of quiet-wait rounds (each round sleeps once), independent of the clock
+MAX_QUIET_ROUNDS = 50
+
+
+class BusBusy(RuntimeError):
+    """No quiet gap could be established; nothing was transmitted."""
 
 
 class SerialPort(Protocol):
@@ -77,11 +85,33 @@ class SerialBus:
 
     # --- timing ---------------------------------------------------------------------------
 
+    def _pending(self) -> int:
+        try:
+            return int(getattr(self.port, "in_waiting", 0) or 0)
+        except Exception:
+            return 0
+
     def _wait_quiet(self) -> None:
-        if self._last_activity is not None:
+        """
+        Wait until no byte was received for `gap` seconds, measured from the last received byte:
+        bytes arriving meanwhile (noise, late answers, foreign traffic) are discarded and restart the
+        timer. Raises BusBusy (nothing sent) if that can't be established in time.
+        """
+        start = self._clock()
+        if self._last_activity is None:
+            self._last_activity = start          # also establish quiet before the very first request
+        for _ in range(MAX_QUIET_ROUNDS):
             remaining = self.gap - (self._clock() - self._last_activity)
             if remaining > 0:
                 self._sleep(remaining)
+            pending = self._pending()
+            if not pending:
+                return
+            self.port.read(pending)
+            self._mark_activity()
+            if self._clock() - start > MAX_QUIET_WAIT_SECONDS:
+                break
+        raise BusBusy("no quiet gap on the bus")
 
     def _mark_activity(self) -> None:
         self._last_activity = self._clock()
@@ -90,7 +120,11 @@ class SerialBus:
         self._wait_quiet()
         if reset_input:
             self.port.flushInput()
-        self.port.write(data)
+        try:
+            self.port.write(data)
+        except Exception:
+            self._mark_activity()            # a partial write may have reached the bus
+            raise
 
     def _receive_frame(self, max_skipped: int = 5) -> bytes:
         try:
@@ -172,6 +206,8 @@ class SerialBus:
             for _ in range(attempts):
                 self._send(command, reset_input=True)
                 raw = self._receive_frame()
+                if raw == command:             # gateway echo of the request
+                    raw = self._receive_frame()
                 if not raw:
                     result = NO_ANSWER
                     continue
@@ -244,7 +280,8 @@ class SerialBus:
 
     def probe_modbus(self, function_code: int, register: int, count: int) -> bool | None:
         """True for a valid response, False for an exception response, None for no/invalid answer."""
-        status, _ = self.read_modbus(function_code, register, count)
-        if status is None:
-            return None
-        return status is modbus.Status.OK
+        status, value = self.read_modbus(function_code, register, count)
+        if status is modbus.Status.EXCEPTION:
+            # only "illegal function/address" says the feature is missing; busy/device failure is inconclusive
+            return False if value in modbus.UNSUPPORTED_CODES else None
+        return True if status is modbus.Status.OK else None

@@ -24,7 +24,8 @@
           "backup": true,
           "primary": true
         },
-        "primary": "valid"
+        "primary": "valid",
+        "read_at": "2026-11-04T12:00:00+01:00"
       },
       "identity": {
         "base_version": "16.06.13",
@@ -38,10 +39,12 @@
         "energy_charged": 7000.1,
         "energy_discharged": 6900.2,
         "full_capacity": 280.0,
+        "read_at": "2026-11-04T12:00:00+01:00",
         "remaining_capacity": 150.0,
         "state_of_charge": 53.6
       },
       "storage": {
+        "lock_cache_consistent": true,
         "lock_recorded_backup": false,
         "lock_recorded_primary": false,
         "lock_runtime": false,
@@ -50,6 +53,7 @@
           "comparison": "identical",
           "primary": "valid"
         },
+        "read_at": "2026-11-04T12:00:00+01:00",
         "soc": {
           "backup": "valid",
           "comparison": "identical",

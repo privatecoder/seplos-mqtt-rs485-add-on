@@ -5,8 +5,8 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime
 
+from . import timeutil
 from .config import Config
 from .decoders import alarms, clock, identity, intrapack, parameters, telemetry
 from .energy import EnergyGuard
@@ -50,14 +50,6 @@ STATUS_MAX_AGE_SECONDS = 60
 # all extended status keys with unknown values
 UNKNOWN_STATUS = {group: dict.fromkeys(values) for group, values in intrapack.decode_extended_status(bytes(32)).items()}
 
-def local_now() -> datetime:
-    """Host local time (naive), the convention the BMS clock is compared with."""
-    return datetime.now()
-
-
-def now_iso() -> str:
-    """Local time with UTC offset, for HA timestamp sensors."""
-    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 class BatteryPack:
@@ -73,11 +65,14 @@ class BatteryPack:
         self.config = config
         self.info: dict | None = None
         self.info_attempts = 0
+        self.info_revision = 0          # incremented when the cached device info changes
         self.parameters: dict | None = None
         self.parameters_ts = 0.0
         self.extended_status: dict | None = None
         self.extended_status_ts = 0.0
         self.cell_count: int | None = None
+        # monotonic time of the last successful core read (0x42 + 0x44), for the health check
+        self.core_success = 0.0
         self.maint = MaintSupport(address, config.multi_pack) if config.maint_firmware else None
         self._uart1_parameters_ts = 0.0
         self.clock_value: dict | None = None
@@ -140,6 +135,7 @@ class BatteryPack:
 
         info["normal"]["firmware_patch"] = self._derive_firmware_patch(info["normal"]["firmware_version"])
         self.info = info
+        self.info_revision += 1
 
     def _derive_firmware_patch(self, firmware_version: str) -> str:
         """
@@ -227,9 +223,9 @@ class BatteryPack:
 
     def _fetch_parameters(self) -> None:
         """Fetch the parameters (CID2 0x47) at startup and then every PARAMETER_REFRESH_SECONDS."""
-        if time.time() - self.parameters_ts < self.PARAMETER_REFRESH_SECONDS:
+        if time.monotonic() - self.parameters_ts < self.PARAMETER_REFRESH_SECONDS:
             return
-        self.parameters_ts = time.time()
+        self.parameters_ts = time.monotonic()
         try:
             feedback = self._request(
                 0x47, PARAMETER_LEN, lambda raw: {"normal": parameters.decode_ascii_answer(raw)}, "Parameters", info=b""
@@ -238,10 +234,10 @@ class BatteryPack:
             logger.warning("Pack%s:Invalid parameter answer: %s", self.address, e)
             feedback = None
         if feedback is not None:
-            self.parameters = {**feedback["normal"], "read_at": now_iso()}
+            self.parameters = {**feedback["normal"], "read_at": timeutil.now_iso()}
         else:
             # retry after a minute instead of waiting for the next regular refresh
-            self.parameters_ts = time.time() - self.PARAMETER_REFRESH_SECONDS + 60
+            self.parameters_ts = time.monotonic() - self.PARAMETER_REFRESH_SECONDS + 60
 
     # --- MAINT custom firmware (optional, read-only) ----------------------------------------------
 
@@ -252,8 +248,23 @@ class BatteryPack:
         except Exception as e:
             logger.warning("Pack%s:MAINT read failed: %s", self.address, e)
 
+    def _energy_source_key(self) -> str:
+        return f"pack{self.address}.energy_source"
+
     def _merge_maint(self, data: BatteryData) -> None:
         maint = self.maint
+        store = self.energy.store
+        if maint.state == "absent" and store.get(self._energy_source_key()):
+            store.set(self._energy_source_key(), None)       # confirmed OEM now (e.g. replaced pack)
+        if maint.identity is None:
+            if store.get(self._energy_source_key()) == "maint":
+                # the totals came from the wide MAINT counters before: never fall back to the narrow
+                # 0x42 values on the same entities while the identity is unknown
+                data["telemetry"]["normal"].update(energy_charged=None, energy_discharged=None)
+            return
+        if self.info is not None and self.info["normal"].get("firmware_patch") != maint.identity.base_version:
+            self.info["normal"]["firmware_patch"] = maint.identity.base_version
+            self.info_revision += 1
         if self.parameters is not None and not self.config.multi_pack:
             maint.group0 = int(self.parameters["function_switches"][:2], 16)
         elif maint.parameters.value is not None:
@@ -266,11 +277,12 @@ class BatteryPack:
         if energy is not None:
             # full-width counters replace the 0x42 values with their 6500 kWh fallback
             data["telemetry"]["normal"].update(energy)
+            store.set(self._energy_source_key(), "maint")
         if self.config.multi_pack:
             if maint.parameters.value is not None:
                 if maint.parameters.ts != self._uart1_parameters_ts:
                     self._uart1_parameters_ts = maint.parameters.ts
-                    self._uart1_parameters_read_at = now_iso()
+                    self._uart1_parameters_read_at = timeutil.now_iso()
                 data["parameters"] = {**maint.parameters.value, "read_at": self._uart1_parameters_read_at}
             if maint.serials and "info" in data:
                 data["info"] = {"normal": {**data["info"]["normal"], **{k: v for k, v in maint.serials.items() if v}}}
@@ -295,7 +307,7 @@ class BatteryPack:
             except ValueError as e:
                 logger.debug("Pack%s:Invalid clock answer: %s", self.address, e)
             else:
-                host = local_now()
+                host = timeutil.local_now()
                 self.clock_value = {"bms_time": bms_time.isoformat(), "clock_offset": round((bms_time - host).total_seconds())}
                 self.clock_ts, self.clock_next = now, now + self.CLOCK_INTERVAL
                 return
@@ -310,6 +322,11 @@ class BatteryPack:
     @property
     def capabilities(self) -> set[str]:
         return self.maint.capabilities if self.maint is not None else set()
+
+    @property
+    def capabilities_resolved(self) -> bool:
+        """MAINT detected or confirmed absent; pending/silent leaves the discovery catalog untouched."""
+        return self.maint is not None and self.maint.state in ("present", "absent")
 
     # --- poll -----------------------------------------------------------------------------------
 
@@ -332,6 +349,7 @@ class BatteryPack:
             if telesignal_feedback is None:
                 return None, False
             data["telesignalization"] = telesignal_feedback
+            self.core_success = time.monotonic()
 
             if self.maint is not None:
                 self._guarded(self.maint.detect)
@@ -348,7 +366,7 @@ class BatteryPack:
 
             if not self.config.multi_pack:
                 extended_status = self._fetch_extended_status()
-                now = time.time()
+                now = time.monotonic()
                 if extended_status is not None:
                     self.extended_status = extended_status
                     self.extended_status_ts = now

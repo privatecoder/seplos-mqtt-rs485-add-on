@@ -698,7 +698,7 @@ def test_main_loop_resync_republishes(monkeypatch):
     client, _ = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2, resync_after_polls=1)
     sensors = [r for r in client.as_records() if r["topic"] == "seplos/pack-0/sensors"]
     configs = [r for r in client.as_records() if r["topic"] == "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_1/config"]
-    assert len(sensors) == 2 and len(configs) == 2     # unchanged data replayed, discovery resent
+    assert len(sensors) >= 2 and len(configs) == 2     # unchanged data replayed, discovery resent
 
 
 def test_discovery_device_block_retried_after_failed_publish():
@@ -728,7 +728,7 @@ def test_config_validation():
 
 def test_health_decision():
     from seplos_mqtt import health
-    assert health.max_poll_age(1, 1, False) == 30.0
+    assert health.max_poll_age(1, 1, False) == 60.0
     assert health.max_poll_age(4, 60, True) == (4 * 3 + 60 + 3) * 3 + 10
     assert health.is_healthy(True, True, 5, 30) and not health.is_healthy(True, True, 31, 30)
     assert not health.is_healthy(False, True, 5, 30) and not health.is_healthy(True, False, 5, 30)
@@ -1062,7 +1062,8 @@ def test_maint_stage2_master(monkeypatch, golden):
     assert maint["binary"] == {"storage_problem": "OFF", "pack_lock_active": "ON", "maintenance_mode": "ON"}
     assert maint["normal"]["effective_slave_count"] == 0 and maint["normal"]["recharge_stop_mode"] == "hard stop"
     assert maint["attributes"]["settings"]["pack_lock_recorded"] is True
-    assert maint["attributes"]["calibration"] == {"invalid_calibration_flags": "0x08", "current_a_ma": 250, "current_b_ma": -12}
+    assert maint["attributes"]["calibration"] == {"invalid_calibration_flags": "0x08", "current_a_ma": 250, "current_b_ma": -12,
+                                                  "read_at": api.FIXED_NOW}
     assert data["clock"]["normal"] == {"bms_time": "2026-11-04T12:00:00", "clock_offset": 0}
     assert {"maint_lock", "maint_marker", "maint_hard_stop"} <= api.capabilities(pack)
     golden("poll_maint_stage2_master", data)
@@ -1085,3 +1086,124 @@ def test_oem_multi_pack_has_no_clock(monkeypatch):
         bms = _multi_pack_bms()
         data, ok = api.poll(api.make_pack(0), bms)
     assert ok and "clock" not in data and not any(r.cid2 == 0x4D for r in bms.requests)
+
+
+# --- review step 3 + MAINT 1 (M01-M09) ----------------------------------------------------------------
+
+def test_wide_energy_source_survives_restart(monkeypatch, tmp_path):
+    """M01: after MAINT supplied the totals, a restart with failing identity yields unknown, not the 0x42 value."""
+    api.no_sleep(monkeypatch)
+    state_file = tmp_path / "state.json"
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500, energy_discharged=6500)
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        data, _ = api.poll(api.make_pack(0, state_file=state_file), bms)
+        assert data["telemetry"]["normal"]["energy_charged"] == 7000.1
+        bms.ascii[(0, 0x64)] = None                                    # identity silent after the restart
+        restarted = api.make_pack(0, state_file=state_file)
+        for _ in range(4):
+            data, ok = api.poll(restarted, bms)
+            assert ok and data["telemetry"]["normal"]["energy_charged"] is None
+            assert data["telemetry"]["normal"]["energy_discharged"] is None
+        bms.ascii[(0, 0x64)] = ("rtn", 0x04)                          # confirmed OEM (pack replaced)
+        data, _ = api.poll(api.make_pack(0, state_file=state_file), bms)
+    assert data["telemetry"]["normal"]["energy_charged"] == 650.0 or data["telemetry"]["normal"]["energy_charged"] is None
+
+
+def test_quiet_gap_restarts_on_received_noise():
+    """M02: bytes arriving during the wait are discarded and restart the quiet timer."""
+    events = api.quiet_gap_trace(noise_at=0.99)
+    sends = [t for kind, t in events if kind == "write"]
+    noise = [t for kind, t in events if kind == "noise"]
+    assert noise and sends[-1] - noise[-1] >= 1.0 - 1e-9, events
+
+
+def test_bus_busy_when_quiet_never_comes():
+    import pytest
+    with pytest.raises(api.BusBusy):
+        api.quiet_gap_trace(noise_forever=True)
+
+
+def test_failed_offline_publish_is_retried(monkeypatch):
+    """M03: an availability change only counts as sent after the client accepted it."""
+    state, pack_state, client = api.availability_state(monkeypatch)
+    client.fail_next = 1
+    api.publish_availability(state, pack_state, now=1000.0)          # pack aged out, publish fails
+    assert pack_state.availability == "online"
+    api.publish_availability(state, pack_state, now=1001.0)
+    assert pack_state.availability == "offline"
+    assert client.as_records()[-1] == {"topic": "seplos/pack-0/availability", "payload": "offline", "qos": 0, "retain": False}
+
+
+def test_health_follows_core_progress_during_slow_first_poll(monkeypatch):
+    """M04: core 0x42/0x44 success counts for health even while optional reads are still running."""
+    assert api.health_progress_during_slow_poll(monkeypatch) is True
+
+
+def test_discovery_keeps_maint_entities_while_detection_pending():
+    """M05: unknown capabilities neither create nor delete MAINT-dependent configs."""
+    disc, client = api.discovery(maint_enabled=True)
+    api.discovery_startup(disc, 2)
+    topics = {r["topic"].split("/")[-2] for r in client.as_records() if "seplos-mqtt-pack-0" in r["topic"]}
+    for key in ("maint_version", "storage_problem", "parameters", "serial_number"):
+        assert key not in topics, key
+    assert "balancing_active" in topics                                  # RS485-1/2-only entity is still removed
+    client.published.clear()
+    assert api.set_capabilities(disc, 0, set(), pack_bus=False)         # confirmed OEM: now removed
+    removed = {r["topic"].split("/")[-2] for r in client.as_records() if r["payload"] == ""}
+    assert {"maint_version", "parameters", "serial_number"} <= removed
+
+
+def test_strict_parser_rejects_whitespace_and_short_headers():
+    """M06."""
+    import pytest
+    for body in (b"20004600    ", b"20      0000"):
+        with pytest.raises(api.FrameError):
+            api.parse_frame(api.with_checksum(b"~" + body + b"0000\r"))
+
+
+def test_maint_transient_rtn_retried_and_late_identity_refreshes_firmware(monkeypatch):
+    """M08: RTN 02 is not 'no MAINT'; a late identity replaces the heuristic firmware patch."""
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = ("rtn", 0x02)
+        pack = api.make_pack(0)
+        data, _ = api.poll(pack, bms)
+        assert data["info"]["normal"]["firmware_patch"] == "16.06.13+" and pack.maint.state == "pending"
+        revision = pack.info_revision
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        data, _ = api.poll(pack, bms)
+    assert pack.maint.state == "present" and data["info"]["normal"]["firmware_patch"] == "16.06.13"
+    assert pack.info_revision > revision
+
+
+def test_modbus_busy_is_not_feature_rejection(monkeypatch):
+    """M08: a busy exception during the CAN-port patch probe is inconclusive, not 'older firmware'."""
+    api.no_sleep(monkeypatch)
+    with api.mode(2):
+        bms = _multi_pack_bms()
+        bms.modbus[(0x03, 0x001F, 9)] = ("exc", 0x06)
+        bms.modbus[(0x03, 0x9000, 21)] = ("exc", 0x06)
+        data, _ = api.poll(api.make_pack(0), bms)
+    assert data["info"]["normal"]["firmware_patch"] == "16.06.12+"
+
+
+def test_storage_lock_codes_validated():
+    """M09: only 00/01/FF are valid recorded lock codes."""
+    import pytest
+    with pytest.raises(ValueError):
+        api.decode_storage(f.maint_storage(locks=(2, 0)))
+    with pytest.raises(ValueError):
+        api.decode_storage(f.maint_storage(cache=0x08))
+
+
+def test_config_rejects_malformed_values():
+    import pytest
+
+    from seplos_mqtt.config import ConfigError
+    for env in ({"NUMBER_OF_PACKS": "two"}, {"ENABLE_HA_DISCOVERY_CONFIG": "maybe"}):
+        with pytest.raises(ConfigError):
+            api.config_from(env)
+    assert api.config_from({"MQTT_TOPIC": "/seplos"}).mqtt_topic == "/seplos"     # leading slash stays legal

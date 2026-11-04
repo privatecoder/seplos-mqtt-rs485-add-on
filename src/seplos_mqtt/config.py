@@ -7,20 +7,25 @@ from dataclasses import dataclass, field, fields
 from typing import Any
 
 
+class ConfigError(ValueError):
+    pass
+
+
 def _env(env: Mapping[str, str], name: str, default: Any, cast: type) -> Any:
     value = env.get(name)
     if value is None or value == "":
         return default
+    if cast is bool:
+        text = str(value).strip().lower()
+        if text in ("true", "1", "yes", "on"):
+            return True
+        if text in ("false", "0", "no", "off"):
+            return False
+        raise ConfigError(f"{name}={value!r} is not a boolean")
     try:
-        if cast is bool:
-            return str(value).lower() in ("true", "1", "yes", "on")
         return cast(value)
-    except (ValueError, TypeError):
-        return default
-
-
-class ConfigError(ValueError):
-    pass
+    except (ValueError, TypeError) as e:
+        raise ConfigError(f"{name}={value!r} is not a valid {cast.__name__}") from e
 
 
 def _baudrate(value: str | None) -> int:
@@ -110,8 +115,8 @@ class Config:
             problems.append(f"mqtt_update_interval {self.mqtt_update_interval}")
         for name in ("mqtt_topic", "ha_discovery_prefix"):
             value = getattr(self, name)
-            if not value or any(c in value for c in "+#") or value.startswith("/") or value.endswith("/"):
-                problems.append(f"{name} {value!r} (no wildcards, no leading/trailing slash)")
+            if not value or any(c in value for c in "+#") or value.endswith("/"):
+                problems.append(f"{name} {value!r} (no wildcards, no trailing slash)")
         if problems:
             raise ConfigError("; ".join(problems))
 

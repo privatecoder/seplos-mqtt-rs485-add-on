@@ -12,6 +12,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 
+from . import timeutil
 from .decoders import identity as identity_decoder
 from .decoders import maint as md
 from .decoders import parameters as parameter_decoder
@@ -21,6 +22,8 @@ from .transport import NO_ANSWER, SerialBus
 logger = logging.getLogger("SeplosBMS.maint")
 
 DETECT_ATTEMPTS = 3
+# RTN 04 unknown command, RTN 05 unknown subcommand: the board has no MAINT identity read
+UNSUPPORTED_RTN = (0x04, 0x05)
 ENERGY_INTERVAL = 60
 ENERGY_MAX_AGE = 600
 STORAGE_INTERVAL = 600
@@ -49,6 +52,7 @@ class Timed:
     value: object = None
     ts: float = 0.0          # monotonic time of the last success
     next_due: float = 0.0
+    read_at: str | None = None
 
     def fresh(self, now: float, max_age: float) -> bool:
         return self.value is not None and now - self.ts <= max_age
@@ -83,10 +87,16 @@ class MaintSupport:
                 self.state = "unknown"
                 logger.info("Pack%s:No answer to the MAINT identity request, MAINT reads disabled", self.address)
             return
-        if answer.code != 0x00:
+        if answer.code in UNSUPPORTED_RTN:
             # OEM firmware: unknown command / subcommand
             self.state = "absent"
             logger.info("Pack%s:No MAINT firmware (identity request answered with RTN %02X)", self.address, answer.code)
+            return
+        if answer.code != 0x00:
+            # checksum/device errors (RTN 02, 08, ...) say nothing about the firmware: try again
+            logger.debug("Pack%s:MAINT identity request: RTN %02X", self.address, answer.code)
+            if self.attempts >= DETECT_ATTEMPTS:
+                self.state = "unknown"
             return
         try:
             self.identity = md.decode_identity(answer.info)
@@ -140,7 +150,7 @@ class MaintSupport:
             logger.warning("Pack%s:Invalid MAINT answer: %s", self.address, e)
             value = None
         if value is not None:
-            item.value, item.ts, item.next_due = value, now, now + interval
+            item.value, item.ts, item.next_due, item.read_at = value, now, now + interval, timeutil.now_iso()
         else:
             item.next_due = now + min(interval, RETRY_INTERVAL)
 
@@ -215,13 +225,14 @@ class MaintSupport:
         binary: dict = {}
         attributes: dict = {"identity": self.identity.as_dict()}
         if self.energy.value is not None:
-            attributes["checkpoint"] = self.energy.value["persisted"]
-            attributes["live_snapshot"] = self.energy.value["live"]
+            attributes["live_snapshot"] = {**self.energy.value["live"], "read_at": self.energy.read_at}
+            if self.identity.has_capability(md.CAP_PERSISTED_SOC):
+                attributes["checkpoint"] = {**self.energy.value["persisted"], "read_at": self.energy.read_at}
         if self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
             fresh = self.storage.fresh(now, 3 * STORAGE_INTERVAL)
             binary["storage_problem"] = ("ON" if md.storage_problem(self.storage.value) else "OFF") if fresh else None
             if self.storage.value is not None:
-                attributes["storage"] = self.storage.value
+                attributes["storage"] = {**self.storage.value, "read_at": self.storage.read_at}
             if CAP_LOCK in self.capabilities:
                 lock_fresh = self.storage.fresh(now, 3 * LOCK_INTERVAL)
                 runtime = self.storage.value.get("lock_runtime") if lock_fresh else None
@@ -232,7 +243,7 @@ class MaintSupport:
             binary["maintenance_mode"] = None if active is None else ("ON" if active else "OFF")
             normal["effective_slave_count"] = marker["effective_slave_count"] if marker else None
         if self.calibration.value is not None:
-            attributes["calibration"] = self.calibration.value
+            attributes["calibration"] = {**self.calibration.value, "read_at": self.calibration.read_at}
         if self.group0 is not None:
             settings = md.decode_group0(self.group0, self.identity)
             attributes["settings"] = settings

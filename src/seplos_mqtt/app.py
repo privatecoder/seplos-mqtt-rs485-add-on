@@ -11,12 +11,12 @@ from typing import Any
 import serial
 from serial.serialutil import SerialException
 
-from . import health, topics
+from . import health, timeutil, topics
 from .config import Config, ConfigError
 from .decoders.identity import device_firmware
 from .discovery import Discovery
 from .mqtt_client import MqttConnection, Publisher
-from .pack import BatteryPack, now_iso
+from .pack import BatteryPack
 from .state import StateStore
 from .system import SystemReader
 from .transport import SerialBus
@@ -32,7 +32,7 @@ class PackState:
     last_success: float | None = None
     publish_counter: int = 0
     availability: str = "offline"
-    firmware_reported: bool = False
+    firmware_reported: int = 0          # info_revision of the pack shown in the HA device info
 
 
 @dataclass
@@ -47,6 +47,11 @@ class AppState:
     packs: list[PackState] = field(default_factory=list)
     # monotonic time of the last successful BMS poll (startup counts as grace period)
     last_poll: float = 0.0
+    next_replay: float = 0.0
+
+    def last_progress(self) -> float:
+        """Latest successful core read (0x42/0x44) of any pack, also during a long first poll."""
+        return max([self.last_poll, *(p.pack.core_success for p in self.packs if p.pack.core_success)])
 
     def max_age(self) -> float:
         return health.max_poll_age(self.config.number_of_packs, self.config.mqtt_update_interval, self.config.multi_pack)
@@ -55,7 +60,7 @@ class AppState:
         return health.is_healthy(
             mqtt_connected=self.mqtt is not None and self.mqtt.is_connected(),
             serial_open=self.bus is not None and self.bus.is_open,
-            poll_age=time.monotonic() - self.last_poll,
+            poll_age=time.monotonic() - self.last_progress(),
             max_age=self.max_age(),
         )
 
@@ -105,19 +110,40 @@ def publish_discovery(state: AppState) -> None:
         discovery.remove_system()
 
 
+# states are refreshed shortly after discovery (HA subscribes after processing the configs)
+# and periodically, so late subscribers converge even when the values don't change
+REPLAY_DELAY_SECONDS = 5
+REPLAY_INTERVAL_SECONDS = 600
+
+
 def resync(state: AppState) -> None:
-    """After a reconnect or an HA restart: discovery and the latest states again."""
+    """After a reconnect or an HA restart: discovery, availability and the latest states again."""
     logger.info("Resending discovery configs and states")
     publish_discovery(state)
+    now = time.monotonic()
+    for pack_state in state.packs:
+        pack_state.availability = "unknown"          # current (freshness-derived) value goes out again
+        publish_pack_availability(state, pack_state, now)
+    state.publisher.publish(topics.availability(state.config.mqtt_topic), "online")
     state.publisher.replay()
+    state.next_replay = now + REPLAY_DELAY_SECONDS
+
+
+def refresh_states(state: AppState) -> None:
+    """Delayed/periodic replay of the latest states (non-retained)."""
+    now = time.monotonic()
+    if now >= state.next_replay:
+        state.publisher.replay()
+        state.next_replay = now + REPLAY_INTERVAL_SECONDS
 
 
 def publish_pack_availability(state: AppState, pack_state: PackState, now: float) -> None:
+    """Publish a changed availability; the change only counts as sent once the client accepted it."""
     online = pack_state.last_success is not None and now - pack_state.last_success <= state.max_age()
     desired = "online" if online else "offline"
     if pack_state.availability != desired:
-        state.publisher.publish(topics.pack_availability(state.config.mqtt_topic, pack_state.address), desired)
-        pack_state.availability = desired
+        if state.publisher.publish(topics.pack_availability(state.config.mqtt_topic, pack_state.address), desired):
+            pack_state.availability = desired
 
 
 def publish_system_data(state: AppState, reader: SystemReader) -> None:
@@ -141,19 +167,20 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
         state.last_poll = now
         pack_state.last_success = now
         pack_state.publish_counter += 1
-        heartbeat = {"last_publish": now_iso(), "publish_counter": pack_state.publish_counter}
+        heartbeat = {"last_publish": timeutil.now_iso(), "publish_counter": pack_state.publish_counter}
         state.publisher.publish(topics.pack_heartbeat(base, address), heartbeat)
         state.publisher.publish(topics.pack_availability(base, address), "online")
         pack_state.availability = "online"
 
-    if discovery:
-        discovery.set_capabilities(address, pack_state.pack.capabilities, pack_bus=not state.config.multi_pack)
+    if discovery and pack_state.pack.capabilities_resolved:
+        if discovery.set_capabilities(address, pack_state.pack.capabilities, pack_bus=not state.config.multi_pack):
+            state.next_replay = now + REPLAY_DELAY_SECONDS
     if discovery and pack_state.pack.cell_count:
         discovery.update_cell_count(address, pack_state.pack.cell_count)
     # show the real firmware version in the HA device info once it's known
-    if discovery and pack_state.pack.info and not pack_state.firmware_reported:
+    if discovery and pack_state.pack.info and pack_state.firmware_reported != pack_state.pack.info_revision:
         discovery.update_firmware(address, device_firmware(pack_state.pack.info))
-        pack_state.firmware_reported = True
+        pack_state.firmware_reported = pack_state.pack.info_revision
 
     if data is not None:
         if state.publisher.state(topics.pack_sensors(base, address), data):
@@ -231,18 +258,21 @@ def main(config: Config | None = None) -> None:
         if config.enable_ha_discovery:
             logger.info("Sending Home Assistant Auto-Discovery configurations")
             state.discovery = Discovery(
-                state.publisher, config.mqtt_topic, config.ha_discovery_prefix, config.invert_ha_dis_charge_measurements
+                state.publisher, config.mqtt_topic, config.ha_discovery_prefix, config.invert_ha_dis_charge_measurements,
+                maint_enabled=config.maint_firmware,
             )
             publish_discovery(state)
             logger.info("Auto-Discovery configurations sent")
 
         index = 0
         system_reader = SystemReader()
+        state.next_replay = time.monotonic() + REPLAY_DELAY_SECONDS
         while True:
             try:
                 if state.mqtt.resync.is_set():
                     state.mqtt.resync.clear()
                     resync(state)
+                refresh_states(state)
                 poll_pack(state, state.packs[index])
                 index += 1
                 if index >= len(state.packs):

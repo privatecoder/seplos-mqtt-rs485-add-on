@@ -86,7 +86,8 @@ def decode_identity(info: bytes) -> Identity:
 
 def decode_storage(info: bytes) -> dict:
     """64/04 format 01: parameter and SOC flash mirrors, 1.6.4 lock state."""
-    if len(info) != STORAGE_LEN or info[0] != 1 or any(info[i] > 2 for i in range(1, 7)):
+    if (len(info) != STORAGE_LEN or info[0] != 1 or any(info[i] > 2 for i in range(1, 7))
+            or any(info[i] not in (0x00, 0x01, 0xFF) for i in (7, 8)) or info[9] & ~0x07):
         raise MaintFormatError(f"unknown storage diagnostics: {info.hex()}")
 
     def lock(value: int) -> bool | None:
@@ -99,6 +100,7 @@ def decode_storage(info: bytes) -> dict:
         "lock_recorded_primary": lock(info[7]),
         "lock_recorded_backup": lock(info[8]),
         "lock_runtime": bool(info[9] & 0x01) if cache_valid else None,
+        "lock_cache_consistent": bool(info[9] & 0x02) if cache_valid else None,
     }
 
 

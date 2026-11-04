@@ -10,7 +10,6 @@ from contextlib import contextmanager
 
 from fakes import FakeBms, FakeConnection, FakeMqtt, FakeSerial
 from seplos_mqtt import app
-from seplos_mqtt import pack as pack_module
 from seplos_mqtt.config import Config
 from seplos_mqtt.decoders import alarms, identity, intrapack, parameters, system
 from seplos_mqtt.decoders.identity import device_firmware
@@ -57,9 +56,11 @@ def no_sleep(monkeypatch) -> None:
     """No real delays and a fixed wall-clock timestamp."""
     import time
     monkeypatch.setattr(time, "sleep", lambda _s: None)
-    monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
     import datetime as _datetime
-    monkeypatch.setattr(pack_module, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
+
+    from seplos_mqtt import timeutil
+    monkeypatch.setattr(timeutil, "now_iso", lambda: FIXED_NOW)
+    monkeypatch.setattr(timeutil, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
 
 
 # --- framing ----------------------------------------------------------------------------------
@@ -89,10 +90,11 @@ def decode_telemetry_sequence(infos: list[bytes], state_file=None, flush_before:
 
 
 def fake_clock(monkeypatch) -> dict:
-    """time.time() under test control: clock["t"] += seconds."""
+    """time.time() and time.monotonic() under test control: clock["t"] += seconds."""
     import time
     clock = {"t": 1_000_000.0}
     monkeypatch.setattr(time, "time", lambda: clock["t"])
+    monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
     return clock
 
 
@@ -126,8 +128,8 @@ def decode_system(regs: list[int]) -> dict:
 
 # --- polling ----------------------------------------------------------------------------------
 
-def make_pack(address: int):
-    return BatteryPack(address, None, config())
+def make_pack(address: int, state_file=None):
+    return BatteryPack(address, None, config(), StateStore(str(state_file)) if state_file else None)
 
 
 def poll(pack, bms: FakeBms):
@@ -145,9 +147,10 @@ def read_system(master, bms: FakeBms):
 
 # --- discovery --------------------------------------------------------------------------------
 
-def discovery(invert: bool = False, topic: str = "seplos", prefix: str = "homeassistant") -> tuple[Discovery, FakeMqtt]:
+def discovery(invert: bool = False, topic: str = "seplos", prefix: str = "homeassistant",
+              maint_enabled: bool = False) -> tuple[Discovery, FakeMqtt]:
     client = FakeMqtt()
-    return Discovery(client, topic, prefix, invert), client
+    return Discovery(client, topic, prefix, invert, maint_enabled=maint_enabled), client
 
 
 def discovery_startup(disc: Discovery, number_of_packs: int) -> None:
@@ -274,10 +277,7 @@ def run_main(
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     monkeypatch.setattr(time, "time", fake_time)
     monkeypatch.setattr(time, "monotonic", fake_time)
-    monkeypatch.setattr(app, "now_iso", lambda: FIXED_NOW)
     no_sleep(monkeypatch)
-    import datetime as _datetime
-    monkeypatch.setattr(pack_module, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
     monkeypatch.setattr(app, "initialize_mqtt", lambda _config: connection)
     monkeypatch.setattr(app, "initialize_serial", lambda _config: port)
     monkeypatch.setattr(app, "start_health_server", lambda _state: None)
@@ -304,9 +304,11 @@ def with_checksum(raw: bytes) -> bytes:
 
 def bus_trace_poll(monkeypatch, bms: FakeBms, flaky_first_42: bool = False) -> list[tuple[str, float]]:
     """One poll on a bus with a simulated clock; returns (write|read, time) events."""
-    monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
     import datetime as _datetime
-    monkeypatch.setattr(pack_module, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
+
+    from seplos_mqtt import timeutil
+    monkeypatch.setattr(timeutil, "now_iso", lambda: FIXED_NOW)
+    monkeypatch.setattr(timeutil, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
     clock = {"t": 0.0}
     trace: list[tuple[str, float]] = []
 
@@ -401,8 +403,8 @@ def capabilities(pack) -> set:
     return pack.capabilities
 
 
-def set_capabilities(disc: Discovery, pack_no: int, caps: set, pack_bus: bool) -> None:
-    disc.set_capabilities(pack_no, caps, pack_bus)
+def set_capabilities(disc: Discovery, pack_no: int, caps: set, pack_bus: bool) -> bool:
+    return disc.set_capabilities(pack_no, caps, pack_bus)
 
 
 def fake_monotonic(monkeypatch) -> dict:
@@ -426,3 +428,97 @@ def decode_group0(group0: int, identity):
 def decode_marker(info: bytes) -> dict:
     from seplos_mqtt.decoders import maint
     return maint.decode_marker(info)
+
+
+
+
+FrameError = af.FrameError
+
+
+def _bus_busy():
+    from seplos_mqtt.transport import BusBusy
+    return BusBusy
+
+
+BusBusy = _bus_busy()
+
+
+def parse_frame(raw: bytes):
+    return af.parse(raw)
+
+
+def decode_storage(info: bytes) -> dict:
+    from seplos_mqtt.decoders import maint
+    return maint.decode_storage(info)
+
+
+def quiet_gap_trace(noise_at: float | None = None, noise_forever: bool = False) -> list[tuple[str, float]]:
+    """Two requests on a bus with a simulated clock; foreign bytes arrive at `noise_at` (or always)."""
+    clock = {"t": 0.0}
+    events: list[tuple[str, float]] = []
+    bms = FakeBms()
+
+    class NoisySerial(FakeSerial):
+        @property
+        def in_waiting(self):
+            if noise_forever or (noise_at is not None and not any(k == "noise" for k, _ in events) and clock["t"] >= noise_at):
+                events.append(("noise", clock["t"]))
+                self.rx += b"\x00"
+            return len(self.rx)
+
+        def write(self, data):
+            events.append(("write", clock["t"]))
+            return super().write(data)
+
+    def sleep(seconds):
+        clock["t"] += seconds
+
+    bus = SerialBus(NoisySerial(bms), clock=lambda: clock["t"], sleep=sleep)
+    bus.request_rtn(0, 0x51)
+    clock["t"] += 0.0
+    if noise_at is not None:
+        clock["t"] = max(clock["t"], noise_at - 0.5)
+    bus.request_rtn(0, 0x51)
+    return events
+
+
+def availability_state(monkeypatch):
+    client = FakeMqtt()
+    from seplos_mqtt.mqtt_client import Publisher
+    state = app.AppState(config=config())
+    state.publisher = Publisher(client)
+    pack_state = app.PackState(BatteryPack(0, None, config()), 0, last_success=0.0, availability="online")
+    state.packs = [pack_state]
+    return state, pack_state, client
+
+
+def publish_availability(state, pack_state, now: float) -> None:
+    app.publish_pack_availability(state, pack_state, now)
+
+
+def health_progress_during_slow_poll(monkeypatch) -> bool:
+    """Run a pack poll whose optional reads take long; check health right after the core reads."""
+    import time
+    clock = {"t": 0.0}
+    monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
+    no_sleep(monkeypatch)
+    from frames import device_info_info, telemetry_info, telesignal_info
+    bms = FakeBms()
+    bms.ascii[(0, 0x42)] = telemetry_info()
+    bms.ascii[(0, 0x44)] = telesignal_info()
+    bms.ascii[(0, 0x51)] = device_info_info()
+    state = app.AppState(config=config())
+    pack = BatteryPack(0, SerialBus(FakeSerial(bms)), config())
+    state.packs = [app.PackState(pack, 0)]
+    state.last_poll = 0.0
+    seen = {}
+    original = pack._fetch_device_info
+
+    def slow_optional():
+        clock["t"] += 55                      # optional/static work takes long (startup grace alone: 65 s > 60 s)
+        seen["healthy"] = state.max_age() > clock["t"] - state.last_progress()
+        original()
+    pack._fetch_device_info = slow_optional
+    clock["t"] = 10.0
+    pack.read()
+    return seen["healthy"]

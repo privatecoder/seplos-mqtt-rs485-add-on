@@ -30,10 +30,12 @@ _OPTIONAL = {
 }
 
 SYSTEM_SCOPE = "system"
+MAINT_CONDITIONS = frozenset({"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop"})
 
 
 class Discovery:
-    def __init__(self, client, mqtt_topic: str, prefix: str, invert: bool) -> None:
+    def __init__(self, client, mqtt_topic: str, prefix: str, invert: bool, maint_enabled: bool = False) -> None:
+        self.maint_enabled = maint_enabled
         self.client = client
         self.topic = mqtt_topic
         self.prefix = prefix
@@ -146,9 +148,12 @@ class Discovery:
         removed: list[Entity] = []
         cells = self._cells.get(pack_no, 16)
         cell_keys = {key for _domain, key in CELL_ENTITIES}
+        known = pack_no in self._caps or not self.maint_enabled
         conditions = {"always", *(["pack_bus"] if pack_bus else []), *self._caps.get(pack_no, set())}
         for entity in PACK_ENTITIES:
             for index, item in enumerate(entity.expand(), start=1):
+                if not item.when & conditions and not known and item.when & MAINT_CONDITIONS:
+                    continue          # MAINT detection pending: keep whatever HA has (no delete/recreate)
                 if entity.key in cell_keys and index > cells or not item.when & conditions:
                     removed.append(item)
                 else:
@@ -171,12 +176,16 @@ class Discovery:
         for entity in SYSTEM:
             self._remove(entity.domain, SYSTEM_SCOPE, entity.key)
 
-    def set_capabilities(self, pack_no: int, caps: set[str], pack_bus: bool) -> None:
-        """MAINT capabilities of a pack changed: republish its configs with the matching entities."""
-        if self._caps.get(pack_no, set()) == caps:
-            return
+    def set_capabilities(self, pack_no: int, caps: set[str], pack_bus: bool) -> bool:
+        """
+        The pack's capabilities are known (MAINT detected or confirmed absent): republish its configs with
+        the matching entities. True if anything changed.
+        """
+        if self._caps.get(pack_no) == caps:
+            return False
         self._caps[pack_no] = set(caps)
         self.publish_pack(pack_no, pack_bus)
+        return True
 
     def update_cell_count(self, pack_no: int, cell_count: int) -> None:
         """Reconcile the per-cell entities with the pack's actual cell count (removed above it, restored up to it)."""

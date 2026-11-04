@@ -55,20 +55,27 @@ def encode(address: int, cid2: int, info: bytes = b"\x01") -> bytes:
     return SOI + body + f"{checksum(body):04X}".encode() + EOI
 
 
+_HEX = frozenset(b"0123456789ABCDEFabcdef")
+
+
 def parse(raw: bytes) -> Frame:
     """Validate the complete envelope (SOI/EOI, VER, CID1, LENGTH incl. check nibble, hex, checksum)."""
     if len(raw) < OVERHEAD or raw[:1] != SOI or raw[-1:] != EOI:
         raise FrameError("bad SOI/EOI or too short")
+    if not _HEX.issuperset(raw[1:-1]) or (len(raw) - OVERHEAD) % 2:
+        raise FrameError("non-hex characters or odd INFO length")
     try:
         header = bytes.fromhex(raw[1:13].decode("ascii"))
         info = bytes.fromhex(raw[13:-5].decode("ascii"))
         received_checksum = int(raw[-5:-1].decode("ascii"), 16)
     except (ValueError, UnicodeDecodeError) as e:
         raise FrameError(f"non-hex characters: {e}") from e
+    if len(header) != 6:
+        raise FrameError("short header")
     ver, address, cid1, code, length = header[0], header[1], header[2], header[3], int.from_bytes(header[4:6], "big")
     if ver != VER or cid1 != CID1:
         raise FrameError(f"VER/CID1 {ver:02X}/{cid1:02X}")
-    if length != length_field(2 * len(info)):
+    if 2 * len(info) > 0xFFF or length != length_field(2 * len(info)):
         raise FrameError(f"LENGTH {length:04X} does not match {2 * len(info)} INFO characters")
     if checksum(raw[1:-5]) != received_checksum:
         raise FrameError("checksum mismatch")

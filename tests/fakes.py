@@ -139,6 +139,10 @@ class FakeSerial:
         self.rx += self.bms.respond(bytes(data))
         return len(data)
 
+    @property
+    def in_waiting(self) -> int:
+        return len(self.rx)
+
     def read_until(self, terminator: bytes = b"\n", size: int | None = None) -> bytes:
         idx = self.rx.find(terminator)
         end = len(self.rx) if idx < 0 else idx + len(terminator)
