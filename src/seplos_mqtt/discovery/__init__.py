@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from .. import topics
-from .catalog import FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SYSTEM, Entity
+from .catalog import CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SYSTEM, Entity
 
 logger = logging.getLogger("SeplosBMS.discovery")
 
@@ -42,6 +42,8 @@ class Discovery:
         self._device_sent: set = set()
         # firmware version shown in the device info, per pack number and "system"
         self._sw: dict = {}
+        # cell count per pack once known
+        self._cells: dict[int, int] = {}
         self._system_active = False
 
     # --- rendering ----------------------------------------------------------------------------
@@ -52,7 +54,7 @@ class Discovery:
         if entity.kind == "heartbeat":
             return "{{ value_json.last_publish }}"
         if entity.kind == "parameters":
-            return "{{ value_json.get('parameters', {}) | length }}"
+            return "{{ value_json.get('parameters', {}).get('read_at') }}"
         state = "binary" if entity.domain == "binary_sensor" else "normal"
         path = f"value_json.{state}.{entity.key}" if scope == SYSTEM_SCOPE else f"value_json.{entity.group}.{state}.{entity.key}"
         if entity.invert and self.invert and entity.domain == "sensor":
@@ -155,6 +157,15 @@ class Discovery:
     def remove_system(self) -> None:
         for entity in SYSTEM:
             self._remove(entity.domain, SYSTEM_SCOPE, entity.key)
+
+    def update_cell_count(self, pack_no: int, cell_count: int) -> None:
+        """Remove the per-cell entities above the pack's actual cell count (packs with < 16 cells)."""
+        if self._cells.get(pack_no) == cell_count:
+            return
+        self._cells[pack_no] = cell_count
+        for domain, key in CELL_ENTITIES:
+            for i in range(cell_count + 1, 17):
+                self._remove(domain, pack_no, f"{key}_{i}")
 
     def update_firmware(self, pack_no: int, firmware: str) -> None:
         """

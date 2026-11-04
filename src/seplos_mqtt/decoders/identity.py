@@ -15,9 +15,9 @@ def decode_device_info(raw: bytes) -> dict:
     }
 
 
-def decode_serial_number(raw: bytes) -> dict:
-    """0xA2, 30 bytes ASCII."""
-    return {"normal": {"serial_number": text(raw[0:30])}}
+def decode_serial_number(raw: bytes, key: str = "serial_number") -> dict:
+    """0xA2 (string 1, battery serial number) / 0xA4 (string 2, BMS serial number): 30 bytes ASCII."""
+    return {"normal": {key: text(raw[0:30])}}
 
 
 def device_firmware(info: dict) -> str:

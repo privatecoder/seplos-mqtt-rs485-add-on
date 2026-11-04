@@ -2,37 +2,45 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 
 from .common import KELVIN_OFFSET, s16, u16
 
 logger = logging.getLogger("SeplosBMS.telemetry")
 
-# Byte offsets in the binary INFO for 16 cells (DATA FLAG, address, cell count, 16 cells, temperature count …)
-# name: (offset, scale, rounding, bias, signed, amount)
+# The layout depends on the cell count M (byte 2): cell voltages at 3..2+2M, all later fields
+# relative to BASE = 3 + 2M (for 16 cells BASE = 35).
+CELL_OFFSET = 3
+# name: (offset relative to BASE, scale, rounding, bias, signed, amount)
 _FIELDS: dict[str, tuple[int, float, int | None, int, bool, int]] = {
-    "voltage_cell":           (3,  1 / 1000, 3, 0, False, 16),           # doc: "Voltage of cell 1..M"
-    "cell_temperature":       (36, 1 / 10, 1, -KELVIN_OFFSET, False, 4),  # doc: "Cell temperature 1..4"
-    "ambient_temperature":    (44, 1 / 10, 1, -KELVIN_OFFSET, False, 1),  # doc: "Environment temperature"
-    "components_temperature": (46, 1 / 10, 1, -KELVIN_OFFSET, False, 1),  # doc: "Power temperature" (MOSFET)
-    "dis_charge_current":     (48, 1 / 100, 2, 0, True, 1),               # doc: "Charge/discharge current", 0 when idle
-    "total_pack_voltage":     (50, 1 / 100, 2, 0, False, 1),              # doc: "Total battery voltage"
-    "residual_capacity":      (52, 1 / 100, 2, 0, False, 1),              # doc: "Residual capacity"
-    "full_capacity":          (55, 1 / 100, 1, 0, False, 1),              # doc: "Battery capacity", learned full capacity
-    "state_of_charge":        (57, 1 / 10, 1, 0, False, 1),               # doc: "SOC"
-    "rated_capacity":         (59, 1 / 100, 1, 0, False, 1),              # doc: "Rated capacity", setting P58
-    "charging_cycles":        (61, 1, None, 0, False, 1),                 # doc: "Number of cycles"
-    # offset 63: SOH - not evaluated, the firmware always sends 1000 (100.0 %)
-    "port_voltage":           (65, 1 / 100, 2, 0, False, 1),              # doc: "Port voltage"
+    # BASE+0: number of temperatures (6)
+    "cell_temperature":       (1, 1 / 10, 1, -KELVIN_OFFSET, False, 4),  # doc: "Cell temperature 1..4" (<= 8 cells: 3/4 copy 2)
+    "ambient_temperature":    (9, 1 / 10, 1, -KELVIN_OFFSET, False, 1),  # doc: "Environment temperature"
+    "components_temperature": (11, 1 / 10, 1, -KELVIN_OFFSET, False, 1), # doc: "Power temperature" (MOSFET)
+    "dis_charge_current":     (13, 1 / 100, 2, 0, True, 1),              # doc: "Charge/discharge current", 0 when idle
+    "total_pack_voltage":     (15, 1 / 100, 2, 0, False, 1),             # doc: "Total battery voltage"
+    "residual_capacity":      (17, 1 / 100, 2, 0, False, 1),             # doc: "Residual capacity"
+    # BASE+19: number of user defined values (10)
+    "full_capacity":          (20, 1 / 100, 2, 0, False, 1),             # doc: "Battery capacity", learned full capacity
+    "state_of_charge":        (22, 1 / 10, 1, 0, False, 1),              # doc: "SOC"
+    "rated_capacity":         (24, 1 / 100, 2, 0, False, 1),             # doc: "Rated capacity", setting P58
+    "charging_cycles":        (26, 1, None, 0, False, 1),                # doc: "Number of cycles"
+    # BASE+28: SOH - not evaluated, the firmware always sends 1000 (100.0 %)
+    "port_voltage":           (30, 1 / 100, 2, 0, False, 1),             # doc: "Port voltage"
     # The four "Reservation" fields of the doc are filled by the firmware:
     # 1: reference/offset channel of the current measurement in mA (drift compensation)
     # 2: offset corrected current in mA, only sent while idle (0 while charging/discharging)
     # 3/4: charged/discharged energy in 0.1 kWh; the firmware sends 6500 once a counter reaches 65000
-    "current_offset":         (67, 1, None, 0, True, 1),
-    "current_idle":           (69, 1 / 1000, 3, 0, True, 1),
-    "energy_charged":         (71, 1 / 10, 1, 0, False, 1),
-    "energy_discharged":      (73, 1 / 10, 1, 0, False, 1),
+    "current_offset":         (32, 1, None, 0, True, 1),
+    "current_idle":           (34, 1 / 1000, 3, 0, True, 1),
+    "energy_charged":         (36, 1 / 10, 1, 0, False, 1),
+    "energy_discharged":      (38, 1 / 10, 1, 0, False, 1),
 }
+
+
+def info_length(cell_count: int) -> int:
+    """Binary INFO length of the 0x42 answer."""
+    return 43 + 2 * cell_count
+
 
 ENERGY_KEYS = ("energy_charged", "energy_discharged")
 ENERGY_FALLBACK_KWH = 650.0
@@ -46,31 +54,31 @@ def _value(raw: bytes, offset: int, scale: float, rounding: int | None, bias: in
 
 def decode(info: bytes, min_cell_voltage: float, max_cell_voltage: float) -> dict:
     """Decode the 0x42 INFO into {"normal": {...}} incl. calculated values."""
-    number_of_cells = info[2]
+    cell_count = info[2]
+    base = CELL_OFFSET + 2 * cell_count
     feedback: dict = {
         "cell_voltage_setting_min": min_cell_voltage,
         "cell_voltage_setting_max": max_cell_voltage,
-        "pack_voltage_setting_min": min_cell_voltage * number_of_cells,
-        "pack_voltage_setting_max": max_cell_voltage * number_of_cells,
+        "pack_voltage_setting_min": min_cell_voltage * cell_count,
+        "pack_voltage_setting_max": max_cell_voltage * cell_count,
     }
-    lists: dict[str, list] = {}
+    cells = [_value(info, CELL_OFFSET + 2 * i, 1 / 1000, 3, 0, False) for i in range(cell_count)]
+    for i, value in enumerate(cells):
+        feedback[f"voltage_cell_{i + 1}"] = value
+    temps: list[float] = []
     for name, (offset, scale, rounding, bias, signed, amount) in _FIELDS.items():
         if amount > 1:
-            count = number_of_cells if name == "voltage_cell" else amount
-            values = [_value(info, offset + 2 * i, scale, rounding, bias, signed) for i in range(count)]
-            lists[name] = values
-            for i, value in enumerate(values):
+            temps = [_value(info, base + offset + 2 * i, scale, rounding, bias, signed) for i in range(amount)]
+            for i, value in enumerate(temps):
                 feedback[f"{name}_{i + 1}"] = value
         else:
-            feedback[name] = _value(info, offset, scale, rounding, bias, signed)
+            feedback[name] = _value(info, base + offset, scale, rounding, bias, signed)
 
     # 0x42 reports 0 while idle, the idle current (1 mA resolution) comes in "Reservation" 2
     current = feedback["dis_charge_current"] or feedback["current_idle"]
     feedback["current"] = current
     feedback.pop("current_idle")
 
-    cells = lists["voltage_cell"]
-    temps = lists["cell_temperature"]
     lowest_idx, lowest = min(enumerate(cells), key=lambda x: x[1])
     highest_idx, highest = max(enumerate(cells), key=lambda x: x[1])
     feedback.update({
@@ -82,29 +90,44 @@ def decode(info: bytes, min_cell_voltage: float, max_cell_voltage: float) -> dic
         "highest_cell": highest_idx + 1,
         "highest_cell_voltage": highest,
         "delta_cell_voltage": round(highest - lowest, 3),
+        "highest_cell_temperature": max(temps),
+        "lowest_cell_temperature": min(temps),
         "delta_cell_temperature": round(max(temps) - min(temps), 1),
     })
     return {"normal": feedback}
 
 
-@dataclass
 class EnergyGuard:
     """
-    The firmware sends 6500 (650.0 kWh) once a counter reaches 65000 (6500 kWh).
-    Keep the last valid value instead of publishing a false reset.
+    The firmware sends 6500 (650.0 kWh) once a counter reaches 65000 (6500 kWh). A 650.0 after a
+    larger value is that fallback: keep the last valid value instead of publishing a false reset.
+    The last value survives restarts via the state store; without any history a 650.0 is ambiguous
+    and published as unknown (None) until the counter moves.
     """
-    pack_address: int
-    last: dict[str, float] = field(default_factory=dict)
-    overflow_logged: bool = False
+
+    def __init__(self, pack_address: int, store=None) -> None:
+        self.pack_address = pack_address
+        self.store = store
+        self.overflow_logged = False
+
+    def _key(self, counter: str) -> str:
+        return f"pack{self.pack_address}.{counter}"
+
+    def _last(self, counter: str) -> float | None:
+        return self.store.get(self._key(counter)) if self.store is not None else None
 
     def apply(self, normal: dict) -> None:
-        for key in ENERGY_KEYS:
-            value = normal[key]
-            last = self.last.get(key)
-            if value == ENERGY_FALLBACK_KWH and last is not None and last > ENERGY_FALLBACK_KWH:
-                if not self.overflow_logged:
-                    logger.warning("Pack%s:Energy counter exceeded 6500 kWh, the BMS no longer reports it", self.pack_address)
-                    self.overflow_logged = True
-                value = last
-            self.last[key] = value
-            normal[key] = value
+        for counter in ENERGY_KEYS:
+            value = normal[counter]
+            last = self._last(counter)
+            if value == ENERGY_FALLBACK_KWH:
+                if last is None:
+                    value = None
+                elif last > ENERGY_FALLBACK_KWH:
+                    if not self.overflow_logged:
+                        logger.warning("Pack%s:Energy counter exceeded 6500 kWh, the BMS no longer reports it", self.pack_address)
+                        self.overflow_logged = True
+                    value = last
+            if value is not None and self.store is not None:
+                self.store.set(self._key(counter), value)
+            normal[counter] = value

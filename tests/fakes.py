@@ -102,6 +102,8 @@ class FakeBms:
             return b""
         if isinstance(entry, tuple) and entry[0] == "exc":
             return modbus_exception(req.adr, req.fc, entry[1])
+        if isinstance(entry, tuple) and entry[0] == "raw":
+            return entry[1]
         return modbus_response(req.adr, req.fc, entry)
 
 

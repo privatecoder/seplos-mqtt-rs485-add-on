@@ -55,6 +55,12 @@ def modbus_response(slave: int, fc: int, regs: list[int]) -> bytes:
     return body + modbus_crc(body).to_bytes(2, "little")
 
 
+def modbus_wide_count_response(slave: int, fc: int, value: int) -> bytes:
+    """Seplos single-register answer with a 16-bit byte count (0x0033, 0x0070-0x0074)."""
+    body = bytes([slave, fc, 0x00, 0x02]) + u16(value)
+    return body + modbus_crc(body).to_bytes(2, "little")
+
+
 def modbus_exception(slave: int, fc: int, code: int) -> bytes:
     body = bytes([slave, fc | 0x80, code])
     return body + modbus_crc(body).to_bytes(2, "little")

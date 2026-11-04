@@ -8,6 +8,7 @@ bashio::log.info "Starting Seplos MQTT RS485 Add-on..."
 export RS485_REMOTE_IP=$(bashio::config 'rs485_remote_ip')
 export RS485_REMOTE_PORT=$(bashio::config 'rs485_remote_port')
 export SERIAL_INTERFACE=$(bashio::config 'serial_interface')
+export SERIAL_BAUDRATE=$(bashio::config 'serial_baudrate')
 export NUMBER_OF_PACKS=$(bashio::config 'number_of_packs')
 export MIN_CELL_VOLTAGE=$(bashio::config 'min_cell_voltage')
 export MAX_CELL_VOLTAGE=$(bashio::config 'max_cell_voltage')

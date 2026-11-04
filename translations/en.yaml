@@ -11,6 +11,10 @@ configuration:
   serial_interface:
     name: "Serial Interface"
     description: "Serial device path (e.g., /dev/ttyUSB0 for local or /tmp/vcom0 for remote via socat)"
+
+  serial_baudrate:
+    name: "Baud Rate"
+    description: "auto = 19200 for a single pack (RS485-1/2), 9600 for multiple packs (CAN port). Firmware 16.04.x needs 9600 on RS485-1/2 as well."
   
   # Battery Configuration
   number_of_packs:

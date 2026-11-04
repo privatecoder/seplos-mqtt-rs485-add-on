@@ -53,7 +53,7 @@
         "via_device": "seplos_bms_pack_0"
       },
       "ic": "mdi:information-outline",
-      "name": "System State (as reported to inverter)",
+      "name": "System State (Aggregate)",
       "obj_id": "seplos_bms_system_system_state",
       "stat_t": "seplos/system/sensors",
       "uniq_id": "seplos_bms_system_system_state",

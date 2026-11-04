@@ -19,6 +19,15 @@ def _env(env: Mapping[str, str], name: str, default: Any, cast: type) -> Any:
         return default
 
 
+def _baudrate(value: str | None) -> int:
+    """'auto'/empty -> 0 (by mode), else 9600 or 19200."""
+    try:
+        baud = int(value or 0)
+    except ValueError:
+        return 0
+    return baud if baud in (9600, 19200) else 0
+
+
 @dataclass(frozen=True)
 class Config:
     # BMS
@@ -27,6 +36,8 @@ class Config:
     number_of_packs: int = 1
     # Serial
     serial_interface: str = "/tmp/vcom0"
+    # 0 = by mode (single pack 19200, multi pack 9600); firmware 16.04.x uses 9600 on RS485-1/2 too
+    serial_baudrate: int = 0
     # MQTT
     mqtt_host: str = "192.168.1.100"
     mqtt_port: int = 1883
@@ -40,6 +51,8 @@ class Config:
     invert_ha_dis_charge_measurements: bool = True
     # Logging
     logging_level: str = "INFO"
+    # persistent state (energy counters); empty = /data/seplos_state.json if writable
+    state_file: str = ""
 
     @property
     def multi_pack(self) -> bool:
@@ -51,6 +64,8 @@ class Config:
 
     @property
     def baudrate(self) -> int:
+        if self.serial_baudrate:
+            return self.serial_baudrate
         return 9600 if self.multi_pack else 19200
 
     @classmethod
@@ -62,6 +77,7 @@ class Config:
             max_cell_voltage=_env(env, "MAX_CELL_VOLTAGE", d.max_cell_voltage, float),
             number_of_packs=_env(env, "NUMBER_OF_PACKS", d.number_of_packs, int),
             serial_interface=_env(env, "SERIAL_INTERFACE", d.serial_interface, str),
+            serial_baudrate=_baudrate(env.get("SERIAL_BAUDRATE")),
             mqtt_host=_env(env, "MQTT_HOST", d.mqtt_host, str),
             mqtt_port=_env(env, "MQTT_PORT", d.mqtt_port, int),
             mqtt_username=_env(env, "MQTT_USERNAME", d.mqtt_username, str),
@@ -72,6 +88,7 @@ class Config:
             ha_discovery_prefix=_env(env, "HA_DISCOVERY_PREFIX", d.ha_discovery_prefix, str),
             invert_ha_dis_charge_measurements=_env(env, "INVERT_HA_DIS_CHARGE_MEASUREMENTS", d.invert_ha_dis_charge_measurements, bool),
             logging_level=_env(env, "LOGGING_LEVEL", "info", str).upper(),
+            state_file=_env(env, "STATE_FILE", d.state_file, str),
         )
 
     def loggable(self) -> dict[str, Any]:

@@ -36,9 +36,10 @@
     "no_calibration_of_null_point": "OK",
     "no_calibration_of_voltage": "OK",
     "output_connection_failure": "OK",
-    "output_reverse_polarity_protection": "OK",
     "power_switch_failure": "OK",
     "rtc_clock_failure": "OK",
+    "rtc_time_invalid": "OK",
+    "severe_fault": "OK",
     "temperature_sensing_failure": "OK",
     "voltage_sensing_failure": "OK"
   },

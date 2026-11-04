@@ -8,7 +8,6 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import paho.mqtt.client as mqtt
@@ -20,7 +19,8 @@ from . import health, topics
 from .config import Config
 from .decoders.identity import device_firmware
 from .discovery import Discovery
-from .pack import BatteryPack, request_gap
+from .pack import BatteryPack, now_iso, request_gap
+from .state import StateStore
 from .system import SystemReader
 from .transport import SerialBus
 
@@ -42,6 +42,7 @@ class AppState:
     config: Config
     client: Any = None
     bus: SerialBus | None = None
+    store: StateStore | None = None
     packs: list[PackState] = field(default_factory=list)
     # timestamp of the last successful BMS poll (seconds since epoch)
     last_bms_update_ts: float = 0.0
@@ -151,6 +152,8 @@ def graceful_exit(state: AppState) -> None:
         if state.bus is not None and state.bus.is_open:
             logger.info("Closing serial connection")
             state.bus.close()
+        if state.store is not None:
+            state.store.flush()
     except Exception as e:
         logger.error("Error during graceful exit: %s", e)
 
@@ -166,11 +169,13 @@ def poll_pack(state: AppState, pack_state: PackState, discovery: Discovery | Non
         state.last_bms_update_ts = now
         pack_state.last_success_ts = now
         pack_state.publish_counter += 1
-        heartbeat = {"last_publish": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "publish_counter": pack_state.publish_counter}
+        heartbeat = {"last_publish": now_iso(), "publish_counter": pack_state.publish_counter}
         state.client.publish(topics.pack_heartbeat(base, address), json.dumps(heartbeat), retain=False)
         state.client.publish(topics.pack_availability(base, address), "online", retain=False)
         pack_state.availability = "online"
 
+    if discovery and pack_state.pack.cell_count:
+        discovery.update_cell_count(address, pack_state.pack.cell_count)
     # show the real firmware version in the HA device info once it's known
     if discovery and pack_state.pack.info and not pack_state.firmware_reported:
         discovery.update_firmware(address, device_firmware(pack_state.pack.info))
@@ -206,7 +211,10 @@ def main(config: Config | None = None) -> None:
         state.client = initialize_mqtt(state)
         state.bus = SerialBus(initialize_serial(config))
 
-        state.packs = [PackState(BatteryPack(address, state.bus, config), address) for address in range(config.number_of_packs)]
+        state.store = StateStore.default(config.state_file)
+        state.packs = [
+            PackState(BatteryPack(address, state.bus, config, state.store), address) for address in range(config.number_of_packs)
+        ]
         logger.info("Initialized %s battery pack(s)", config.number_of_packs)
         for pack_state in state.packs:
             state.client.publish(topics.pack_availability(config.mqtt_topic, pack_state.address), "offline", retain=False)

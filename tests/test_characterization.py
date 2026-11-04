@@ -29,8 +29,10 @@ def test_telemetry_decoder(golden):
     assert n["delta_cell_temperature"] == 3.4
     assert n["dis_charge_power"] == -653.16
     assert n["pack_voltage_setting_min"] == 40.0 and n["pack_voltage_setting_max"] == 58.4
-    # F12 (characterized): 0.01 Ah raw values are rounded to 0.1 Ah
-    assert n["full_capacity"] == 280.0 and n["rated_capacity"] == 280.0
+    # F12: capacities keep their 0.01 Ah resolution
+    assert n["full_capacity"] == 280.01 and n["rated_capacity"] == 280.03
+    # G06: cell temperature extrema from the four 0x42 channels (both bus modes)
+    assert n["highest_cell_temperature"] == 23.4 and n["lowest_cell_temperature"] == 20.0
     assert "current_idle" not in n
     golden("decode_telemetry", out)
 
@@ -47,10 +49,25 @@ def test_telemetry_energy_fallback_within_process():
     assert second["normal"]["energy_charged"] == 6499.9
 
 
-def test_telemetry_energy_fallback_after_restart_characterized():
-    # F03 (characterized): a fresh process publishes the 650.0 fallback as a valid total
+def test_telemetry_energy_fallback_without_history_is_unknown():
+    # F03: without any history a 650.0 can be the fallback, publish unknown instead of a false reset
     out = api.decode_telemetry(f.telemetry_info(energy_charged=6500))
-    assert out["normal"]["energy_charged"] == 650.0
+    assert out["normal"]["energy_charged"] is None
+    assert out["normal"]["energy_discharged"] == 900.0
+
+
+def test_telemetry_energy_fallback_after_restart_with_state(tmp_path):
+    # F03: the last valid value survives a restart via the state file
+    path = tmp_path / "state.json"
+    first = api.decode_telemetry_sequence([f.telemetry_info(energy_charged=64999)], state_file=path)
+    restarted = api.decode_telemetry_sequence([f.telemetry_info(energy_charged=6500)], state_file=path, flush_before=True)
+    assert first[0]["normal"]["energy_charged"] == 6499.9
+    assert restarted[0]["normal"]["energy_charged"] == 6499.9
+
+
+def test_telemetry_legit_650_with_history():
+    out = api.decode_telemetry_sequence([f.telemetry_info(energy_charged=6499), f.telemetry_info(energy_charged=6500)])
+    assert out[1]["normal"]["energy_charged"] == 650.0
 
 
 def test_telesignal_decoder(golden):
@@ -79,8 +96,10 @@ def test_telesignal_decoder(golden):
     assert b["eep_storage_failure"] == "Fault"
     assert b["discharge_switch"] == "ON" and b["charge_switch"] == "ON" and b["heating_switch"] == "OFF"
     assert b["balancer_cell_1"] == "ON" and b["balancer_cell_16"] == "ON" and b["balancer_cell_2"] == "OFF"
-    # F08 (characterized): reverse polarity entity still decoded
-    assert b["output_reverse_polarity_protection"] == "OK"
+    # F08: reverse polarity is never set by the firmware, not decoded anymore
+    assert "output_reverse_polarity_protection" not in b
+    # F01 / F09
+    assert b["severe_fault"] == "OK" and b["rtc_time_invalid"] == "OK"
     golden("decode_telesignal", out)
 
 
@@ -120,19 +139,24 @@ def test_parameters_decoder(golden):
     assert out["cells_in_series"] == 16
     assert out["compensation_point_2_impedance_mohm"] == 1.5
     assert out["function_switches"] == "FE FF FF 7F FF FF 0F 80"
-    assert out["balancing_enabled"] is True and out["charge_current_limit_mode"] == "warning - 10 A"
-    # F02 (characterized): switch byte 0 is treated as a mask of event 1
-    assert out["disabled_alarm_bits"] == {"alarm_event_1": [0], "alarm_event_4": [7]}
+    assert out["balancing_enabled"] is True and out["ccl_base_mode"] == "warning - 10 A (if above 20 A)"   # F21
+    # F02: BitGroup0 is no mask; groups 1-5 mask events 2-6
+    assert out["disabled_alarm_bits"] == {"alarm_event_4": [7]}
+    assert out["temperature_sensor_plausibility_check"] is True and out["severe_fault_reporting"] is False   # G10
+    # F10: P70-P72 describe what they are
+    assert out["transient_or_short_circuit_lockout_event_count"] == 4
+    assert out["charge_current_limit_duration_min"] == 10 and out["charge_activation_window_min"] == 30
     assert out["device_name"] == "SP16S020"
-    assert len(out) == 95   # F19 (characterized): attribute count, used as the Parameters state
     golden("decode_parameters", out)
 
 
 def test_extended_status_decoder(golden):
     out = api.decode_extended_status(f.intra_pack_info())
-    assert out["normal"] == {"dis_charge_current_unfiltered": 0.37, "highest_cell_temperature": 23.4, "lowest_cell_temperature": 20.0}
-    assert out["binary"]["balancing_active"] == "ON" and out["binary"]["charge_forbidden"] == "ON"
-    assert out["binary"]["balancing_blocked"] == "OFF"
+    assert out["normal"] == {"dis_charge_current_unfiltered": 0.37}
+    b = out["binary"]
+    assert b["balancing_active"] == "ON" and b["charge_forbidden"] == "ON" and b["balancing_blocked"] == "OFF"
+    # G01/G02 from the system status 0x02: charging, nothing else
+    assert b["external_voltage_detected"] == "OFF" and b["charge_current_status"] == "OFF"
     golden("decode_extended_status", out)
 
 
@@ -161,6 +185,7 @@ def _multi_pack_bms() -> FakeBms:
     bms.ascii[(0x02, 0x60)] = ("rtn", 0x00)
     bms.modbus[(0x03, 0x001F, 9)] = [0] * 9
     bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
+    bms.modbus[(0x03, 0x0074, 1)] = ("raw", f.modbus_wide_count_response(1, 3, 0xC0))
     return bms
 
 
@@ -194,17 +219,24 @@ def test_single_pack_poll(monkeypatch, golden):
         assert cids.count(0x42) == 2 and cids.count(0x47) == 1 and cids.count(0x51) >= 1
 
 
-def test_single_pack_poll_failed_5a_keeps_stale_status(monkeypatch):
-    # F04 (characterized): a failed 0x5A keeps the last status without expiry
+def test_single_pack_poll_failed_5a_status_expires(monkeypatch):
+    # F04: a failed 0x5A bridges a short gap, then the status becomes unknown
     api.no_sleep(monkeypatch)
+    clock = api.fake_clock(monkeypatch)
     with api.mode(1):
         pack = api.make_pack(0)
         bms = _single_pack_bms()
         data, _ = api.poll(pack, bms)
         bms.ascii[(0, 0x5A)] = None
         bms.ascii[(0, 0x42)] = f.telemetry_info(cycles=43)
+        clock["t"] += 10
         data2, ok = api.poll(pack, bms)
         assert ok and data2["status"] == data["status"]
+        bms.ascii[(0, 0x42)] = f.telemetry_info(cycles=44)
+        clock["t"] += 120
+        data3, ok = api.poll(pack, bms)
+        assert ok and data3["status"]["binary"]["charge_forbidden"] is None
+        assert set(data3["status"]["binary"]) == set(data["status"]["binary"])
 
 
 def test_multi_pack_poll(monkeypatch, golden):
@@ -234,14 +266,14 @@ def test_patch_probe_pack_bus_old_firmware(monkeypatch):
         assert data["info"]["normal"]["firmware_patch"] == "16.06.03-16.06.12"
 
 
-def test_patch_probe_pack_bus_other_rtn_characterized(monkeypatch):
-    # F16 (characterized): RTN 02 on 0xAA is not RTN 04 and the pack answers 0x51 -> classified 16.06.13+
+def test_patch_probe_pack_bus_other_rtn_is_unknown(monkeypatch):
+    # F16: only silence counts for 16.06.13+, any other answer to 0xAA makes the result unknown
     api.no_sleep(monkeypatch)
     with api.mode(1):
         bms = _single_pack_bms()
         bms.ascii[(0, 0xAA)] = ("rtn", 0x02)
         data, _ = api.poll(api.make_pack(0), bms)
-        assert data["info"]["normal"]["firmware_patch"] == "16.06.13+"
+        assert data["info"]["normal"]["firmware_patch"] == "16.06 (unknown)"
 
 
 def test_poll_fails_on_bad_checksum(monkeypatch):
@@ -259,8 +291,21 @@ def test_system_read(monkeypatch):
     with api.mode(2):
         bms = FakeBms()
         bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
+        bms.modbus[(0x03, 0x0074, 1)] = ("raw", f.modbus_wide_count_response(1, 3, 0xE0))
         out = api.read_system(api.make_pack(0), bms)
-        assert out == api.decode_system(f.system_registers())
+        expected = api.decode_system(f.system_registers())
+        expected["binary"].update({"force_charge_1": "ON", "force_charge_2": "OFF"})   # G07
+        assert out == expected
+
+
+def test_system_read_without_flags_register(monkeypatch):
+    """Firmware < 16.06.11 answers 0x0074 with an exception: the flags are left out."""
+    api.no_sleep(monkeypatch)
+    bms = FakeBms()
+    bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
+    bms.modbus[(0x03, 0x0074, 1)] = ("exc", 0x02)
+    out = api.read_system(api.make_pack(0), bms)
+    assert out == api.decode_system(f.system_registers())
 
 
 # --- discovery ----------------------------------------------------------------------------------
@@ -387,9 +432,17 @@ def test_intra_pack_record_decoder(golden):
 
 def test_extended_status_bits_cleared():
     out = api.decode_extended_status(f.intra_pack_info(event7=0x0E, event8=0x00, max_t=-5.0, min_t=-12.3, current_10ma=-250))
-    assert out["normal"] == {"dis_charge_current_unfiltered": -2.5, "highest_cell_temperature": -5.0, "lowest_cell_temperature": -12.3}
+    assert out["normal"] == {"dis_charge_current_unfiltered": -2.5}
     assert out["binary"] == {"balancing_active": "OFF", "balancing_blocked": "ON", "balancing_time_limit": "ON",
-                             "balancing_temperature_blocked": "ON", "charge_forbidden": "OFF"}
+                             "balancing_temperature_blocked": "ON", "limiter_charging_from_10a": "OFF",
+                             "limiter_after_charge_overcurrent_warning": "OFF", "charge_forbidden": "OFF",
+                             "precharge_running": "OFF", "external_voltage_detected": "OFF",
+                             "discharge_current_status": "OFF", "charge_current_status": "OFF"}
+    out = api.decode_extended_status(f.intra_pack_info(event7=0xC0, on_off=0x13, status=0xC4))
+    b = out["binary"]
+    assert b["limiter_charging_from_10a"] == "ON" and b["limiter_after_charge_overcurrent_warning"] == "ON"
+    assert b["precharge_running"] == "ON" and b["external_voltage_detected"] == "ON"
+    assert b["discharge_current_status"] == "ON" and b["charge_current_status"] == "ON"
 
 
 def test_negative_temperatures_and_parameter_currents():
@@ -506,3 +559,55 @@ def test_discovery_custom_prefix_topic(golden):
     records = client.as_records()
     assert all(r["topic"].startswith("ha/") for r in records)
     golden("discovery_custom_prefix", _discovery(records))
+
+
+# --- step 2: variable cell count, baud override, force charge flags ----------------------------------
+
+def test_fifteen_cell_pack(monkeypatch, golden):
+    """F05: the 0x42/0x44 layout follows the cell count M."""
+    api.no_sleep(monkeypatch)
+    cells = [3300 + i for i in range(15)]
+    with api.mode(1):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(cells_mv=cells, cycles=77, energy_charged=1234)
+        bms.ascii[(0, 0x44)] = f.telesignal_info(cell_alarms=[0] * 14 + [2], events_1_6=(0, 0, 0, 0x80, 0, 0), balancing=(0x01, 0x40))
+        data, ok = api.poll(api.make_pack(0), bms)
+    assert ok
+    t = data["telemetry"]["normal"]
+    assert t["voltage_cell_15"] == 3.314 and "voltage_cell_16" not in t
+    assert t["charging_cycles"] == 77 and t["energy_charged"] == 123.4 and t["average_cell_voltage"] == 3.307
+    assert t["pack_voltage_setting_max"] == 3.65 * 15
+    s = data["telesignalization"]
+    assert s["normal"]["cell_voltage_alarm_15"] == "Alarm (high)" and "cell_voltage_alarm_16" not in s["normal"]
+    assert s["binary"]["severe_fault"] == "Fault"
+    assert s["binary"]["balancer_cell_15"] == "ON" and "balancer_cell_16" not in s["binary"]
+    golden("poll_fifteen_cells", data)
+
+
+def test_discovery_removes_cells_above_count(golden):
+    disc, client = api.discovery()
+    api.discovery_startup(disc, 1)
+    client.published.clear()
+    api.cell_count(disc, 0, 15)
+    api.cell_count(disc, 0, 15)   # idempotent
+    topics = [r["topic"] for r in client.as_records()]
+    assert topics == [
+        "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_16/config",
+        "homeassistant/sensor/seplos-mqtt-pack-0/cell_voltage_alarm_16/config",
+        "homeassistant/binary_sensor/seplos-mqtt-pack-0/balancer_cell_16/config",
+    ]
+
+
+def test_implausible_cell_count_rejected(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(cells_mv=[3300] * 17)
+        assert api.poll(api.make_pack(0), bms) == (None, False)
+
+
+def test_baudrate_override(monkeypatch):
+    """F17: 16.04.x uses 9600 on RS485-1/2 as well."""
+    assert api.init_serial(monkeypatch, 1, SERIAL_BAUDRATE="9600")["baudrate"] == 9600
+    assert api.init_serial(monkeypatch, 1, SERIAL_BAUDRATE="auto")["baudrate"] == 19200
+    assert api.init_serial(monkeypatch, 2, SERIAL_BAUDRATE="12345")["baudrate"] == 9600

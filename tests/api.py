@@ -6,11 +6,11 @@ delegates; it must not re-implement production composition.
 from __future__ import annotations
 
 import dataclasses
-import datetime as _dt
 from contextlib import contextmanager
 
 from fakes import FakeBms, FakeMqtt, FakeSerial
 from seplos_mqtt import app
+from seplos_mqtt import pack as pack_module
 from seplos_mqtt.config import Config
 from seplos_mqtt.decoders import alarms, identity, intrapack, parameters, system
 from seplos_mqtt.decoders.identity import device_firmware
@@ -18,6 +18,7 @@ from seplos_mqtt.discovery import Discovery
 from seplos_mqtt.framing import ascii as af
 from seplos_mqtt.framing import modbus
 from seplos_mqtt.pack import BatteryPack
+from seplos_mqtt.state import StateStore
 from seplos_mqtt.system import SystemReader
 from seplos_mqtt.transport import SerialBus
 
@@ -48,9 +49,14 @@ def mode(number_of_packs: int, **overrides):
         _CONFIG["config"] = old
 
 
+FIXED_NOW = "2026-11-04T12:00:00+01:00"
+
+
 def no_sleep(monkeypatch) -> None:
+    """No real delays and a fixed wall-clock timestamp."""
     import time
     monkeypatch.setattr(time, "sleep", lambda _s: None)
+    monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
 
 
 # --- framing ----------------------------------------------------------------------------------
@@ -69,10 +75,22 @@ def decode_telemetry(info: bytes) -> dict:
     return decode_telemetry_sequence([info])[0]
 
 
-def decode_telemetry_sequence(infos: list[bytes]) -> list[dict]:
-    """Several 0x42 answers decoded by the same pack (stateful energy handling)."""
-    pack = BatteryPack(0, None, config())
-    return [pack._decode_telemetry(i) for i in infos]
+def decode_telemetry_sequence(infos: list[bytes], state_file=None, flush_before: bool = False) -> list[dict]:
+    """Several 0x42 answers decoded by the same pack (stateful energy handling, optional state file)."""
+    store = StateStore(str(state_file)) if state_file else None
+    pack = BatteryPack(0, None, config(), store)
+    out = [pack._decode_telemetry(i) for i in infos]
+    if store is not None:
+        store.flush()
+    return out
+
+
+def fake_clock(monkeypatch) -> dict:
+    """time.time() under test control: clock["t"] += seconds."""
+    import time
+    clock = {"t": 1_000_000.0}
+    monkeypatch.setattr(time, "time", lambda: clock["t"])
+    return clock
 
 
 def decode_telesignal(info: bytes) -> dict:
@@ -140,6 +158,10 @@ def discovery_startup(disc: Discovery, number_of_packs: int) -> None:
         disc.remove_system()
 
 
+def cell_count(disc: Discovery, pack_no: int, cells: int) -> None:
+    disc.update_cell_count(pack_no, cells)
+
+
 def firmware_refresh(disc: Discovery, pack_no: int, info: dict) -> None:
     disc.update_firmware(pack_no, device_firmware(info))
 
@@ -152,10 +174,12 @@ class SerialSpy:
         self.is_open = True
 
 
-def init_serial(monkeypatch, number_of_packs: int) -> dict:
+def init_serial(monkeypatch, number_of_packs: int, **env) -> dict:
     monkeypatch.setattr(app.serial, "Serial", SerialSpy)
-    with mode(number_of_packs):
-        return app.initialize_serial(config()).kwargs
+    import os
+    cfg = Config.from_env({**os.environ, **env})
+    cfg = dataclasses.replace(cfg, number_of_packs=number_of_packs)
+    return app.initialize_serial(cfg).kwargs
 
 
 class MqttClientSpy:
@@ -229,11 +253,6 @@ def run_main(
     for adr in range(number_of_packs):
         bms.ascii[(adr, 0x42)] = gate(adr, bms.ascii.get((adr, 0x42)))
 
-    class FixedDatetime(_dt.datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return cls(2026, 11, 4, 12, 0, 0, tzinfo=tz)
-
     clock = {"t": 1_000_000.0}
 
     def fake_time():
@@ -243,7 +262,8 @@ def run_main(
     import time
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     monkeypatch.setattr(time, "time", fake_time)
-    monkeypatch.setattr(app, "datetime", FixedDatetime)
+    monkeypatch.setattr(app, "now_iso", lambda: FIXED_NOW)
+    monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
     monkeypatch.setattr(app, "initialize_mqtt", lambda _state: client)
     monkeypatch.setattr(app, "initialize_serial", lambda _config: port)
     monkeypatch.setattr(app, "start_health_server", lambda _state: None)

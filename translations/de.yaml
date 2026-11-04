@@ -11,6 +11,10 @@ configuration:
   serial_interface:
     name: "Serielle Schnittstelle"
     description: "Pfad zum seriellen Gerät (z.B. /dev/ttyUSB0 für lokal oder /tmp/vcom0 für remote via socat)"
+
+  serial_baudrate:
+    name: "Baudrate"
+    description: "auto = 19200 bei einem Pack (RS485-1/2), 9600 bei mehreren Packs (CAN-Port). Firmware 16.04.x braucht auch an RS485-1/2 9600."
   
   # Batterie-Konfiguration
   number_of_packs:

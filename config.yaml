@@ -1,6 +1,6 @@
 name: "Seplos MQTT RS485 Add-on"
 description: "Read Seplos V2/V16 BMS data via RS485 and publish it to HA via MQTT"
-version: "2.0.0-beta5"
+version: "2.0.0-beta6"
 slug: "seplos_mqtt_rs485_add-on"
 init: false
 arch:
@@ -24,6 +24,7 @@ options:
   rs485_remote_ip: ""
   rs485_remote_port: 4196
   serial_interface: "/tmp/vcom0"
+  serial_baudrate: "auto"
   number_of_packs: 1
   min_cell_voltage: 2.5
   max_cell_voltage: 3.65
@@ -37,6 +38,7 @@ schema:
   rs485_remote_ip: "str?"
   rs485_remote_port: "int?"
   serial_interface: "str"
+  serial_baudrate: "list(auto|9600|19200)"
   number_of_packs: "int(1,16)"
   min_cell_voltage: "float"
   max_cell_voltage: "float"

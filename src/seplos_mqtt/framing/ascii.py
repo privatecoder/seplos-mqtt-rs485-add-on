@@ -9,6 +9,7 @@ characters, CHKSUM = two's complement of the sum of all characters between ~ and
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 logger = logging.getLogger("SeplosBMS.framing")
 
@@ -86,12 +87,21 @@ def info_ascii(raw: bytes) -> bytes:
     return raw[13:-5]
 
 
-def validate_response(raw: bytes, address: int, info_len: int) -> bytes | None:
+# Expected binary INFO length: a fixed number, or a function of the decoded INFO
+# (e.g. derived from the cell count) that returns None for an implausible INFO
+ExpectedLength = int | Callable[[bytes], int | None]
+
+
+def min_frame_length(expected: ExpectedLength) -> int:
+    return OVERHEAD + (2 * expected if isinstance(expected, int) else 6)
+
+
+def validate_response(raw: bytes, address: int, expected: ExpectedLength) -> bytes | None:
     """
-    Validate a normal response (RTN 00) from `address` with exactly `info_len` INFO characters.
+    Validate a normal response (RTN 00) from `address` whose INFO has the expected binary length.
     Returns the binary INFO or None.
     """
-    if len(raw) < info_len + OVERHEAD:
+    if len(raw) < min_frame_length(expected):
         logger.debug("Frame too short: %s", len(raw))
         return None
     adr = raw[3:5]
@@ -99,11 +109,13 @@ def validate_response(raw: bytes, address: int, info_len: int) -> bytes | None:
     if not is_hex(adr) or hex_byte(adr, 0) != address:
         logger.debug("Frame address mismatch: %s", adr)
         return None
-    if len(info) != info_len:
-        logger.debug("Frame length mismatch - expected: %s, got: %s", info_len, len(info))
-        return None
-    if not is_hex(info):
+    if len(info) % 2 or not is_hex(info):
         logger.debug("Frame includes non-hexadecimal characters: %s", info)
+        return None
+    payload = bytes.fromhex(info.decode("ascii"))
+    length = expected if isinstance(expected, int) else expected(payload)
+    if length is None or len(payload) != length:
+        logger.debug("Frame length mismatch - expected: %s, got: %s", length, len(payload))
         return None
     if not checksum_ok(raw):
         logger.debug("Frame checksum mismatch")
@@ -111,7 +123,7 @@ def validate_response(raw: bytes, address: int, info_len: int) -> bytes | None:
     if raw[7:9] != b"00":
         logger.debug("Frame error flag (RTN) set: %s", raw[7:9])
         return None
-    return bytes.fromhex(info.decode("ascii"))
+    return payload
 
 
 def is_intra_pack(raw: bytes) -> bool:

@@ -98,7 +98,9 @@
   "event4_bit6": {
     "low_temperature_heating": "ON"
   },
-  "event4_bit7": {},
+  "event4_bit7": {
+    "severe_fault": "Fault"
+  },
   "event5_bit0": {
     "charging_overcurrent": "Alarm"
   },
@@ -138,9 +140,7 @@
   "event6_bit4": {
     "cell_low_voltage_forbidden_charging": "Protection"
   },
-  "event6_bit5": {
-    "output_reverse_polarity_protection": "Protection"
-  },
+  "event6_bit5": {},
   "event6_bit6": {
     "output_connection_failure": "Fault"
   },
@@ -172,7 +172,9 @@
   "event8_bit4": {
     "no_calibration_of_null_point": "Warning"
   },
-  "event8_bit5": {},
+  "event8_bit5": {
+    "rtc_time_invalid": "Warning"
+  },
   "event8_bit6": {},
   "event8_bit7": {},
   "on_off_bit0": {

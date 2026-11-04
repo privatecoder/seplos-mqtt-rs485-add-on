@@ -14,9 +14,8 @@
       "dev": {
         "ids": "seplos_bms_pack_0"
       },
-      "dev_cla": "problem",
       "ent_cat": "diagnostic",
-      "name": "Charge Activation Waiting (Auto)",
+      "name": "Charge Activation Window Active (Auto)",
       "obj_id": "seplos_bms_pack_0_auto_charging_wait",
       "pl_off": "OK",
       "pl_on": "Warning",
@@ -555,7 +554,6 @@
       "dev": {
         "ids": "seplos_bms_pack_0"
       },
-      "dev_cla": "problem",
       "ent_cat": "diagnostic",
       "name": "Balancing Time Limit Reached",
       "obj_id": "seplos_bms_pack_0_balancing_time_limit",
@@ -642,11 +640,36 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_charge_current_status",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "name": "Charge Current Status (>= 3 A)",
+      "obj_id": "seplos_bms_pack_0_charge_current_status",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_charge_current_status",
+      "val_tpl": "{{ value_json.status.binary.charge_current_status }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/charge_current_status/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "binary_sensor.seplos_bms_pack_0_charge_forbidden",
       "dev": {
         "ids": "seplos_bms_pack_0"
       },
-      "dev_cla": "problem",
       "ent_cat": "diagnostic",
       "name": "Charge Blocked (Charge MOSFET Off Request)",
       "obj_id": "seplos_bms_pack_0_charge_forbidden",
@@ -827,6 +850,32 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/current_sensing_failure/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_discharge_current_status",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "name": "Discharge Current Status (>= 3 A)",
+      "obj_id": "seplos_bms_pack_0_discharge_current_status",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_discharge_current_status",
+      "val_tpl": "{{ value_json.status.binary.discharge_current_status }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/discharge_current_status/config"
   },
   {
     "payload": {
@@ -1020,6 +1069,33 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_external_voltage_detected",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "plug",
+      "ent_cat": "diagnostic",
+      "name": "External Voltage Detected (Charger)",
+      "obj_id": "seplos_bms_pack_0_external_voltage_detected",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_external_voltage_detected",
+      "val_tpl": "{{ value_json.status.binary.external_voltage_detected }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/external_voltage_detected/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "binary_sensor.seplos_bms_pack_0_heating_switch",
       "dev": {
         "ids": "seplos_bms_pack_0"
@@ -1052,7 +1128,7 @@
         "ids": "seplos_bms_pack_0"
       },
       "ent_cat": "diagnostic",
-      "name": "Charging Paused (Intermittent Charge)",
+      "name": "Intermittent Recharge Waiting",
       "obj_id": "seplos_bms_pack_0_intermittent_power_supplement",
       "pl_off": "OK",
       "pl_on": "Warning",
@@ -1063,6 +1139,58 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/intermittent_power_supplement/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_limiter_after_charge_overcurrent_warning",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "name": "Current Limiter Active (After Charge Overcurrent Warning)",
+      "obj_id": "seplos_bms_pack_0_limiter_after_charge_overcurrent_warning",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_limiter_after_charge_overcurrent_warning",
+      "val_tpl": "{{ value_json.status.binary.limiter_after_charge_overcurrent_warning }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/limiter_after_charge_overcurrent_warning/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_limiter_charging_from_10a",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "name": "Current Limiter Active (Charging >= 10 A)",
+      "obj_id": "seplos_bms_pack_0_limiter_charging_from_10a",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_limiter_charging_from_10a",
+      "val_tpl": "{{ value_json.status.binary.limiter_charging_from_10a }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/limiter_charging_from_10a/config"
   },
   {
     "payload": {
@@ -1106,9 +1234,8 @@
       "dev": {
         "ids": "seplos_bms_pack_0"
       },
-      "dev_cla": "problem",
       "ent_cat": "diagnostic",
-      "name": "Charge Activation Waiting (Manual)",
+      "name": "Charge Activation Window Active (Manual)",
       "obj_id": "seplos_bms_pack_0_manual_charging_wait",
       "pl_off": "OK",
       "pl_on": "Warning",
@@ -1237,30 +1364,7 @@
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/output_connection_failure/config"
   },
   {
-    "payload": {
-      "avty": [
-        {
-          "t": "seplos/availability"
-        },
-        {
-          "t": "seplos/pack-0/availability"
-        }
-      ],
-      "avty_mode": "all",
-      "default_entity_id": "binary_sensor.seplos_bms_pack_0_output_reverse_polarity_protection",
-      "dev": {
-        "ids": "seplos_bms_pack_0"
-      },
-      "dev_cla": "problem",
-      "ent_cat": "diagnostic",
-      "name": "Output Reverse Polarity Protection",
-      "obj_id": "seplos_bms_pack_0_output_reverse_polarity_protection",
-      "pl_off": "OK",
-      "pl_on": "Protection",
-      "stat_t": "seplos/pack-0/sensors",
-      "uniq_id": "seplos_bms_pack_0_output_reverse_polarity_protection",
-      "val_tpl": "{{ value_json.telesignalization.binary.output_reverse_polarity_protection }}"
-    },
+    "payload": "",
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/output_reverse_polarity_protection/config"
@@ -1305,6 +1409,33 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_precharge_running",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "running",
+      "ent_cat": "diagnostic",
+      "name": "Precharge Running",
+      "obj_id": "seplos_bms_pack_0_precharge_running",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_precharge_running",
+      "val_tpl": "{{ value_json.status.binary.precharge_running }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/precharge_running/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "binary_sensor.seplos_bms_pack_0_rtc_clock_failure",
       "dev": {
         "ids": "seplos_bms_pack_0"
@@ -1322,6 +1453,64 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/rtc_clock_failure/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_rtc_time_invalid",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "problem",
+      "ent_cat": "diagnostic",
+      "name": "RTC Time Invalid",
+      "obj_id": "seplos_bms_pack_0_rtc_time_invalid",
+      "pl_off": "OK",
+      "pl_on": "Warning",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_rtc_time_invalid",
+      "val_tpl": "{{ value_json.telesignalization.binary.rtc_time_invalid }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/rtc_time_invalid/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "binary_sensor.seplos_bms_pack_0_severe_fault",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "problem",
+      "ent_cat": "diagnostic",
+      "name": "Severe Fault (Latched Until Restart)",
+      "obj_id": "seplos_bms_pack_0_severe_fault",
+      "pl_off": "OK",
+      "pl_on": "Fault",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_severe_fault",
+      "val_tpl": "{{ value_json.telesignalization.binary.severe_fault }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/severe_fault/config"
   },
   {
     "payload": {
@@ -1392,6 +1581,18 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-system/discharge_allowed/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-system/force_charge_1/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-system/force_charge_2/config"
   },
   {
     "payload": "",
@@ -1596,6 +1797,33 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/battery_capacity/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_bms_serial_number",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "ic": "mdi:barcode",
+      "name": "BMS Serial Number",
+      "obj_id": "seplos_bms_pack_0_bms_serial_number",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_bms_serial_number",
+      "val_tpl": "{{ value_json.get('info', {}).get('normal', {}).get('bms_serial_number', 'unknown') }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/bms_serial_number/config"
   },
   {
     "payload": {
@@ -3126,7 +3354,7 @@
       "sug_dsp_prc": 1,
       "uniq_id": "seplos_bms_pack_0_highest_cell_temperature",
       "unit_of_meas": "°C",
-      "val_tpl": "{{ value_json.status.normal.highest_cell_temperature }}"
+      "val_tpl": "{{ value_json.telemetry.normal.highest_cell_temperature }}"
     },
     "qos": 1,
     "retain": true,
@@ -3177,9 +3405,10 @@
       "dev": {
         "ids": "seplos_bms_pack_0"
       },
+      "dev_cla": "timestamp",
       "ent_cat": "diagnostic",
       "ic": "mdi:update",
-      "name": "Last Publish",
+      "name": "Last Successful Poll",
       "obj_id": "seplos_bms_pack_0_last_publish",
       "stat_t": "seplos/pack-0/heartbeat",
       "uniq_id": "seplos_bms_pack_0_last_publish",
@@ -3239,7 +3468,7 @@
       "sug_dsp_prc": 1,
       "uniq_id": "seplos_bms_pack_0_lowest_cell_temperature",
       "unit_of_meas": "°C",
-      "val_tpl": "{{ value_json.status.normal.lowest_cell_temperature }}"
+      "val_tpl": "{{ value_json.telemetry.normal.lowest_cell_temperature }}"
     },
     "qos": 1,
     "retain": true,
@@ -3479,6 +3708,7 @@
       "dev": {
         "ids": "seplos_bms_pack_0"
       },
+      "dev_cla": "timestamp",
       "ent_cat": "diagnostic",
       "ic": "mdi:tune-vertical",
       "json_attr_t": "seplos/pack-0/sensors",
@@ -3487,7 +3717,7 @@
       "obj_id": "seplos_bms_pack_0_parameters",
       "stat_t": "seplos/pack-0/sensors",
       "uniq_id": "seplos_bms_pack_0_parameters",
-      "val_tpl": "{{ value_json.get('parameters', {}) | length }}"
+      "val_tpl": "{{ value_json.get('parameters', {}).get('read_at') }}"
     },
     "qos": 1,
     "retain": true,
@@ -3621,7 +3851,7 @@
       },
       "ent_cat": "diagnostic",
       "ic": "mdi:barcode",
-      "name": "Serial Number",
+      "name": "Battery Serial Number",
       "obj_id": "seplos_bms_pack_0_serial_number",
       "stat_t": "seplos/pack-0/sensors",
       "uniq_id": "seplos_bms_pack_0_serial_number",

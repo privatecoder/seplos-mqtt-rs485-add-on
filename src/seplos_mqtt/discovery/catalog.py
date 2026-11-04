@@ -69,6 +69,8 @@ TELEMETRY: list[Entity] = [
     _sensor("highest_cell", "Highest Cell No.", T_, icon="mdi:numeric"),
     _sensor("highest_cell_voltage", "Highest Cell Voltage", T_, precision=3, icon="mdi:arrow-up-thin", **V),
     _sensor("delta_cell_voltage", "Delta Cell Voltage", T_, precision=3, icon="mdi:delta", **V),
+    _sensor("highest_cell_temperature", "Highest Cell Temperature", T_, precision=1, icon="mdi:thermometer-chevron-up", **T),
+    _sensor("lowest_cell_temperature", "Lowest Cell Temperature", T_, precision=1, icon="mdi:thermometer-chevron-down", **T),
     _sensor("delta_cell_temperature", "Delta Cell Temperature", T_, device_class="temperature_delta", state_class="measurement",
             unit="°C", precision=1, icon="mdi:delta"),
     _sensor("ambient_temperature", "Ambient Temperature", T_, precision=1, icon="mdi:thermometer", **T),
@@ -94,7 +96,9 @@ TELEMETRY: list[Entity] = [
             precision=1, icon="mdi:battery-arrow-down"),
 ]
 
-HEARTBEAT = Entity(key="last_publish", name="Last Publish", kind="heartbeat", icon="mdi:update", category=DIAG)
+# refreshed on every successful poll, also when the data didn't change
+HEARTBEAT = Entity(key="last_publish", name="Last Successful Poll", kind="heartbeat", device_class="timestamp", icon="mdi:update",
+                   category=DIAG)
 
 # Static device info (CID2 0x51 / 0xA2), published under "info"
 INFO: list[Entity] = [
@@ -102,7 +106,8 @@ INFO: list[Entity] = [
     Entity("firmware_version", "Firmware Version", group="info", kind="info", icon="mdi:chip", category=DIAG),
     Entity("firmware_patch", "Firmware Patch (derived)", group="info", kind="info", icon="mdi:chip", category=DIAG),
     Entity("can_protocol", "CAN Protocol", group="info", kind="info", icon="mdi:swap-horizontal", category=DIAG),
-    Entity("serial_number", "Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG, pack_bus_only=True),
+    Entity("serial_number", "Battery Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG, pack_bus_only=True),
+    Entity("bms_serial_number", "BMS Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG, pack_bus_only=True),
 ]
 FIRMWARE_ENTITY = INFO[1]
 
@@ -110,21 +115,29 @@ FIRMWARE_ENTITY = INFO[1]
 STATUS: list[Entity] = [
     _sensor("dis_charge_current_unfiltered", "Current (incl. idle)", "status", invert=True, precision=2, icon="mdi:current-dc",
             pack_bus_only=True, **A),
-    _sensor("highest_cell_temperature", "Highest Cell Temperature", "status", precision=1, icon="mdi:thermometer-chevron-up",
-            pack_bus_only=True, **T),
-    _sensor("lowest_cell_temperature", "Lowest Cell Temperature", "status", precision=1, icon="mdi:thermometer-chevron-down",
-            pack_bus_only=True, **T),
     Entity("balancing_active", "Balancing Active", "status", "binary_sensor", device_class="running", category=DIAG, pack_bus_only=True),
     Entity("balancing_blocked", "Balancing Not Running (Blocked / Not Needed)", "status", "binary_sensor", category=DIAG,
            pack_bus_only=True),
-    Entity("balancing_time_limit", "Balancing Time Limit Reached", "status", "binary_sensor", device_class="problem", category=DIAG,
-           pack_bus_only=True),
+    Entity("balancing_time_limit", "Balancing Time Limit Reached", "status", "binary_sensor", category=DIAG, pack_bus_only=True),
     Entity("balancing_temperature_blocked", "Balancing Blocked (Temperature)", "status", "binary_sensor", device_class="problem",
            category=DIAG, pack_bus_only=True),
-    Entity("charge_forbidden", "Charge Blocked (Charge MOSFET Off Request)", "status", "binary_sensor", device_class="problem",
+    # normal during recharge waiting with hard stop or before a shutdown, so not a problem class
+    Entity("charge_forbidden", "Charge Blocked (Charge MOSFET Off Request)", "status", "binary_sensor", category=DIAG,
+           pack_bus_only=True),
+    Entity("limiter_charging_from_10a", "Current Limiter Active (Charging >= 10 A)", "status", "binary_sensor", category=DIAG,
+           pack_bus_only=True),
+    Entity("limiter_after_charge_overcurrent_warning", "Current Limiter Active (After Charge Overcurrent Warning)", "status",
+           "binary_sensor", category=DIAG, pack_bus_only=True),
+    Entity("precharge_running", "Precharge Running", "status", "binary_sensor", device_class="running", category=DIAG,
+           pack_bus_only=True),
+    Entity("external_voltage_detected", "External Voltage Detected (Charger)", "status", "binary_sensor", device_class="plug",
            category=DIAG, pack_bus_only=True),
-    # all parameters (CID2 0x47) as attributes of one sensor
-    Entity("parameters", "Parameters", kind="parameters", icon="mdi:tune-vertical", category=DIAG, pack_bus_only=True),
+    Entity("charge_current_status", "Charge Current Status (>= 3 A)", "status", "binary_sensor", category=DIAG, pack_bus_only=True),
+    Entity("discharge_current_status", "Discharge Current Status (>= 3 A)", "status", "binary_sensor", category=DIAG,
+           pack_bus_only=True),
+    # all parameters (CID2 0x47) as attributes of one sensor, state: time of the last successful read
+    Entity("parameters", "Parameters", kind="parameters", device_class="timestamp", icon="mdi:tune-vertical", category=DIAG,
+           pack_bus_only=True),
 ]
 
 TELESIGNALIZATION: list[Entity] = [
@@ -166,21 +179,23 @@ TELESIGNALIZATION: list[Entity] = [
     _alarm_binary("current_limit_switch_failure", "Current Limiter Failure", device_class="problem"),
     # alarm event 4
     _alarm_binary("low_temperature_heating", "Cell Heating Requested", device_class="heat"),
+    _alarm_binary("severe_fault", "Severe Fault (Latched Until Restart)", device_class="problem"),
     # alarm event 6
     _alarm_binary("charging_high_voltage_protection", "Charger Overvoltage Protection", device_class="problem"),
-    _alarm_binary("intermittent_power_supplement", "Charging Paused (Intermittent Charge)"),
+    # excludes the pack from the normal charge capability; the charge MOSFET stays on (soft stop)
+    _alarm_binary("intermittent_power_supplement", "Intermittent Recharge Waiting"),
     _alarm_binary("cell_low_voltage_forbidden_charging", "Charging Blocked (Cell < Min.)", device_class="problem"),
-    _alarm_binary("output_reverse_polarity_protection", "Output Reverse Polarity Protection", device_class="problem"),
     _alarm_binary("output_connection_failure", "Output Connection Failure", device_class="problem"),
-    # alarm event 7
-    _alarm_binary("auto_charging_wait", "Charge Activation Waiting (Auto)", device_class="problem"),
-    _alarm_binary("manual_charging_wait", "Charge Activation Waiting (Manual)", device_class="problem"),
+    # alarm event 7: a charge activation window is running (keys kept for existing installations)
+    _alarm_binary("auto_charging_wait", "Charge Activation Window Active (Auto)"),
+    _alarm_binary("manual_charging_wait", "Charge Activation Window Active (Manual)"),
     # alarm event 8
     _alarm_binary("eep_storage_failure", "EEPROM Failure", device_class="problem"),
     _alarm_binary("rtc_clock_failure", "RTC Clock Failure", device_class="problem"),
     _alarm_binary("no_calibration_of_voltage", "No Calibration Of Voltage", device_class="problem"),
     _alarm_binary("no_calibration_of_current", "No Calibration Of Current", device_class="problem"),
     _alarm_binary("no_calibration_of_null_point", "Current Zero Point Not Calibrated", device_class="problem"),
+    _alarm_binary("rtc_time_invalid", "RTC Time Invalid", device_class="problem"),
     # on-off state
     _alarm_binary("discharge_switch", "Discharge MOSFET", device_class="power"),
     _alarm_binary("charge_switch", "Charge MOSFET", device_class="power"),
@@ -193,11 +208,12 @@ PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNA
 Y = "system"
 # System values from the master via Modbus 0x1000 (CAN port RS485 bus only), topic <topic>/system/sensors
 SYSTEM: list[Entity] = [
-    Entity("system_state", "System State (as reported to inverter)", Y, icon="mdi:information-outline"),
+    # aggregate of the master over all packs via Modbus; CAN/RS485 inverter profiles add their own rules
+    Entity("system_state", "System State (Aggregate)", Y, icon="mdi:information-outline"),
     Entity("system_voltage", "System Voltage", Y, precision=1, **V),
     Entity("system_current", "System Current", Y, precision=1, invert=True, **A),
     Entity("system_soc", "System SOC", Y, device_class="battery", state_class="measurement", unit="%"),
-    Entity("total_capacity", "Total Capacity", Y, unit="Ah", icon="mdi:battery"),
+    Entity("total_capacity", "Total Full Capacity", Y, unit="Ah", state_class="measurement", icon="mdi:battery"),
     Entity("charge_voltage_limit", "Charge Voltage Limit", Y, precision=1, **V),
     Entity("charge_current_limit", "Charge Current Limit", Y, precision=1, **A),
     Entity("discharge_current_limit", "Discharge Current Limit", Y, precision=1, **A),
@@ -215,6 +231,9 @@ SYSTEM: list[Entity] = [
     Entity("charge_allowed", "Charge Allowed", Y, "binary_sensor", device_class="power"),
     Entity("discharge_allowed", "Discharge Allowed", Y, "binary_sensor", device_class="power"),
     Entity("pack_communication_fault", "Pack Communication Fault", Y, "binary_sensor", device_class="problem"),
+    # FC03 0x0074 (16.06.11+): the master requests forced charging at low SOC
+    Entity("force_charge_1", "Force Charge Request I (SOC <= 5 %)", Y, "binary_sensor", category=DIAG),
+    Entity("force_charge_2", "Force Charge Request II (SOC <= 9 %)", Y, "binary_sensor", category=DIAG),
 ]
 
 # Retained discovery configs of earlier versions that must be cleared: (domain, key)
@@ -229,4 +248,13 @@ OBSOLETE: list[tuple[str, str]] = [
     *[("sensor", f"reserved_{i}") for i in range(1, 5)],
     # cell disconnection: the firmware always sends 0
     *[("binary_sensor", f"disconnection_cell_{i}") for i in range(1, 17)],
+    # event 6 bit 5 "reverse polarity": no firmware code sets it
+    ("binary_sensor", "output_reverse_polarity_protection"),
+]
+
+# per-cell entities, removed above the actual cell count
+CELL_ENTITIES: list[tuple[str, str]] = [
+    ("sensor", "voltage_cell"),
+    ("sensor", "cell_voltage_alarm"),
+    ("binary_sensor", "balancer_cell"),
 ]

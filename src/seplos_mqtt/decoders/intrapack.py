@@ -26,22 +26,27 @@ def decode_record(raw: bytes) -> dict:
 
 
 def decode_extended_status(raw: bytes) -> dict:
-    """The values of the intra-pack record that aren't available via 0x42/0x44."""
-    record = decode_record(raw)
-    alarm_event_7 = raw[29]
-    alarm_event_8 = raw[30]
+    """
+    The values of the intra-pack record that 0x44 masks out (bit meanings: KB intra-pack.md
+    "Bit meanings"). Cell temperature extrema are calculated from 0x42 instead.
+    """
+    on_off_state, event_7, event_8, status = raw[28], raw[29], raw[30], raw[31]
     return {
         "normal": {
             # not zeroed in idle like the current of 0x42
-            "dis_charge_current_unfiltered": record["current"],
-            "highest_cell_temperature": record["highest_cell_temperature"],
-            "lowest_cell_temperature": record["lowest_cell_temperature"],
+            "dis_charge_current_unfiltered": s16(raw, 10) / 100,
         },
         "binary": {
-            "balancing_active": on_off(alarm_event_7 & 0x01),
-            "balancing_blocked": on_off(alarm_event_7 & 0x02),          # blocked or not needed
-            "balancing_time_limit": on_off(alarm_event_7 & 0x04),
-            "balancing_temperature_blocked": on_off(alarm_event_7 & 0x08),
-            "charge_forbidden": on_off(alarm_event_8 & 0x40),           # drives the charge MOSFET
+            "balancing_active": on_off(event_7 & 0x01),
+            "balancing_blocked": on_off(event_7 & 0x02),               # blocked or not needed
+            "balancing_time_limit": on_off(event_7 & 0x04),
+            "balancing_temperature_blocked": on_off(event_7 & 0x08),
+            "limiter_charging_from_10a": on_off(event_7 & 0x40),       # charging via the current limiter (>= 10 A)
+            "limiter_after_charge_overcurrent_warning": on_off(event_7 & 0x80),  # passive limiting, P71 minutes
+            "charge_forbidden": on_off(event_8 & 0x40),                # request that drives the charge MOSFET
+            "precharge_running": on_off(on_off_state & 0x10),          # P57
+            "external_voltage_detected": on_off(status & 0x04),        # charger/external voltage at the port
+            "discharge_current_status": on_off(status & 0x40),         # discharge current >= 3 A (with hysteresis)
+            "charge_current_status": on_off(status & 0x80),            # charge current >= 3 A (with hysteresis)
         },
     }

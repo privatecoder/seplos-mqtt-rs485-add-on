@@ -15,6 +15,9 @@ from .framing import modbus
 
 logger = logging.getLogger("SeplosBMS.bus")
 
+# request_rtn(): nothing received at all (distinct from an invalid answer)
+NO_ANSWER = -1
+
 
 class SerialPort(Protocol):
     def write(self, data: bytes) -> int | None: ...
@@ -80,17 +83,17 @@ class SerialBus:
         except (UnicodeDecodeError, ValueError):
             return False
 
-    def request(self, address: int, cid2: int, info_len: int, label: str, info: bytes = b"01") -> bytes | None:
-        """Request a normal answer with exactly `info_len` INFO characters; returns the binary INFO."""
+    def request(self, address: int, cid2: int, expected: af.ExpectedLength, label: str, info: bytes = b"01") -> bytes | None:
+        """Request a normal answer whose INFO has the expected binary length; returns the binary INFO."""
         command = af.encode(address, cid2, info)
         logger.debug("Pack%s:%s_command: %s", address, label, command)
         for attempt in range(self.FRAME_READ_RETRIES):
             self.port.write(command)
             raw = self.read_frame()
-            if len(raw) < info_len + af.OVERHEAD:
+            if len(raw) < af.min_frame_length(expected):
                 logger.debug("Pack%s:%s attempt %s: insufficient length", address, label, attempt + 1)
                 continue
-            payload = af.validate_response(raw, address, info_len)
+            payload = af.validate_response(raw, address, expected)
             if payload is not None:
                 return payload
             logger.debug("Pack%s:%s attempt %s: validation failed", address, label, attempt + 1)
@@ -98,10 +101,15 @@ class SerialBus:
         return None
 
     def request_rtn(self, address: int, cid2: int) -> int | None:
-        """Send a command without INFO and return the RTN of the answer, None if there's no valid answer."""
+        """
+        Send a command without INFO and return the RTN of the answer: NO_ANSWER if nothing at all
+        was received, None for an invalid answer.
+        """
         self.port.flushInput()
         self.port.write(af.encode(address, cid2, b""))
         raw = self.read_frame()
+        if not raw:
+            return NO_ANSWER
         if len(raw) < af.OVERHEAD or raw[:1] != af.SOI:
             return None
         if af.address_of(raw) != address or not af.checksum_ok(raw):
@@ -127,6 +135,12 @@ class SerialBus:
         self.port.flushInput()
         self.port.write(modbus.encode_read(function_code, register, count))
         return modbus.parse_read(self.port.read(modbus.response_length(count)), function_code, count)
+
+    def read_modbus_single_wide(self, function_code: int, register: int) -> tuple[modbus.Status | None, int | None]:
+        """One register from a handler with the non-standard 16-bit byte count (8 byte answer)."""
+        self.port.flushInput()
+        self.port.write(modbus.encode_read(function_code, register, 1))
+        return modbus.parse_single_wide_count(self.port.read(8), function_code)
 
     def probe_modbus(self, function_code: int, register: int, count: int) -> bool | None:
         """True for a valid response, False for an exception response, None for no/invalid answer."""
