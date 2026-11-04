@@ -105,6 +105,7 @@
   "invalid.format": "This value has an invalid format.",
   "invalid.value": "This value is not allowed.",
   "invalid.order": "The minimum must be lower than the maximum.",
+  "invalid.duplicate": "This value is already used.",
 
   "guard.text": "There are unsaved changes in the settings.",
   "guard.stay": "Stay and keep editing",

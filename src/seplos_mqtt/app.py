@@ -23,7 +23,7 @@ from .decoders.identity import device_firmware
 from .discovery import Discovery
 from .jobs import JobQueue, step_detect
 from .monitoring.migration import load_or_migrate
-from .monitoring.model import ConfigValidationError
+from .monitoring.model import ConfigValidationError, MonitoringConfig
 from .monitoring.store import JsonStore
 from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
@@ -80,6 +80,20 @@ class AppState:
     system_data: dict | None = None   # last system values (multi pack mode)
     status: dict | None = None        # snapshot for the web thread (replaced as a whole, never mutated)
     jobs: Any = None                  # JobQueue: submitted by the web thread, run by the main loop
+    parallel_sets: tuple = ()         # the sets the loop works with (changed by the main loop only)
+    # latest saved sets, replaced as a whole by the web thread; never cleared, the loop adopts it
+    # when it is not the tuple in use (no lost update between reading and clearing)
+    pending_sets: tuple | None = None
+
+    def request_sets(self, config: Any) -> None:
+        """A saved set change (web thread): picked up at the next cycle boundary, no restart."""
+        self.pending_sets = config.parallel_sets
+
+    def adopt_sets(self) -> None:
+        pending = self.pending_sets
+        if pending is not None and pending is not self.parallel_sets:
+            self.parallel_sets = pending
+            logger.info("Parallel sets updated: %s set(s)", len(pending))
 
     def request_restart(self, _config: Any = None, reason: str = "connection") -> None:
         """A clean process restart is wanted ("connection": a saved change, called from the web
@@ -390,6 +404,15 @@ def startup_config(env: Mapping[str, str]) -> tuple[Config, JsonStore | None]:
         sys.exit(1)
 
 
+def load_sets(store: JsonStore) -> tuple:
+    """The stored parallel sets; none when the document is missing or corrupt (the add-on options
+    are in use then)."""
+    try:
+        return MonitoringConfig.from_dict(store.snapshot()[3]).parallel_sets
+    except ConfigValidationError:
+        return ()
+
+
 def start_web(state: AppState, store: JsonStore, port: str) -> None:
     """The Ingress app in its own thread; a failure only costs the UI, never the polling."""
     try:
@@ -397,7 +420,7 @@ def start_web(state: AppState, store: JsonStore, port: str) -> None:
 
         web_app = WebApp(
             WebSettings(port=int(port)), store, on_connection_saved=state.request_restart,
-            status_provider=lambda: state.status, jobs=state.jobs,
+            on_sets_saved=state.request_sets, status_provider=lambda: state.status, jobs=state.jobs,
         )
         web = WebThread(web_app)
         bound = web.start()
@@ -448,6 +471,9 @@ def main(config: Config | None = None) -> None:
         state.last_poll = time.monotonic()
         state.health_server = start_health_server(state)
 
+        if standalone and store is not None:
+            state.parallel_sets = load_sets(store)
+
         ingress_port = os.environ.get("INGRESS_PORT")
         if standalone and ingress_port and store is not None:
             start_web(state, store, ingress_port)
@@ -486,6 +512,7 @@ def main(config: Config | None = None) -> None:
                 if index >= len(state.packs):
                     index = 0
                     publish_system_data(state, system_reader)
+                    state.adopt_sets()
                     now = time.monotonic()
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
                     update_status(state)

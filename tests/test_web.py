@@ -615,7 +615,7 @@ def test_every_text_the_code_asks_for_exists():
         + [f"mode.{v}" for v in ("single", "multi")]
         + [f"job.state.{v}" for v in ("queued", "running", "done", "failed", "cancelled")]
         + [f"job.error.{v}" for v in ("restarting", "shutting_down", "job_failed", "unknown_job_kind")]
-        + [f"invalid.{v}" for v in ("required", "type", "range", "format", "value", "order")]
+        + [f"invalid.{v}" for v in ("required", "type", "range", "format", "value", "order", "duplicate")]
         + [f"store.{s}.{p}" for s in ("corrupt", "missing") for p in ("title", "text")]
     )
     assert not [k for k in family if k not in en]

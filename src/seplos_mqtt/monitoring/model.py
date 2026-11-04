@@ -209,9 +209,140 @@ class ConnectionSettings:
         return out
 
 
+_SET_KEYS = frozenset({"id", "name", "packs", "wiring", "plus", "minus"})
+WIRINGS = ("diagonal", "common_busbar", "unknown")
+MAX_SET_NAME = 40
+
+
+@dataclass(frozen=True)
+class ParallelSet:
+    """Packs wired in parallel. The packs are kept in physical order; ``plus``/``minus`` are the packs
+    carrying the battery cables of a diagonal wiring (``None``: not known)."""
+
+    id: int
+    name: str
+    packs: tuple[int, ...]
+    wiring: str = "unknown"  # "diagonal" | "common_busbar" | "unknown"
+    plus: int | None = None
+    minus: int | None = None
+    # unknown keys (settings of later versions) survive load and save untouched
+    _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    @classmethod
+    def from_dict(cls, data: Any, path: str = "parallel_sets[0]") -> ParallelSet:
+        if not isinstance(data, Mapping):
+            raise ConfigValidationError([(path, "type")])
+        problems: list[Problem] = []
+
+        def bad(key: str, kind: str) -> None:
+            problems.append((f"{path}.{key}", kind))
+
+        set_id = data.get("id")
+        if "id" not in data:
+            bad("id", "required")
+        elif not _is_int(set_id):
+            bad("id", "type")
+        elif set_id < 1:
+            bad("id", "range")
+
+        name = ""
+        if "name" not in data:
+            bad("name", "required")
+        elif not isinstance(data["name"], str):
+            bad("name", "type")
+        else:
+            name = data["name"].strip()
+            if not 1 <= len(name) <= MAX_SET_NAME:
+                bad("name", "range")
+
+        packs: list[int] = []
+        packs_ok = False
+        if "packs" not in data:
+            bad("packs", "required")
+        elif not isinstance(data["packs"], list):
+            bad("packs", "type")
+        else:
+            packs_ok = True
+            for j, address in enumerate(data["packs"]):
+                if not _is_int(address):
+                    bad(f"packs[{j}]", "type")
+                    packs_ok = False
+                elif not 0 <= address <= 15:
+                    bad(f"packs[{j}]", "range")
+                    packs_ok = False
+                elif address in packs:
+                    bad(f"packs[{j}]", "duplicate")
+                    packs_ok = False
+                else:
+                    packs.append(address)
+            if not 2 <= len(data["packs"]) <= 16:
+                bad("packs", "range")
+                packs_ok = False
+
+        wiring = "unknown"
+        wiring_ok = False
+        if "wiring" not in data:
+            bad("wiring", "required")
+        elif data["wiring"] not in WIRINGS or not isinstance(data["wiring"], str):
+            bad("wiring", "value")
+        else:
+            wiring = data["wiring"]
+            wiring_ok = True
+
+        taps: dict[str, int | None] = {"plus": None, "minus": None}
+        taps_ok = True
+        for key in taps:
+            value = data.get(key)
+            if value is None:
+                continue
+            if not _is_int(value):
+                bad(key, "type")
+                taps_ok = False
+            elif packs_ok and value not in packs:
+                bad(key, "value")
+                taps_ok = False
+            else:
+                taps[key] = value
+        if wiring == "diagonal" and wiring_ok:
+            for key in taps:
+                if data.get(key) is None:
+                    bad(key, "required")
+                    taps_ok = False
+            if taps_ok and taps["plus"] == taps["minus"]:
+                bad("plus", "value")
+                bad("minus", "value")
+
+        if problems:
+            raise ConfigValidationError(problems)
+        return cls(
+            id=set_id,
+            name=name,
+            packs=tuple(packs),
+            wiring=wiring,
+            plus=taps["plus"],
+            minus=taps["minus"],
+            _extra={k: copy.deepcopy(v) for k, v in data.items() if k not in _SET_KEYS},
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = copy.deepcopy(dict(self._extra))
+        out.update(
+            id=self.id,
+            name=self.name,
+            packs=list(self.packs),
+            wiring=self.wiring,
+            plus=self.plus,
+            minus=self.minus,
+        )
+        return out
+
+
 @dataclass(frozen=True)
 class MonitoringConfig:
     connection: ConnectionSettings
+    parallel_sets: tuple[ParallelSet, ...] = ()
+    # the id of the next new set; ids are never reused
+    next_set_id: int = 1
     # unknown top-level keys (sections of later versions) survive load and save untouched
     _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
@@ -228,12 +359,73 @@ class MonitoringConfig:
                 connection = ConnectionSettings.from_dict(data["connection"])
             except ConfigValidationError as e:
                 problems.extend(e.problems)
+
+        next_set_id = 1
+        next_ok = True
+        if "next_set_id" in data:
+            next_set_id = data["next_set_id"]
+            if not _is_int(next_set_id):
+                problems.append(("next_set_id", "type"))
+                next_ok = False
+            elif next_set_id < 1:
+                problems.append(("next_set_id", "range"))
+                next_ok = False
+
+        sets: list[ParallelSet] = []
+        raw_sets = data.get("parallel_sets", [])
+        if not isinstance(raw_sets, list):
+            problems.append(("parallel_sets", "type"))
+        else:
+            seen_ids: set[int] = set()
+            seen_names: set[str] = set()
+            seen_packs: set[int] = set()
+            for i, raw in enumerate(raw_sets):
+                path = f"parallel_sets[{i}]"
+                try:
+                    item = ParallelSet.from_dict(raw, path)
+                except ConfigValidationError as e:
+                    problems.extend(e.problems)
+                    continue
+                sets.append(item)
+                if item.id in seen_ids:
+                    problems.append((f"{path}.id", "duplicate"))
+                elif next_ok and item.id >= next_set_id:
+                    problems.append((f"{path}.id", "value"))
+                seen_ids.add(item.id)
+                if item.name.casefold() in seen_names:
+                    problems.append((f"{path}.name", "duplicate"))
+                seen_names.add(item.name.casefold())
+                for j, address in enumerate(item.packs):
+                    if address in seen_packs:
+                        problems.append((f"{path}.packs[{j}]", "duplicate"))
+                seen_packs.update(item.packs)
+
         if problems or connection is None:
             raise ConfigValidationError(problems)
-        extra = {k: copy.deepcopy(v) for k, v in data.items() if k != "connection"}
-        return cls(connection=connection, _extra=extra)
+        known = {"connection", "parallel_sets", "next_set_id"}
+        extra = {k: copy.deepcopy(v) for k, v in data.items() if k not in known}
+        return cls(connection=connection, parallel_sets=tuple(sets), next_set_id=next_set_id, _extra=extra)
 
     def to_dict(self) -> dict[str, Any]:
         out = copy.deepcopy(dict(self._extra))
         out["connection"] = self.connection.to_dict()
+        # a stage-1 document stays as it is until the first set is saved
+        if self.parallel_sets or self.next_set_id != 1:
+            out["parallel_sets"] = [s.to_dict() for s in self.parallel_sets]
+            out["next_set_id"] = self.next_set_id
         return out
+
+
+def set_activity(config: MonitoringConfig) -> list[tuple[bool, str | None]]:
+    """``(active, reason)`` per stored set: a set works only in multi pack mode and when all its
+    packs are configured. Inactive sets stay stored (not a validation error)."""
+    count = config.connection.pack_count
+    out: list[tuple[bool, str | None]] = []
+    for item in config.parallel_sets:
+        if count == 1:
+            out.append((False, "single_pack"))
+        elif any(address >= count for address in item.packs):
+            out.append((False, "pack_not_configured"))
+        else:
+            out.append((True, None))
+    return out

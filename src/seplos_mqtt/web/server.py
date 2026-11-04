@@ -28,7 +28,7 @@ from typing import Any
 from aiohttp import web
 
 from ..jobs import Job, JobBusy, JobQueue
-from ..monitoring.model import ConfigValidationError, MonitoringConfig
+from ..monitoring.model import ConfigValidationError, MonitoringConfig, Problem, set_activity
 from ..monitoring.store import JsonStore, LoadStatus, StaleRevision, StoreCorrupt
 
 log = logging.getLogger("SeplosBMS.web")
@@ -90,20 +90,23 @@ class WebApp:
         store: JsonStore,
         *,
         on_connection_saved: Callable[[MonitoringConfig], None] | None = None,
+        on_sets_saved: Callable[[MonitoringConfig], None] | None = None,
         status_provider: Callable[[], dict[str, Any] | None] | None = None,
         jobs: JobQueue | None = None,
     ) -> None:
         """``on_connection_saved`` is called on the web event loop after each successful save, in
-        commit order, and must return quickly (step 1c hands the work to the main thread).
+        commit order, and must return quickly (step 1c hands the work to the main thread);
+        ``on_sets_saved`` is the same for the parallel sets (it must not restart anything).
         ``status_provider`` returns the latest status snapshot (a finished dict, read-only here);
         ``jobs`` is the queue the main loop thread works off (None: the job routes answer 503).
         The web thread never touches the serial bus."""
         self.settings = settings
         self.store = store
         self._on_connection_saved = on_connection_saved
+        self._on_sets_saved = on_sets_saved
         self._status_provider = status_provider or (lambda: None)
         self._jobs = jobs
-        # serialises PUT /api/connection from the corrupt check through callback and response
+        # serialises PUT /api/connection and /api/sets from the corrupt check through callback and response
         # (binds to the server's loop on first contention)
         self._save_lock = asyncio.Lock()
         self._saves: set[asyncio.Task[web.Response]] = set()
@@ -123,6 +126,8 @@ class WebApp:
         r.add_get("/api/session", self._session)
         r.add_get("/api/connection", self._get_connection)
         r.add_put("/api/connection", self._put_connection)
+        r.add_get("/api/sets", self._get_sets)
+        r.add_put("/api/sets", self._put_sets)
         r.add_get("/api/status", self._get_status)
         r.add_post("/api/jobs/detect", self._post_detect)
         r.add_get("/api/jobs/{job_id}", self._get_job)
@@ -256,17 +261,31 @@ class WebApp:
     def _connection_view(self, config: MonitoringConfig, revision: int) -> dict[str, Any]:
         return {"revision": revision, "connection": config.connection.to_dict()}
 
-    async def _get_connection(self, request: web.Request) -> web.Response:
+    def _sets_view(self, config: MonitoringConfig, revision: int) -> dict[str, Any]:
+        sets = [
+            {**item.to_dict(), "active": active, "reason": reason}
+            for item, (active, reason) in zip(config.parallel_sets, set_activity(config), strict=True)
+        ]
+        return {"revision": revision, "pack_count": config.connection.pack_count, "sets": sets}
+
+    async def _load(self) -> tuple[MonitoringConfig, int]:
         status, _problem, revision, data = await asyncio.to_thread(self.store.snapshot)
         if status is LoadStatus.CORRUPT:
             raise ApiError("store_corrupt", 409)
         if status is LoadStatus.MISSING:
             raise ApiError("store_missing", 409)
         try:
-            config = MonitoringConfig.from_dict(data)
+            return MonitoringConfig.from_dict(data), revision
         except ConfigValidationError:
             raise ApiError("store_corrupt", 409) from None
+
+    async def _get_connection(self, request: web.Request) -> web.Response:
+        config, revision = await self._load()
         return json_response(self._connection_view(config, revision))
+
+    async def _get_sets(self, request: web.Request) -> web.Response:
+        config, revision = await self._load()
+        return json_response(self._sets_view(config, revision))
 
     # -- status and jobs (the web thread only reads snapshots and enqueues jobs) --------------
 
@@ -314,39 +333,102 @@ class WebApp:
         return json_response({"job": job.to_dict()})
 
     async def _put_connection(self, request: web.Request) -> web.Response:
+        return await self._put(
+            request, self._apply_connection, self._connection_view, self._on_connection_saved, "connection"
+        )
+
+    async def _put_sets(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_sets, self._sets_view, self._on_sets_saved, "sets")
+
+    async def _put(
+        self,
+        request: web.Request,
+        apply: Callable[[Any, LoadStatus, dict[str, Any]], list[Problem]],
+        view: Callable[[MonitoringConfig, int], dict[str, Any]],
+        callback: Callable[[MonitoringConfig], None] | None,
+        what: str,
+    ) -> web.Response:
         _user, body, expected = await self._mutation(request)
         if self._closing:
             raise ApiError("shutting_down", 503)
         # The whole save (lock, validation, commit, callback) runs as its own task: if aiohttp
         # cancels this handler, the durable commit and its callback still complete, and the save
         # lock stays held until then.
-        task = asyncio.ensure_future(self._save(body, expected))
+        task = asyncio.ensure_future(self._save(body, expected, apply, view, callback, what))
         self._saves.add(task)
         task.add_done_callback(self._saves.discard)
         return await asyncio.shield(task)
 
-    async def _save(self, body: Any, expected: int) -> web.Response:
+    @staticmethod
+    def _apply_connection(body: Any, _status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """Put the body into the document ``data``; returns problems found on the way."""
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", field="body")
+        unknown = sorted(str(k)[:64] for k in body if k != "connection")
+        if unknown:
+            raise ApiError("unknown_field", fields=unknown[:10])
+        if "connection" not in body:
+            raise ApiError("missing_field", fields=["connection"])
+        # the body's connection is the complete new object; the document's other keys stay
+        data["connection"] = body["connection"]
+        return []
+
+    @staticmethod
+    def _apply_sets(body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", field="body")
+        unknown = sorted(str(k)[:64] for k in body if k != "sets")
+        if unknown:
+            raise ApiError("unknown_field", fields=unknown[:10])
+        if "sets" not in body:
+            raise ApiError("missing_field", fields=["sets"])
+        if not isinstance(body["sets"], list):
+            raise ApiError("invalid_request", field="sets")
+        if status is LoadStatus.MISSING:
+            raise ApiError("store_missing", 409)
+        stored = data.get("parallel_sets")
+        stored_ids = {s.get("id") for s in stored if isinstance(s, dict)} if isinstance(stored, list) else set()
+        next_id = data.get("next_set_id", 1)
+        entries: list[Any] = []
+        problems: list[Problem] = []
+        for i, entry in enumerate(body["sets"]):
+            if isinstance(entry, dict):
+                entry = {k: v for k, v in entry.items() if k not in ("active", "reason")}
+                if "id" not in entry:
+                    entry["id"] = next_id
+                    next_id += 1
+                elif type(entry["id"]) is int and entry["id"] not in stored_ids:    # other types: model `type`
+                    problems.append((f"parallel_sets[{i}].id", "value"))
+            entries.append(entry)
+        data["parallel_sets"] = entries
+        data["next_set_id"] = next_id
+        return problems
+
+    async def _save(
+        self,
+        body: Any,
+        expected: int,
+        apply: Callable[[Any, LoadStatus, dict[str, Any]], list[Problem]],
+        view: Callable[[MonitoringConfig, int], dict[str, Any]],
+        callback: Callable[[MonitoringConfig], None] | None,
+        what: str,
+    ) -> web.Response:
         async with self._save_lock:
             status, _problem, _revision, data = await asyncio.to_thread(self.store.snapshot)
             if status is LoadStatus.CORRUPT:
                 raise ApiError("store_corrupt", 409)
-            if not isinstance(body, dict):
-                raise ApiError("invalid_request", field="body")
-            unknown = sorted(str(k)[:64] for k in body if k != "connection")
-            if unknown:
-                raise ApiError("unknown_field", fields=unknown[:10])
-            if "connection" not in body:
-                raise ApiError("missing_field", fields=["connection"])
-            # the body's connection is the complete new object; the document's other keys stay
-            data["connection"] = body["connection"]
+            problems = apply(body, status, data)
+            candidate = None
             try:
                 candidate = MonitoringConfig.from_dict(data)
             except ConfigValidationError as exc:
+                problems = list(dict.fromkeys([*problems, *exc.problems]))
+            if problems or candidate is None:
                 raise ApiError(
                     "invalid_fields",
                     422,
-                    fields=[{"path": path, "key": key} for path, key in exc.problems],
-                ) from None
+                    fields=[{"path": path, "key": key} for path, key in problems],
+                )
             try:
                 await asyncio.to_thread(self.store.commit, candidate.to_dict(), expected)
             except StaleRevision as exc:
@@ -356,13 +438,13 @@ class WebApp:
             except OSError as exc:
                 log.error("saving the monitoring configuration failed (%s)", type(exc).__name__)
                 raise ApiError("save_failed", 500) from None
-            if self._on_connection_saved is not None:
+            if callback is not None:
                 try:
-                    self._on_connection_saved(candidate)
+                    callback(candidate)
                 except Exception as exc:
-                    log.error("connection saved callback failed (%s)", type(exc).__name__)
+                    log.error("%s saved callback failed (%s)", what, type(exc).__name__)
             # the revision this commit produced, never a later read of the store
-            return json_response(self._connection_view(candidate, expected + 1))
+            return json_response(view(candidate, expected + 1))
 
 
 class WebThread:
