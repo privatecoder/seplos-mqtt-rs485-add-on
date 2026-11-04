@@ -82,6 +82,7 @@ def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
         "mode": "multi" if multi else "single",
         "mqtt_connected": bool(state.mqtt is not None and state.mqtt.is_connected()),
         "bridge": bridge,
+        "connection_error": getattr(state, "connection_error", None),
         "last_cycle_s": round(state.last_cycle, 1) if state.last_cycle else None,
         "packs": [_pack_status(p, now_mono) for p in state.packs],
         "system": system,

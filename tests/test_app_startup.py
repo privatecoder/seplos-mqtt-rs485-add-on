@@ -374,18 +374,28 @@ def test_sigterm_cleans_up_without_exec(monkeypatch, tmp_path):
     assert api.LAST_RUN["exit"] == 0
 
 
-def test_bridge_error_at_startup_exits(monkeypatch, tmp_path):
+def test_bridge_error_at_startup_enters_setup_mode(monkeypatch, tmp_path):
     from seplos_mqtt.bridge import BridgeError
 
     class Failing(FakeBridge):
         def start(self):
             raise BridgeError("socat missing")
 
+    seen = {}
+
+    def fake_start_web(state, store, port):
+        seen["error"] = state.connection_error
+        state.request_restart()                       # a connection saved in the app
+
     monkeypatch.setattr(app, "SocatBridge", Failing)
+    monkeypatch.setattr(app, "start_web", fake_start_web)
     monkeypatch.setenv("MONITORING_FILE", str(tmp_path / "monitoring.json"))
     monkeypatch.setenv("RS485_REMOTE_IP", "10.0.0.5")
-    monkeypatch.delenv("INGRESS_PORT", raising=False)
+    monkeypatch.setenv("INGRESS_PORT", "8099")
     client, port = api.run_main(monkeypatch, single_pack_bms(), number_of_packs=1, telemetry_polls=4, startup=True)
+    assert "socat missing" in seen["error"]
+    assert api.LAST_RUN["exit"] is None
+    assert len(api.LAST_RUN["execs"]) == 1
     assert not [r for r in client.as_records() if r["topic"].endswith("/sensors")]   # never polled
 
 

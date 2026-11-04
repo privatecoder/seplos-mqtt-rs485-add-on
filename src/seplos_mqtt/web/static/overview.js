@@ -57,6 +57,14 @@ function headerLine(status) {
     fact(t('overview.snapshot_age'), fmtDuration(snapshotAge(status))));
 }
 
+// Setup mode: the add-on could not open its BMS connection and waits for a saved one.
+function connectionBanner(reason) {
+  return h('div', { class: 'banner error', role: 'alert' },
+    h('strong', {}, t('overview.no_connection')),
+    ' ', reason, ' ',
+    h('a', { href: '#/settings' }, t('overview.check_settings')));
+}
+
 const SYSTEM_STATES = ['Charging', 'Discharging', 'Idle', 'Off'];
 
 // Known states are translated; an unknown protocol value (for example "0x40") is shown as it is.
@@ -165,6 +173,7 @@ export function overviewView(ctx) {
     // replaceChildren turns null into the text "null": only real nodes go in
     const sets = Array.isArray(status.sets) ? status.sets : [];
     const children = [
+      typeof status.connection_error === 'string' ? connectionBanner(status.connection_error) : null,
       headerLine(status),
       multi ? systemCard(status.system) : null,
       sets.length > 0 ? h('div', { class: 'grid' }, sets.map((set) => setCard(set, age))) : null,

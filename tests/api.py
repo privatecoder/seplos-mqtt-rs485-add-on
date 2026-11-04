@@ -247,6 +247,7 @@ def run_main(
     startup: bool = False,
     job_after_polls: int | None = None,
     sets_after_polls: list[tuple[int, tuple]] | None = None,
+    serial_error: str | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -300,7 +301,12 @@ def run_main(
     monkeypatch.setattr(time, "monotonic", fake_time)
     no_sleep(monkeypatch)
     monkeypatch.setattr(app, "initialize_mqtt", lambda _config: connection)
-    monkeypatch.setattr(app, "initialize_serial", lambda _config: port)
+    def open_serial(_config):
+        if serial_error is not None:
+            raise app.ConnectionUnavailable(serial_error)
+        return port
+
+    monkeypatch.setattr(app, "initialize_serial", open_serial)
     monkeypatch.setattr(app, "start_health_server", lambda _state: None)
     handlers: dict = {}
     monkeypatch.setattr(app.signal, "signal", lambda sig, handler: handlers.__setitem__(sig.name, handler))

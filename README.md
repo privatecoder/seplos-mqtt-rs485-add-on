@@ -120,20 +120,25 @@ Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one
      With the option `serial_baudrate: auto` (default) the add-on derives the baud rate from the number of packs. Firmware 16.04.06 (`..._9600.ehex`) uses 9600 baud on RS485-1/2 as well: set `serial_baudrate: "9600"` for a single pack with that firmware.
 3. Install the add-on.
 4. Open the add-on configuration and set:
-   - RS485 connection (remote IP/port or local serial interface), number of packs, cell voltages: only read once on
-     the first start, see "Settings app" below
    - MQTT topic prefix (default: seplos)
    - Optional: HA discovery, logging level
+
+   The RS485 connection (remote IP/port or serial interface), number of packs and cell voltages are no longer add-on
+   options for new installs: set them in the **Seplos BMS** app (see "Settings app" below). Existing installs have
+   these values imported once on the first start with this version; the add-on then removes them from its
+   configuration automatically.
 5. Save and start the add-on.
-6. Check the logs for successful startup, then open **Seplos BMS** in the sidebar.
+6. Open **Seplos BMS** in the sidebar and enter the gateway or serial connection in **Settings**. A fresh install
+   cannot open any BMS connection yet: the add-on stays up with the app only (the Overview says why) until you
+   save a working connection, then it restarts and starts polling.
 
 ### Settings app (sidebar)
 
 The add-on adds a **Seplos BMS** entry to the Home Assistant sidebar (Ingress). The connection settings
 (remote gateway or serial device, baud rate, number of packs, cell voltage range, update interval, MAINT
-firmware) are stored in `/data/monitoring.json`. The corresponding add-on options in step 4 are only used once,
-to create these initial settings on the first start with this version (they are deprecated); afterwards change
-them in the Seplos BMS app. Saving a changed connection restarts the add-on's process in place, so all packs,
+firmware) are stored in `/data/monitoring.json`. The corresponding legacy add-on options are only used once,
+to create these initial settings on the first start with this version, and are then removed from the add-on
+configuration; change them in the Seplos BMS app. Saving a changed connection restarts the add-on's process in place, so all packs,
 discovery entities and the gateway bridge are rebuilt from the saved settings. The MQTT, discovery and logging
 options stay in the add-on configuration.
 

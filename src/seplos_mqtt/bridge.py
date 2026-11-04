@@ -4,17 +4,14 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
-import re
 import subprocess
 import time
 from collections.abc import Callable
 from typing import Any
 
-from .monitoring.model import TCP_PTY_PATH
+from .monitoring.model import TCP_PTY_PATH, valid_gateway_host
 
 logger = logging.getLogger("SeplosBMS")
-
-_HOST_RE = re.compile(r"^[A-Za-z0-9.:\-\[\]]{1,253}$")
 
 
 class BridgeError(RuntimeError):
@@ -46,7 +43,7 @@ class SocatBridge:
         wait_s: float = 5.0,
     ) -> None:
         # the host ends up in a socat address: only plain host names / IP literals
-        if not _HOST_RE.fullmatch(host):  # fullmatch: "$" would accept a trailing newline
+        if not valid_gateway_host(host):
             raise BridgeError(f"invalid gateway host {host!r}")
         self._address = _socat_host(host)
         self.host = host

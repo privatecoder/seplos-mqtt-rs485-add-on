@@ -24,12 +24,13 @@ from .discovery import Discovery
 from .jobs import JobQueue, step_detect
 from .monitoring.migration import load_or_migrate
 from .monitoring.model import ConfigValidationError, MonitoringConfig, activity
-from .monitoring.store import JsonStore
+from .monitoring.store import JsonStore, LoadStatus
 from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
 from .sets import Member, set_values
 from .state import StateStore
 from .status import build_status
+from .supervisor import clear_legacy_options
 from .system import SystemReader
 from .transport import SerialBus
 
@@ -88,6 +89,7 @@ class AppState:
     set_values: dict[int, dict] = field(default_factory=dict)       # last computed values per active set id
     published_sets: dict[int, Any] = field(default_factory=dict)    # ParallelSet as published to HA, per id
     set_inventory: set[int] = field(default_factory=set)            # ids with state in HA (kept in the state file)
+    connection_error: str | None = None   # setup mode: why the BMS connection could not be opened
 
     def request_sets(self, config: Any) -> None:
         """A saved set change (web thread): picked up at the next cycle boundary, no restart."""
@@ -114,6 +116,8 @@ class AppState:
         return health.max_poll_age(self.config.number_of_packs, self.config.mqtt_update_interval, self.config.multi_pack)
 
     def is_healthy(self) -> bool:
+        if self.connection_error is not None:
+            return True       # setup mode: nothing to poll, a watchdog restart would not help
         return health.is_healthy(
             mqtt_connected=self.mqtt is not None and self.mqtt.is_connected(),
             serial_open=self.bus is not None and self.bus.is_open,
@@ -143,13 +147,16 @@ def initialize_mqtt(config: Config) -> MqttConnection:
     return connection
 
 
+class ConnectionUnavailable(Exception):
+    """The serial interface or the gateway bridge cannot be opened (the settings app can fix it)."""
+
+
 def initialize_serial(config: Config) -> Any:
     try:
         logger.info("Initializing serial interface %s at %s baud", config.serial_interface, config.baudrate)
         return serial.Serial(port=config.serial_interface, baudrate=config.baudrate, timeout=0.5, write_timeout=2)
     except SerialException as e:
-        logger.error("Serial initialization failed: %s", e)
-        sys.exit(1)
+        raise ConnectionUnavailable(f"cannot open {config.serial_interface}: {e}") from e
 
 
 def start_health_server(state: AppState) -> Any:
@@ -430,7 +437,8 @@ def wait_or_restart(state: AppState, seconds: float) -> bool:
     return state.restart_event.wait(seconds)
 
 
-BRIDGE_DEAD_RESTART_S = 30        # socat dead this long -> clean process restart
+SETUP_REFRESH_SECONDS = 5         # setup mode: how often the status snapshot is refreshed
+BRIDGE_DEAD_RESTART_S = 30       # socat dead this long -> clean process restart
 WEB_STOP_DEADLINE_S = 30.0        # how long main() waits for the web server to stop
 
 
@@ -491,6 +499,23 @@ def startup_config(env: Mapping[str, str]) -> tuple[Config, JsonStore | None]:
         sys.exit(1)
 
 
+def wait_in_setup_mode(state: AppState) -> None:
+    """No BMS connection: keep the app up, announce the add-on as offline (retried until the broker
+    accepted it, and again after every reconnect) and wait for a saved connection."""
+    topic = topics.availability(state.config.mqtt_topic)
+    announced = False
+    update_status(state)
+    while True:
+        if state.mqtt.resync.is_set():
+            state.mqtt.resync.clear()
+            announced = False
+        if not announced:
+            announced = state.publisher.publish(topic, "offline", retain=True)
+        if wait_or_restart(state, SETUP_REFRESH_SECONDS):
+            raise RestartRequested
+        update_status(state)
+
+
 def load_sets(store: JsonStore) -> tuple:
     """The stored parallel sets; none when the document is missing or corrupt (the add-on options
     are in use then)."""
@@ -507,7 +532,8 @@ def start_web(state: AppState, store: JsonStore, port: str) -> None:
 
         web_app = WebApp(
             WebSettings(port=int(port)), store, on_connection_saved=state.request_restart,
-            on_sets_saved=state.request_sets, status_provider=lambda: state.status, jobs=state.jobs,
+            on_sets_saved=state.request_sets, status_provider=lambda: state.status,
+            jobs=state.jobs if state.connection_error is None else None,     # setup mode: nothing runs jobs
         )
         web = WebThread(web_app)
         bound = web.start()
@@ -525,6 +551,10 @@ def main(config: Config | None = None) -> None:
         # logging first: the migration and the startup errors are logged before the config exists
         setup_logging(os.environ.get("LOGGING_LEVEL") or "info")
         config, store = startup_config(os.environ)
+        token = os.environ.get("SUPERVISOR_TOKEN")
+        if token and store is not None and store.status is LoadStatus.VALID:
+            # best effort in the background: the Supervisor must never delay the start
+            threading.Thread(target=clear_legacy_options, args=(token,), name="legacy-options", daemon=True).start()
     configure_logging(config)
     logger.info("Starting Seplos BMS Data Fetcher")
     logger.debug("Configuration loaded: %s", config.loggable())
@@ -538,21 +568,27 @@ def main(config: Config | None = None) -> None:
     try:
         state.mqtt = initialize_mqtt(config)
         state.publisher = Publisher(state.mqtt.client)
-        if standalone and config.remote_host:
-            try:
-                state.bridge = SocatBridge(config.remote_host, config.remote_port, config.serial_interface)
-                state.bridge.start()
-            except BridgeError as e:
-                logger.error("RS485 gateway bridge failed: %s", e)
-                sys.exit(1)
-        state.bus = SerialBus(initialize_serial(config))
-        state.store = StateStore.default(config.state_file)
-        state.packs = [
-            PackState(BatteryPack(address, state.bus, config, state.store), address) for address in range(config.number_of_packs)
-        ]
-        logger.info("Initialized %s battery pack(s)", config.number_of_packs)
-        for pack_state in state.packs:
-            state.publisher.publish(topics.pack_availability(config.mqtt_topic, pack_state.address), "offline")
+        try:
+            if standalone and config.remote_host:
+                try:
+                    bridge = SocatBridge(config.remote_host, config.remote_port, config.serial_interface)
+                    bridge.start()
+                except BridgeError as e:
+                    raise ConnectionUnavailable(f"gateway bridge failed: {e}") from e
+                state.bridge = bridge
+            state.bus = SerialBus(initialize_serial(config))
+        except ConnectionUnavailable as e:
+            state.connection_error = str(e)
+            logger.error("No connection to the BMS: %s. Waiting for a saved connection in the settings app", e)
+        if state.connection_error is None:
+            state.store = StateStore.default(config.state_file)
+            state.packs = [
+                PackState(BatteryPack(address, state.bus, config, state.store), address)
+                for address in range(config.number_of_packs)
+            ]
+            logger.info("Initialized %s battery pack(s)", config.number_of_packs)
+            for pack_state in state.packs:
+                state.publisher.publish(topics.pack_availability(config.mqtt_topic, pack_state.address), "offline")
 
         # initial grace: healthy until the first poll had a chance to succeed
         state.last_poll = time.monotonic()
@@ -564,6 +600,9 @@ def main(config: Config | None = None) -> None:
         ingress_port = os.environ.get("INGRESS_PORT")
         if standalone and ingress_port and store is not None:
             start_web(state, store, ingress_port)
+
+        if state.connection_error is not None:
+            wait_in_setup_mode(state)
 
         if config.enable_ha_discovery:
             logger.info("Sending Home Assistant Auto-Discovery configurations")

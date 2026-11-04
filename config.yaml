@@ -24,34 +24,26 @@ ingress_port: 0
 panel_title: "Seplos BMS"
 panel_icon: "mdi:battery-high"
 options:
-  rs485_remote_ip: ""
-  rs485_remote_port: 4196
-  serial_interface: "/tmp/vcom0"
-  serial_baudrate: "auto"
-  number_of_packs: 1
-  min_cell_voltage: 2.5
-  max_cell_voltage: 3.65
-  nominal_cell_voltage: 3.2
   mqtt_topic: "seplos"
-  mqtt_update_interval: 1
   enable_ha_discovery: true
   ha_discovery_prefix: "homeassistant"
   invert_ha_dis_charge_measurements: false
-  maint_firmware: false
   logging_level: "info"
 schema:
+  # legacy connection options: migration input only (the Supervisor drops keys that are not in the
+  # schema), optional and without defaults; the add-on removes them after the migration
   rs485_remote_ip: "str?"
-  rs485_remote_port: "int?"
-  serial_interface: "str"
-  serial_baudrate: "list(auto|9600|19200)"
-  number_of_packs: "int(1,16)"
-  min_cell_voltage: "float"
-  max_cell_voltage: "float"
-  nominal_cell_voltage: "float(0.5,5)"
+  rs485_remote_port: "port?"
+  serial_interface: "str?"
+  serial_baudrate: "list(auto|9600|19200)?"
+  number_of_packs: "int(1,16)?"
+  min_cell_voltage: "float?"
+  max_cell_voltage: "float?"
+  nominal_cell_voltage: "float(0.5,5)?"
+  mqtt_update_interval: "int?"
+  maint_firmware: "bool?"
   mqtt_topic: "str"
-  mqtt_update_interval: "int"
   enable_ha_discovery: "bool"
   ha_discovery_prefix: "str"
   invert_ha_dis_charge_measurements: "bool"
-  maint_firmware: "bool"
   logging_level: "list(info|error|debug)"

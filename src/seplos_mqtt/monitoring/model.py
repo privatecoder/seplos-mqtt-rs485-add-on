@@ -3,13 +3,31 @@
 from __future__ import annotations
 
 import copy
+import ipaddress
 import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 # the pty that run.sh creates with socat for a TCP RS485 gateway
 TCP_PTY_PATH = "/tmp/vcom0"
+
+_HOST_RE = re.compile(r"^[A-Za-z0-9.:\-\[\]]{1,253}$")
+
+
+def valid_gateway_host(host: str) -> bool:
+    """A host name or IP literal the socat bridge accepts (shared with ``bridge.SocatBridge``)."""
+    if not _HOST_RE.fullmatch(host):          # fullmatch: "$" would accept a trailing newline
+        return False
+    if ":" not in host:
+        return "[" not in host and "]" not in host
+    inner = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+    try:
+        ipaddress.IPv6Address(inner)
+    except ValueError:
+        return False
+    return True
 
 Problem = tuple[str, str]  # (json_path, key), e.g. ("connection.port", "range")
 
@@ -101,7 +119,7 @@ class ConnectionSettings:
                 host = data["host"]
                 if not isinstance(host, str):
                     bad("host", "type")
-                elif not host or any(c.isspace() for c in host):
+                elif not valid_gateway_host(host):
                     bad("host", "format")
             if "port" in data:
                 port = data["port"]
