@@ -611,3 +611,15 @@ def test_baudrate_override(monkeypatch):
     assert api.init_serial(monkeypatch, 1, SERIAL_BAUDRATE="9600")["baudrate"] == 9600
     assert api.init_serial(monkeypatch, 1, SERIAL_BAUDRATE="auto")["baudrate"] == 19200
     assert api.init_serial(monkeypatch, 2, SERIAL_BAUDRATE="12345")["baudrate"] == 9600
+
+
+def test_inconsistent_cell_count_rejected(monkeypatch):
+    """Review E01: a 16-cell body declaring 15 cells is malformed and must not count as a successful poll."""
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        for cid2, info in ((0x42, f.telemetry_info()), (0x44, f.telesignal_info())):
+            bad = bytearray(info)
+            bad[2] = 15
+            bms = _single_pack_bms()
+            bms.ascii[(0, cid2)] = bytes(bad)
+            assert api.poll(api.make_pack(0), bms) == (None, False), hex(cid2)
