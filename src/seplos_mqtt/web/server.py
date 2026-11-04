@@ -437,10 +437,13 @@ class WebThread:
 
 
 def _finalize(request: web.Request, response: web.StreamResponse) -> web.StreamResponse:
-    """Security headers on every response, ``no-store`` on the API."""
+    """Security headers on every response, ``no-store`` on the API, ``no-cache`` on the page and its
+    static files (the browser revalidates, so an add-on update is not hidden by a cached script)."""
     response.headers.update(_SECURITY_HEADERS)
     if request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
+    elif request.path == "/" or request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

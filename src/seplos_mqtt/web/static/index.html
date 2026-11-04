@@ -3,11 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Seplos BMS</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="static/app.css">
 </head>
 <body>
-<h1>Seplos BMS</h1>
-<p id="status">Loading…</p>
+<div id="app">
+  <header class="app-header">
+    <h1 class="brand"><span class="brand-mark" aria-hidden="true"></span><span data-i18n="app.title">Seplos BMS</span></h1>
+    <nav class="tabs" data-i18n-label="nav.label" aria-label="Main">
+      <a href="#/overview" data-tab="overview" data-i18n="tab.overview">Overview</a>
+      <a href="#/settings" data-tab="settings" data-i18n="tab.settings">Settings</a>
+      <a href="#/detect" data-tab="detect" data-i18n="tab.detect">Detection</a>
+    </nav>
+  </header>
+  <div id="restart" class="banner info" role="status" hidden></div>
+  <div id="guard" class="banner warn" role="alert" hidden></div>
+  <main id="view" tabindex="-1"><p class="loading">Seplos BMS …</p></main>
+</div>
+<div id="messages" role="status" aria-live="polite"></div>
+<noscript><p class="banner error">Seplos BMS needs JavaScript. / Seplos BMS braucht JavaScript.</p></noscript>
 <script type="module" src="static/app.js"></script>
 </body>
 </html>

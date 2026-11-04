@@ -5,15 +5,20 @@ import asyncio
 import hashlib
 import hmac
 import json
+import re
+import shutil
 import socket
+import subprocess
 import threading
 import time
 import urllib.request
+from pathlib import Path
 
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 from yarl import URL
 
+import seplos_mqtt.web.server as server_module
 from seplos_mqtt.monitoring.migration import load_or_migrate
 from seplos_mqtt.monitoring.model import MonitoringConfig
 from seplos_mqtt.monitoring.store import JsonStore
@@ -89,7 +94,7 @@ def test_foreign_peer_forbidden_even_with_valid_headers(tmp_path):
         res = await client.get("/")
         assert res.status == 403
         assert_secure(res)
-        assert "Cache-Control" not in res.headers
+        assert res.headers["Cache-Control"] == "no-cache"          # the page, not the API
 
     run_with(app, scenario)
 
@@ -119,7 +124,7 @@ def test_security_headers_and_no_store(tmp_path):
         assert_secure(missing)
         page = await client.get("/")
         assert_secure(page)
-        assert "Cache-Control" not in page.headers
+        assert page.headers["Cache-Control"] == "no-cache"
 
     run_with(app, scenario)
 
@@ -482,6 +487,240 @@ def _get_json(url, headers=None):
     req = urllib.request.Request(url, headers=headers or {})
     with urllib.request.urlopen(req, timeout=5) as res:
         return json.load(res)
+
+
+# ---------------------------------------------------------------- the UI files
+
+STATIC_DIR = Path(server_module.__file__).parent / "static"
+CONTENT_TYPES = {".html": "text/html", ".css": "text/css", ".js": "javascript", ".json": "application/json"}
+UI_FILES = {
+    "index.html", "app.css", "api.js", "ui.js", "i18n.js", "app.js", "overview.js", "settings.js", "detect.js",
+    "i18n/de.json", "i18n/en.json",
+}
+JS_FILES = sorted(STATIC_DIR.glob("*.js"))
+
+
+def static_files() -> list[Path]:
+    return sorted(p for p in STATIC_DIR.rglob("*") if p.is_file())
+
+
+def rel(path: Path) -> str:
+    return path.relative_to(STATIC_DIR).as_posix()
+
+
+def test_the_ui_files_exist():
+    assert UI_FILES <= {rel(p) for p in static_files()}
+
+
+def test_every_static_file_is_served_with_the_right_content_type(tmp_path):
+    app = WebApp(LOCAL, make_store(tmp_path))
+    files = static_files()
+
+    async def scenario(client):
+        for path in files:
+            url = "/" if rel(path) == "index.html" else f"/static/{rel(path)}"
+            res = await client.get(url)
+            assert res.status == 200, url
+            assert CONTENT_TYPES[path.suffix] in res.headers["Content-Type"], url
+            assert await res.read() == path.read_bytes(), url
+
+    run_with(app, scenario)
+
+
+def test_page_and_static_files_are_revalidated_but_the_api_is_never_cached(tmp_path):
+    app = WebApp(LOCAL, make_store(tmp_path))
+
+    async def scenario(client):
+        for url in ("/", "/static/app.js", "/static/i18n/en.json", "/static/app.css", "/static/missing.js"):
+            res = await client.get(url)
+            assert res.headers["Cache-Control"] == "no-cache", url      # browsers revalidate after an update
+        for url in ("/api/session", "/api/status", "/api/connection"):
+            res = await client.get(url)
+            assert res.headers["Cache-Control"] == "no-store", url
+
+    run_with(app, scenario)
+
+
+def test_referenced_files_exist_and_urls_are_relative():
+    index = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    for url in re.findall(r'(?:src|href)="([^"]+)"', index):
+        if url.startswith(("#", "data:")):
+            continue
+        assert url.startswith("static/"), url                       # relative, below the Ingress path
+        assert (STATIC_DIR / url.removeprefix("static/")).is_file(), url
+    for path in JS_FILES:
+        text = path.read_text(encoding="utf-8")
+        for target in re.findall(r"from\s+'(\./[^']+)'", text):     # import statements
+            assert (STATIC_DIR / target[2:]).is_file(), f"{rel(path)} imports {target}"
+        for target in re.findall(r"fetch\(\s*[`'\"]([^`'\"$]+)", text):
+            assert target.startswith("static/") or target.startswith("api/"), f"{rel(path)} fetches {target}"
+        for _method, target in re.findall(r"api\(\s*'(GET|POST|PUT)'\s*,\s*[`']([^`'$]*)", text):
+            assert target in {"api/session", "api/connection", "api/status", "api/jobs/detect"} or target.startswith("api/jobs/"), target
+
+
+def test_no_absolute_urls_no_external_resources_no_inline_code():
+    for path in static_files():
+        text = path.read_text(encoding="utf-8")
+        name = rel(path)
+        assert "http://" not in text and "https://" not in text, name
+        assert not re.search(r"(?:fetch|import)\(\s*['\"`]/", text), name
+        assert not re.search(r"from\s+['\"]/", text), name
+        assert not re.search(r"(?:src|href)=\"/", text), name
+        assert not re.search(r"url\(\s*['\"]?/", text), name
+        assert "@import" not in text, name
+        if path.suffix == ".js":
+            assert not re.search(r"innerHTML|outerHTML|insertAdjacentHTML|\beval\(|new Function|\.style\b|document\.write", text), name
+    index = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    assert not re.search(r"<script(?![^>]*\bsrc=)", index)          # no inline script
+    assert " style=" not in index and "<style" not in index
+    assert not re.search(r"\bon[a-z]+=", index)                     # no inline event handlers
+
+
+def load_texts() -> tuple[dict, dict]:
+    return (
+        json.loads((STATIC_DIR / "i18n" / "de.json").read_text(encoding="utf-8")),
+        json.loads((STATIC_DIR / "i18n" / "en.json").read_text(encoding="utf-8")),
+    )
+
+
+def test_both_languages_define_the_same_keys_and_placeholders():
+    de, en = load_texts()
+    assert set(de) == set(en), sorted(set(de) ^ set(en))
+    for key in en:
+        assert en[key].strip() and de[key].strip(), key
+        assert sorted(re.findall(r"\{(\w+)\}", de[key])) == sorted(re.findall(r"\{(\w+)\}", en[key])), key
+
+
+def test_every_text_the_code_asks_for_exists():
+    _, en = load_texts()
+    used = set()
+    for path in JS_FILES:
+        text = path.read_text(encoding="utf-8")
+        used |= set(re.findall(r"\bt\('([a-z0-9_.]+)'", text))
+    used |= {m.group(1) for m in re.finditer(r'data-i18n(?:-label)?="([a-z0-9_.]+)"', (STATIC_DIR / "index.html").read_text())}
+    assert used, "no t() calls found"
+    assert not sorted(k for k in used if k not in en)
+    # families built from a variable: every member has to exist
+    names = re.findall(r"\{ name: '([a-z_]+)'", (STATIC_DIR / "settings.js").read_text())
+    assert len(names) == 11
+    for name in names:
+        assert f"settings.f.{name}.label" in en and f"settings.f.{name}.help" in en, name
+    family = (
+        [f"settings.opt.transport.{v}" for v in ("tcp", "serial")]
+        + [f"settings.opt.baud.{v}" for v in ("auto", "9600", "19200")]
+        + [f"avail.{v}" for v in ("online", "offline", "unknown")]
+        + [f"maint.{v}" for v in ("present", "absent", "pending", "disabled")]
+        + [f"bridge.{v}" for v in ("alive", "dead", "none")]
+        + [f"mode.{v}" for v in ("single", "multi")]
+        + [f"job.state.{v}" for v in ("queued", "running", "done", "failed", "cancelled")]
+        + [f"job.error.{v}" for v in ("restarting", "shutting_down", "job_failed", "unknown_job_kind")]
+        + [f"invalid.{v}" for v in ("required", "type", "range", "format", "value", "order")]
+        + [f"store.{s}.{p}" for s in ("corrupt", "missing") for p in ("title", "text")]
+    )
+    assert not [k for k in family if k not in en]
+
+
+def test_every_error_key_of_the_server_has_a_text():
+    _, en = load_texts()
+    source = Path(server_module.__file__).read_text(encoding="utf-8")
+    keys = set(re.findall(r'ApiError\(\s*"([a-z_]+)"', source)) | set(re.findall(r'error_body\("([a-z_]+)"', source))
+    assert {"identity_required", "csrf_invalid", "revision_stale", "invalid_fields", "store_corrupt", "store_missing",
+            "job_busy", "shutting_down", "jobs_unavailable"} <= keys
+    assert not sorted(k for k in keys if f"err.{k}" not in en)
+    assert {"err.network_error", "err.generic"} <= set(en)
+
+
+def test_system_states_are_translated_in_both_languages():
+    from seplos_mqtt.decoders.system import SYSTEM_STATES
+
+    de, en = load_texts()
+    for state in SYSTEM_STATES.values():
+        assert f"system.state_value.{state}" in en and f"system.state_value.{state}" in de, state
+        assert de[f"system.state_value.{state}"] != en[f"system.state_value.{state}"], state      # really translated
+    overview = (STATIC_DIR / "overview.js").read_text(encoding="utf-8")
+    listed = re.search(r"const SYSTEM_STATES = \[([^\]]*)\]", overview)
+    assert listed is not None
+    assert set(re.findall(r"'(\w+)'", listed.group(1))) == set(SYSTEM_STATES.values())   # the UI knows every state
+
+
+def call_arguments(text: str, name: str) -> list[list[str]]:
+    """The top-level arguments of every ``name(...)`` call in a JS source (paren-depth aware)."""
+    calls = []
+    for match in re.finditer(re.escape(name) + r"\(", text):
+        depth, current, args, i = 1, [], [], match.end()
+        while i < len(text) and depth:
+            ch = text[i]
+            depth += ch in "([{"
+            depth -= ch in ")]}"
+            if depth == 1 and ch == ",":
+                args.append("".join(current).strip())
+                current = []
+            elif depth:
+                current.append(ch)
+            i += 1
+        args.append("".join(current).strip())
+        calls.append(args)
+    return calls
+
+
+def test_replace_children_never_receives_null():
+    # Node.replaceChildren turns null into the text "null" (unlike the h() helper)
+    for path in JS_FILES:
+        for args in call_arguments(path.read_text(encoding="utf-8"), ".replaceChildren"):
+            for arg in args:
+                assert arg != "null" and not re.search(r":\s*null\s*$", arg), f"{rel(path)}: replaceChildren({', '.join(args)})"
+
+
+def test_editable_numbers_are_exact_and_display_formatting_stays_on_the_overview():
+    settings = (STATIC_DIR / "settings.js").read_text(encoding="utf-8")
+    assert "formatNumber" not in settings and "Intl." not in settings
+    assert "exactText" in settings
+
+
+def test_background_polling_pauses_while_the_page_is_hidden():
+    for name in ("detect.js", "app.js"):
+        text = (STATIC_DIR / name).read_text(encoding="utf-8")
+        assert "document.hidden" in text and "visibilitychange" in text, name
+    detect = (STATIC_DIR / "detect.js").read_text(encoding="utf-8")
+    assert "removeEventListener('visibilitychange'" in detect          # removed when the view is destroyed
+
+
+def test_restart_recovery_accepts_a_newer_revision_and_pack_age_follows_the_snapshot():
+    app_js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "data.revision >= revision" in app_js and "data.revision === revision" not in app_js
+    assert "data.csrf !== oldCsrf" in app_js                            # still has to be a new process
+    overview = (STATIC_DIR / "overview.js").read_text(encoding="utf-8")
+    assert "lastSuccessAge(pack, snapshotSeconds)" in overview
+
+
+def test_settings_loads_and_saves_are_serialised_by_generation():
+    text = (STATIC_DIR / "settings.js").read_text(encoding="utf-8")
+    for needle in ("let generation", "let loading", "let saving", "mine !== generation", "generation += 1", "controlsDisabled()"):
+        assert needle in text, needle
+    # a stale load answer returns before it touches the draft, baseline, revision or disabled state
+    load = text[text.index("async function load()"):text.index("function payload(")]
+    assert load.index("mine !== generation") < load.index("loaded = data.connection")
+    assert load.index("mine !== generation") < load.index("writeRaw(raw)")
+
+
+def test_exponent_form_numbers_round_trip_exactly():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = (
+        f"import {{ exactText, expandExponent }} from {(STATIC_DIR / 'settings.js').as_uri()!r};"
+        f"import {{ parseNumber }} from {(STATIC_DIR / 'i18n.js').as_uri()!r};"
+        "const values = [1e-25, 1.5e-7, 2.5004, 3.23456, 0.1, 3.65, 5, 1e21, 1.2345e-10];"
+        "for (const v of values) {"
+        "  const text = exactText(v);"
+        "  if (/e/i.test(text) || parseNumber(text) !== v) { console.log('FAIL', v, text); process.exit(1); }"
+        "}"
+        "if (expandExponent('1e-25') !== '0.0000000000000000000000001') process.exit(2);"
+        "if (expandExponent('-1.5e+3') !== '-1500') process.exit(3);"
+        "console.log('ok');"
+    )
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
 
 
 # ---------------------------------------------------------------- jobs
