@@ -494,7 +494,7 @@ def _get_json(url, headers=None):
 STATIC_DIR = Path(server_module.__file__).parent / "static"
 CONTENT_TYPES = {".html": "text/html", ".css": "text/css", ".js": "javascript", ".json": "application/json", ".svg": "image/svg+xml"}
 UI_FILES = {
-    "index.html", "app.css", "api.js", "ui.js", "i18n.js", "app.js", "overview.js", "settings.js", "detect.js",
+    "index.html", "app.css", "api.js", "ui.js", "i18n.js", "app.js", "overview.js", "settings.js", "sets.js", "detect.js",
     "i18n/de.json", "i18n/en.json", "icon.svg",
 }
 JS_FILES = sorted(STATIC_DIR.glob("*.js"))
@@ -555,7 +555,7 @@ def test_referenced_files_exist_and_urls_are_relative():
         for target in re.findall(r"fetch\(\s*[`'\"]([^`'\"$]+)", text):
             assert target.startswith("static/") or target.startswith("api/"), f"{rel(path)} fetches {target}"
         for _method, target in re.findall(r"api\(\s*'(GET|POST|PUT)'\s*,\s*[`']([^`'$]*)", text):
-            assert target in {"api/session", "api/connection", "api/status", "api/jobs/detect"} or target.startswith("api/jobs/"), target
+            assert target in {"api/session", "api/connection", "api/sets", "api/status", "api/jobs/detect"} or target.startswith("api/jobs/"), target
 
 
 def test_no_absolute_urls_no_external_resources_no_inline_code():
@@ -617,6 +617,9 @@ def test_every_text_the_code_asks_for_exists():
         + [f"job.error.{v}" for v in ("restarting", "shutting_down", "job_failed", "unknown_job_kind")]
         + [f"invalid.{v}" for v in ("required", "type", "range", "format", "value", "order", "duplicate")]
         + [f"store.{s}.{p}" for s in ("corrupt", "missing") for p in ("title", "text")]
+        + [f"sets.wiring.{w}{suffix}" for w in ("diagonal", "common_busbar", "unknown") for suffix in ("", ".help")]
+        + [f"sets.reason.{r}" for r in ("single_pack", "pack_not_configured")]
+        + [f"sets.state.{s}" for s in ("active", "inactive")]
     )
     assert not [k for k in family if k not in en]
 
@@ -702,6 +705,84 @@ def test_settings_loads_and_saves_are_serialised_by_generation():
     load = text[text.index("async function load()"):text.index("function payload(")]
     assert load.index("mine !== generation") < load.index("loaded = data.connection")
     assert load.index("mine !== generation") < load.index("writeRaw(raw)")
+
+
+def test_sets_tab_follows_the_settings_request_discipline():
+    text = (STATIC_DIR / "sets.js").read_text(encoding="utf-8")
+    for needle in ("let generation", "let loading", "let saving", "mine !== generation", "generation += 1", "controlsDisabled()",
+                   "{ revision }", "'api/sets'"):
+        assert needle in text, needle
+    load = text[text.index("async function load()"):text.index("// the draft is exactly")]
+    assert load.index("mine !== generation") < load.index("adopt(data)")
+    assert "awaitRestart" not in text                                    # a set change never restarts the add-on
+    index = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    assert index.index('data-tab="settings"') < index.index('data-tab="sets"') < index.index('data-tab="detect"')
+    assert "sets: setsView" in (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+
+
+def test_sets_client_checks_mirror_the_model():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = (
+        f"import {{ checkDraft }} from {(STATIC_DIR / 'sets.js').as_uri()!r};"
+        "const d = (name, packs, wiring = 'unknown', plus = null, minus = null) => ({ name, packs, wiring, plus, minus });"
+        "const eq = (a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(JSON.stringify(a)); process.exit(1); } };"
+        "eq(checkDraft([d('A', [0, 1]), d('B', [2, 3], 'common_busbar')]), [{}, {}]);"
+        "eq(checkDraft([d('A', [0, 1], 'diagonal', 0, 1)]), [{}]);"
+        "eq(checkDraft([d(' ', [0])]), [{ name: 'range', packs: 'range' }]);"
+        "eq(checkDraft([d('x'.repeat(41), [0, 1])]), [{ name: 'range' }]);"
+        "eq(checkDraft([d('A', [0, 1]), d(' a ', [2, 3])]), [{}, { name: 'duplicate' }]);"
+        "eq(checkDraft([d('A', [0, 1]), d('B', [1, 2])]), [{}, { packs: 'duplicate' }]);"
+        "eq(checkDraft([d('A', [0, 1], 'diagonal')]), [{ plus: 'required', minus: 'required' }]);"
+        "eq(checkDraft([d('A', [0, 1], 'diagonal', 1, 1)]), [{ plus: 'value', minus: 'value' }]);"
+        "eq(checkDraft([d('A', [0, 1], 'common_busbar', 5)]), [{ plus: 'value' }]);"
+        "console.log('ok');"
+    )
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_sets_member_moves_stay_inside_the_list():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = (
+        f"import {{ moveMember }} from {(STATIC_DIR / 'sets.js').as_uri()!r};"
+        "const run = (packs, from, to) => { const ok = moveMember(packs, from, to); return JSON.stringify([ok, packs]); };"
+        "const eq = (a, b) => { if (a !== b) { console.log(a, b); process.exit(1); } };"
+        "eq(run([0, 1, 2], 1, 0), '[true,[1,0,2]]');"
+        "eq(run([0, 1, 2], 1, 2), '[true,[0,2,1]]');"
+        "eq(run([0, 1], 0, -1), '[false,[0,1]]');"            # first member up: nothing happens
+        "eq(run([0, 1], 1, 2), '[false,[0,1]]');"             # last member down: nothing happens
+        "eq(run([0, 1], 0, 1.5), '[false,[0,1]]');"
+        "eq(run([], 0, 1), '[false,[]]');"
+        "console.log('ok');"
+    )
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_sets_unlocking_keeps_intrinsically_disabled_controls_off():
+    text = (STATIC_DIR / "sets.js").read_text(encoding="utf-8")
+    assert "control.hasAttribute('data-off')" in text                   # the lock never enables them
+    assert "'data-off': j === 0" in text and "'data-off': j === d.packs.length - 1" in text
+    assert "disabled: j ===" not in text                                # the plain attribute would be overwritten
+    assert "saveButton.disabled = disabled || clean" in text           # save and discard wait for an edit
+
+
+def test_sets_collapse_and_labels():
+    text = (STATIC_DIR / "sets.js").read_text(encoding="utf-8")
+    assert "collapsedCard(d)" in text and "t('sets.edit')" in text and "openFailed()" in text
+    assert "for: addId" in text and "'aria-label': t('sets.add_pack')" not in text    # the select has a real label
+    de, en = load_texts()
+    assert de["sets.add_pack_label"] == "Pack hinzufügen" and en["sets.add_pack_label"] == "Add pack"
+
+
+def test_set_cards_age_follows_the_snapshot():
+    overview = (STATIC_DIR / "overview.js").read_text(encoding="utf-8")
+    assert "setCard(set, snapshotSeconds)" in overview and "setCard(set, age)" in overview
+    assert "v.sample_age + (snapshotSeconds ?? 0)" in overview
 
 
 def test_exponent_form_numbers_round_trip_exactly():

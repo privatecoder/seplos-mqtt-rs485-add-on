@@ -22,6 +22,10 @@ export function append(el, children) {
   return el;
 }
 
+export function chip(text, kind) {
+  return h('span', { class: `chip ${kind || ''}` }, text);
+}
+
 let idCounter = 0;
 export function uid(prefix) {
   idCounter += 1;

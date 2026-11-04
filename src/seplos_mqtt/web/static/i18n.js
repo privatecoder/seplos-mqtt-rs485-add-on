@@ -61,6 +61,11 @@ export function fmtDuration(seconds) {
   return `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`;
 }
 
+// "Pack 03": the address as shown everywhere (two digits).
+export function packName(address) {
+  return t('pack.title', { n: String(address).padStart(2, '0') });
+}
+
 export function orDash(value) {
   return value === null || value === undefined || value === '' ? DASH : String(value);
 }

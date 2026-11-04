@@ -5,9 +5,10 @@ import { loadLanguage, t, errorText, localiseDocument } from './i18n.js';
 import { h, toast } from './ui.js';
 import { overviewView } from './overview.js';
 import { settingsView } from './settings.js';
+import { setsView } from './sets.js';
 import { detectView } from './detect.js';
 
-const VIEWS = { overview: overviewView, settings: settingsView, detect: detectView };
+const VIEWS = { overview: overviewView, settings: settingsView, sets: setsView, detect: detectView };
 const RESTART_POLL_MS = 2000;
 const RESTART_GIVE_UP_MS = 180000;
 

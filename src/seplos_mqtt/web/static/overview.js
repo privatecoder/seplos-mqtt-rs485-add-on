@@ -1,8 +1,8 @@
 // Overview tab: live status of the add-on, polled every 5 s while the page is visible.
 
 import { api, ApiError } from './api.js';
-import { t, errorText, fmt, fmtDuration, orDash } from './i18n.js';
-import { h } from './ui.js';
+import { t, errorText, fmt, fmtDuration, orDash, packName } from './i18n.js';
+import { h, chip } from './ui.js';
 
 const POLL_MS = 5000;
 
@@ -14,10 +14,6 @@ export function storeBanner(session) {
     ' ',
     t(`store.${store.status}.text`),
     store.problem ? h('span', { class: 'muted' }, ` (${store.problem})`) : null);
-}
-
-function chip(text, kind) {
-  return h('span', { class: `chip ${kind || ''}` }, text);
 }
 
 function fact(label, value) {
@@ -83,6 +79,41 @@ function systemCard(system) {
         kv(t('system.state'), systemState(system.system_state))));
 }
 
+// A set value with the pack it comes from: "3,315 V (Pack 01)"; unknown stays a plain dash.
+function withPack(text, pack) {
+  return pack === null || pack === undefined || text === '–' ? text : `${text} (${packName(pack)})`;
+}
+
+// `snapshotSeconds`: time since the snapshot was built; the sample age was measured then.
+function setCard(set, snapshotSeconds) {
+  const id = `set-title-${set.id}`;
+  const v = set.values;
+  let body;
+  if (!set.active) {
+    body = h('p', { class: 'muted' }, t(`sets.reason.${set.reason}`));
+  } else if (v === null || v === undefined) {
+    body = h('p', { class: 'muted' }, t('sets.waiting'));
+  } else {
+    body = h('dl', { class: 'kvs' },
+      kv(t('sets.val.current'), fmt(v.current, 'A', 2)),
+      kv(t('sets.val.power'), fmt(v.power, 'W', 1)),
+      kv(t('sets.val.soc'), fmt(v.soc, '%', 1)),
+      kv(t('sets.val.voltage_median'), fmt(v.voltage_median, 'V', 2)),
+      kv(t('sets.val.voltage_range'), fmt(v.voltage_range, 'V', 3)),
+      kv(t('sets.val.cell_high'), withPack(fmt(v.highest_cell_voltage, 'V', 3), v.highest_cell_voltage_pack)),
+      kv(t('sets.val.cell_low'), withPack(fmt(v.lowest_cell_voltage, 'V', 3), v.lowest_cell_voltage_pack)),
+      kv(t('sets.val.temp_high'), withPack(fmt(v.highest_cell_temperature, '°C', 1), v.highest_cell_temperature_pack)),
+      kv(t('sets.val.temp_low'), withPack(fmt(v.lowest_cell_temperature, '°C', 1), v.lowest_cell_temperature_pack)),
+      kv(t('sets.val.members'), `${orDash(v.members_reporting)} / ${set.packs.length}`),
+      kv(t('sets.val.age'), fmtDuration(typeof v.sample_age === 'number' ? v.sample_age + (snapshotSeconds ?? 0) : null)));
+  }
+  return h('article', { class: 'card', 'aria-labelledby': id },
+    h('div', { class: 'card-head' },
+      h('h3', { id }, set.name),
+      chip(t(set.active ? 'sets.state.active' : 'sets.state.inactive'), set.active ? 'avail-online' : 'avail-unknown')),
+    body);
+}
+
 // The age in the snapshot was measured when it was built: add the time that passed since.
 function lastSuccessAge(pack, snapshotSeconds) {
   if (pack.last_success_age_s === null || pack.last_success_age_s === undefined) return null;
@@ -90,7 +121,7 @@ function lastSuccessAge(pack, snapshotSeconds) {
 }
 
 function packCard(pack, multi, snapshotSeconds) {
-  const title = `${t('pack.title', { n: String(pack.address).padStart(2, '0') })}${multi && pack.address === 0 ? ` ${t('pack.master')}` : ''}`;
+  const title = `${packName(pack.address)}${multi && pack.address === 0 ? ` ${t('pack.master')}` : ''}`;
   const id = `pack-title-${pack.address}`;
   return h('article', { class: 'card pack', 'aria-labelledby': id },
     h('div', { class: 'card-head' }, h('h3', { id }, title), availabilityChip(pack.availability)),
@@ -132,9 +163,11 @@ export function overviewView(ctx) {
     const multi = status.mode === 'multi';
     const age = snapshotAge(status);
     // replaceChildren turns null into the text "null": only real nodes go in
+    const sets = Array.isArray(status.sets) ? status.sets : [];
     const children = [
       headerLine(status),
       multi ? systemCard(status.system) : null,
+      sets.length > 0 ? h('div', { class: 'grid' }, sets.map((set) => setCard(set, age))) : null,
       h('div', { class: 'grid' }, status.packs.map((pack) => packCard(pack, multi, age))),
     ].filter((child) => child !== null);
     body.replaceChildren(...children);
