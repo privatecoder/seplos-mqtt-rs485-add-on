@@ -13,6 +13,7 @@ INFO_STORAGE = b"\x04"
 INFO_ENERGY = b"\x06"
 IDENTITY_LEN = 21      # MNT05
 IDENTITY_LEN_MNT04 = 19
+IDENTITY_LEN_MNT03 = 18
 STORAGE_LEN = 10
 ENERGY_LEN = 68
 
@@ -67,19 +68,25 @@ class Identity:
 
 
 def decode_identity(info: bytes) -> Identity:
-    """MNT05 (21 bytes, current releases) or MNT04 (19 bytes, no capability mask)."""
-    if info[:3] != b"MNT" or (len(info), info[3:4]) not in ((IDENTITY_LEN, b"\x05"), (IDENTITY_LEN_MNT04, b"\x04")):
+    """
+    MNT05 (21 bytes, current releases), MNT04 (19 bytes, no capability mask) or MNT03 (18 bytes,
+    two-part patch version, e.g. the MAINT 1.5/1.6 builds of October 2026). MNT02 (no image flags)
+    is not supported.
+    """
+    formats = ((IDENTITY_LEN, b"\x05"), (IDENTITY_LEN_MNT04, b"\x04"), (IDENTITY_LEN_MNT03, b"\x03"))
+    if info[:3] != b"MNT" or (len(info), info[3:4]) not in formats:
         raise MaintFormatError(f"unknown identity format: {info.hex()}")
     capabilities = int.from_bytes(info[19:21], "big") if info[3] == 5 else 0
     if capabilities & ~KNOWN_CAPS:
         raise MaintFormatError(f"unknown capability bits 0x{capabilities:04X}")
     revision = "?" if info[6] == 0xFF else f"{info[6]:02d}"
+    version_end = 9 if info[3] == 3 else 10
     return Identity(
         info_format=info[3],
         base_version=f"{info[4]}.{info[5]:02d}.{revision}",
-        patch_version=".".join(str(b) for b in info[7:10]),
-        build_id=info[10:18].hex(),
-        image_flags=info[18],
+        patch_version=".".join(str(b) for b in info[7:version_end]),
+        build_id=info[version_end:version_end + 8].hex(),
+        image_flags=info[version_end + 8],
         capabilities=capabilities,
     )
 
@@ -157,16 +164,20 @@ def decode_group0(group0: int, ident: Identity) -> dict:
     MAINT meanings of function switch BitGroup0 (OEM: only bit 1 has a function). Configuration, not
     live state: the lock state itself comes from 64/04, the recharge stop also needs Group5 bit 1.
     """
+    # bits 3/4: positive polarity with image flag 0x08 (1 = permitted/enabled), older images inverse (0 = ...)
+    positive = ident.has_flag(FLAG_POSITIVE_POLARITY)
+
+    def polar(bit: int) -> bool:
+        return bool(group0 & bit) if positive else not group0 & bit
+
     out: dict = {
         "uart1_parameter_write_allowed": bool(group0 & 0x01),
         "uart1_maintenance_start_allowed": bool(group0 & 0x04),
-        # bit 3 = 1 means "permitted" only if the image has the feature (0x02) with positive polarity (0x08)
-        "uart1_power_rtc_allowed": (bool(group0 & 0x08)
-                                    if ident.has_flag(FLAG_UART1_POWER_RTC) and ident.has_flag(FLAG_POSITIVE_POLARITY) else None),
+        "uart1_power_rtc_allowed": polar(0x08) if ident.has_flag(FLAG_UART1_POWER_RTC) else None,
     }
-    if ident.has_flag(FLAG_PACK_LOCK) and ident.has_flag(FLAG_POSITIVE_POLARITY):
-        out["extended_off_enabled"] = bool(group0 & 0x10)
-        out["pack_lock_recorded"] = not group0 & 0x20      # bit 5 = 0: individual lock active
+    if ident.has_flag(FLAG_PACK_LOCK):
+        out["extended_off_enabled"] = polar(0x10)
+        out["pack_lock_recorded"] = not group0 & 0x20      # bit 5 = 0: individual lock active (both polarities)
     if ident.has_flag(FLAG_CONFIGURABLE_HARD_STOP):
         selection = group0 & 0xC0
         if selection in (0x00, 0x40):

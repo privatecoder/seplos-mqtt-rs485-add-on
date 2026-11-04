@@ -28,6 +28,7 @@ ENERGY_INTERVAL = 60
 ENERGY_MAX_AGE = 600
 STORAGE_INTERVAL = 600
 LOCK_INTERVAL = 60            # 64/04 on 1.6.4: carries the runtime lock state
+LOCK_PARAMETER_INTERVAL = 300  # older 1.6 without 64/04: the lock state comes from BitGroup0 of 0x47
 MARKER_INTERVAL = 60
 CALIBRATION_INTERVAL = 600
 PARAMETER_INTERVAL = 3600
@@ -124,12 +125,22 @@ class MaintSupport:
             caps.add(CAP_UART1)
             if self.identity.has_flag(md.FLAG_UART1_POWER_RTC):
                 caps.add(CAP_RTC)
-        if self.identity.has_flag(md.FLAG_PACK_LOCK) and self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
+        # lock state: from the 64/04 runtime cache, or (older images without 0x20) from BitGroup0 of 0x47
+        if self.identity.has_flag(md.FLAG_PACK_LOCK) and (self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS) or self.multi_pack):
             caps.add(CAP_LOCK)
         if self._marker_readable:
             caps.add(CAP_MARKER)
         caps.add(CAP_HARD_STOP)
         return caps
+
+    @property
+    def _lock_from_group0(self) -> bool:
+        return (self.identity is not None and self.identity.has_flag(md.FLAG_PACK_LOCK)
+                and not self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS))
+
+    @property
+    def _parameter_interval(self) -> float:
+        return LOCK_PARAMETER_INTERVAL if self._lock_from_group0 else PARAMETER_INTERVAL
 
     @property
     def _marker_readable(self) -> bool:
@@ -177,7 +188,7 @@ class MaintSupport:
             self._due(self.calibration, now, CALIBRATION_INTERVAL,
                       lambda: self._decode(bus, md.INFO_CALIBRATION_ACTIVE, md.CALIBRATION_ACTIVE_LEN, md.decode_calibration_active))
         if self.multi_pack:
-            self._due(self.parameters, now, PARAMETER_INTERVAL, lambda: self._read_parameters(bus))
+            self._due(self.parameters, now, self._parameter_interval, lambda: self._read_parameters(bus))
             if not self.serials_done:
                 self._read_serials(bus)
 
@@ -243,6 +254,9 @@ class MaintSupport:
                 lock_fresh = self.storage.fresh(now, 3 * LOCK_INTERVAL)
                 runtime = self.storage.value.get("lock_runtime") if lock_fresh else None
                 binary["pack_lock_active"] = None if runtime is None else ("ON" if runtime else "OFF")
+        elif self._lock_from_group0 and CAP_LOCK in self.capabilities:
+            fresh = self.parameters.fresh(now, 3 * LOCK_PARAMETER_INTERVAL) and self.group0 is not None
+            binary["pack_lock_active"] = ("OFF" if self.group0 & 0x20 else "ON") if fresh else None
         if self._marker_readable:
             marker = self.marker.value if self.marker.fresh(now, 3 * MARKER_INTERVAL) else None
             active = marker["maintenance_active"] if marker else None

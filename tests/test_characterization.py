@@ -1346,3 +1346,56 @@ def test_durable_marker_unaffected_by_throttled_counters(tmp_path):
     store.set("pack0.energy_charged", 1.0)
     store.set("pack0.energy_charged", 2.0)        # throttled, store dirty
     assert store.set_durable("pack0.energy_source", "maint")
+
+
+# --- MAINT 1.6 (MNT03, inverse polarity), frames captured from a 12-pack bank ---------------------------
+
+MNT03_LIVE = bytes.fromhex("4d4e540310060d010618daf61d8a93671d06")     # build 18daf61d8a93671d, flags 06
+
+
+def test_mnt03_identity_live_frame():
+    ident = api.decode_maint_identity(MNT03_LIVE)
+    assert (ident.info_format, ident.base_version, ident.patch_version) == (3, "16.06.13", "1.6")
+    assert ident.build_id == "18daf61d8a93671d" and ident.image_flags == 0x06 and ident.capabilities == 0
+
+
+def test_inverse_polarity_group0():
+    ident = api.decode_maint_identity(MNT03_LIVE)
+    d = api.decode_group0(0xFF, ident)            # old FF parameters: power denied, extended off disabled, unlocked
+    assert d["uart1_power_rtc_allowed"] is False and d["extended_off_enabled"] is False and d["pack_lock_recorded"] is False
+    d = api.decode_group0(0xC7, ident)            # bits 3/4/5 = 0
+    assert d["uart1_power_rtc_allowed"] is True and d["extended_off_enabled"] is True and d["pack_lock_recorded"] is True
+
+
+def test_maint16_bank_master_and_slave(monkeypatch, golden):
+    """The live answers of the 12-pack bank: identity, marker (master only), clock, binary 47/A2/A4, no 64/04/06."""
+    api.no_sleep(monkeypatch)
+
+    def respond(req):
+        if req.info == b"\x03":
+            return f.ascii_frame(req.adr, 0, MNT03_LIVE)
+        if req.info == b"\x02" and req.adr == 0:
+            return f.ascii_frame(req.adr, 0, bytes.fromhex("ffffffff0b"))
+        return f.ascii_frame(req.adr, 0x05, b"") if req.adr == 0 else b""
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        for adr, clock, bms_sn in ((0, "07ea0b0415172e", "SEPLOS-2302270260"), (1, "07ea0b04150d2f", "SEPLOS-2302270109")):
+            bms.ascii[(adr, 0x64)] = respond
+            bms.ascii[(adr, 0x4D)] = bytes.fromhex(clock)
+            group0 = 0xDF if adr else 0xFF                     # slave: bit 5 = 0, individual lock active
+            bms.binary[(adr, 0x47)] = f.parameter_info(switches=bytes([group0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x80]))[1:]
+            bms.binary[(adr, 0xA2)] = b"EMU11011OS-XXXX-20220120-00001"
+            bms.binary[(adr, 0xA4)] = bms_sn.encode().ljust(30)
+        master, slave = api.make_pack(0), api.make_pack(1)
+        m, _ = api.poll(master, bms)
+        s, _ = api.poll(slave, bms)
+    assert m["maint"]["normal"]["maint_version"] == "1.6" and m["info"]["normal"]["firmware_patch"] == "16.06.13"
+    assert m["maint"]["binary"]["maintenance_mode"] == "OFF" and m["maint"]["normal"]["effective_slave_count"] == 11
+    assert m["maint"]["binary"]["pack_lock_active"] == "OFF" and s["maint"]["binary"]["pack_lock_active"] == "ON"
+    assert "maintenance_mode" not in s["maint"]["binary"] and "storage_problem" not in m["maint"]["binary"]
+    assert m["clock"]["normal"]["bms_time"] == "2026-11-04T21:23:46" and m["clock"]["normal"]["clock_offset"] == 33826
+    assert s["info"]["normal"]["bms_serial_number"] == "SEPLOS-2302270109"
+    assert m["maint"]["normal"]["recharge_stop_mode"] == "soft stop"
+    assert api.capabilities(master) == {"maint", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc"}
+    assert not any(r.cid2 == 0x64 and r.info in (b"\x04", b"\x06") for r in bms.requests)
+    golden("poll_maint16_bank", {"master": m, "slave": s})
