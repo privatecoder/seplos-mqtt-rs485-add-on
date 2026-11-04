@@ -290,3 +290,40 @@ def test_discovery_firmware_refresh(golden):
     api.firmware_refresh(disc, 0, {"normal": {"firmware_version": "16.06", "firmware_patch": "16.06.13+"}})
     api.firmware_refresh(disc, 1, {"normal": {"firmware_version": "16.06", "firmware_patch": "16.06 (unknown, only derivable for the master)"}})
     golden("discovery_firmware_refresh", client.as_records())
+
+
+# --- main loop: runtime topics, heartbeat, availability, exit ------------------------------------
+
+def _runtime_records(client):
+    """Main-loop publishes without the discovery configs (covered by their own goldens)."""
+    return [r for r in client.as_records() if not r["topic"].startswith("homeassistant/")]
+
+
+def test_main_loop_single_pack(monkeypatch, golden):
+    client = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2)
+    records = _runtime_records(client)
+    topics = [r["topic"] for r in records]
+    assert "seplos/pack-0/sensors" in topics and "seplos/pack-0/heartbeat" in topics
+    assert topics[-2:] == ["seplos/availability", "seplos/pack-0/availability"]   # graceful exit
+    assert records[-2]["payload"] == "offline" and records[-2]["retain"] is True
+    assert any(r["topic"].startswith("homeassistant/") for r in client.as_records())
+    golden("main_loop_single_pack", records)
+
+
+def test_main_loop_multi_pack(monkeypatch, golden):
+    bms = FakeBms()
+    for adr in (0, 1):
+        bms.ascii[(adr, 0x42)] = f.telemetry_info()
+        bms.ascii[(adr, 0x44)] = f.telesignal_info()
+        bms.ascii[(adr, 0x51)] = f.device_info_info()
+    bms.ascii[(0x02, 0x60)] = ("rtn", 0x00)
+    bms.modbus[(0x03, 0x001F, 9)] = [0] * 9
+    bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
+    client = api.run_main(monkeypatch, bms, number_of_packs=2, telemetry_polls=4)
+    records = _runtime_records(client)
+    topics = [r["topic"] for r in records]
+    assert "seplos/system/sensors" in topics and "seplos/system/availability" in topics
+    golden("main_loop_multi_pack", records)
+    # discovery as published by main() equals the startup sequence + firmware refresh
+    disc_records = [r for r in client.as_records() if r["topic"].startswith("homeassistant/")]
+    golden("main_loop_multi_pack_discovery", disc_records)
