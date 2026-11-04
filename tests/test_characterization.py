@@ -623,3 +623,37 @@ def test_inconsistent_cell_count_rejected(monkeypatch):
             bms = _single_pack_bms()
             bms.ascii[(0, cid2)] = bytes(bad)
             assert api.poll(api.make_pack(0), bms) == (None, False), hex(cid2)
+
+
+# --- step 3: bus ownership, timing, strict framing -------------------------------------------------
+
+def test_bus_quiet_gap_on_every_transmission(monkeypatch):
+    """R04: every write, incl. retries, starts >= 1 s after the last bus activity."""
+    trace = api.bus_trace_poll(monkeypatch, _single_pack_bms(), flaky_first_42=True)
+    writes = [t for op, t in trace if op == "write"]
+    reads = [t for op, t in trace if op == "read"]
+    assert len(writes) >= 8
+    for w in writes[1:]:
+        last_read = max(r for r in reads if r <= w)
+        assert w - last_read >= 1.0 - 1e-9, trace
+
+
+def test_strict_envelope_rejected(monkeypatch):
+    """R03: checksum-valid frames with a wrong VER/CID1/LENGTH/EOI are not accepted."""
+    api.no_sleep(monkeypatch)
+    good = f.ascii_frame(0, 0, f.telemetry_info())
+    variants = [
+        f.ascii_frame(0, 0, f.telemetry_info(), ver=0x21),
+        f.ascii_frame(0, 0, f.telemetry_info(), cid1=0x47),
+        api.with_checksum(good[:9] + b"F096" + good[13:]),      # wrong LENGTH nibble
+        good[:-1] + b"\n",                                       # wrong EOI
+    ]
+    with api.mode(1):
+        for raw in variants:
+            bms = _single_pack_bms()
+            bms.ascii[(0, 0x42)] = lambda req, raw=raw: raw
+            assert api.poll(api.make_pack(0), bms) == (None, False), raw
+
+
+def test_length_field_wraps_correctly():
+    assert api.length_field(46) == 0x002E and api.length_field(2) == 0xE002 and api.length_field(150) == 0x1096

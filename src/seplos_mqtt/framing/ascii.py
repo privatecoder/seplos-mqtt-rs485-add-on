@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 
 logger = logging.getLogger("SeplosBMS.framing")
 
@@ -22,69 +23,56 @@ OVERHEAD = 18
 CID2_INTRA_PACK = 0x5A
 
 
+class FrameError(ValueError):
+    """A received frame that is not a well-formed Seplos ASCII frame."""
+
+
+@dataclass(frozen=True)
+class Frame:
+    address: int
+    code: int          # RTN of an answer (or CID2 0x5A of intra-pack traffic)
+    info: bytes        # binary INFO
+    raw: bytes
+
+
 def checksum(body: bytes) -> int:
     """Two's complement of the character sum, modulo 65536."""
     return (-sum(body)) & 0xFFFF
 
 
 def length_field(info_ascii_len: int) -> int:
-    """LENGTH field for an INFO of the given number of ASCII characters."""
-    if info_ascii_len == 0:
-        return 0
-    lchksum = (info_ascii_len & 0xF) + ((info_ascii_len >> 4) & 0xF) + ((info_ascii_len >> 8) & 0xF)
-    lchksum %= 16
-    lchksum ^= 0xF
-    lchksum += 1
-    return (lchksum << 12) + info_ascii_len
+    """LENGTH field: check nibble (two's complement of the three length nibbles) + 12-bit length."""
+    if not 0 <= info_ascii_len <= 0xFFF:
+        raise ValueError(f"INFO too long: {info_ascii_len}")
+    nibbles = (info_ascii_len & 0xF) + ((info_ascii_len >> 4) & 0xF) + ((info_ascii_len >> 8) & 0xF)
+    return (((-nibbles) & 0xF) << 12) | info_ascii_len
 
 
-def encode(address: int, cid2: int, info: bytes = b"01") -> bytes:
-    """Encode a request; `info` is already hex ASCII."""
-    body = f"{VER:02X}{address:02X}{CID1:02X}{cid2:02X}{length_field(len(info)):04X}".encode() + info
+def encode(address: int, cid2: int, info: bytes = b"\x01") -> bytes:
+    """Encode a request; `info` is binary and sent as hex ASCII."""
+    info_hex = info.hex().upper().encode()
+    body = f"{VER:02X}{address:02X}{CID1:02X}{cid2:02X}{length_field(len(info_hex)):04X}".encode() + info_hex
     return SOI + body + f"{checksum(body):04X}".encode() + EOI
 
 
-def hex_byte(data: bytes, offset: int) -> int:
-    return int(data[offset:offset + 2].decode("ascii"), 16)
-
-
-def hex_word(data: bytes, offset: int) -> int:
-    return int(data[offset:offset + 4].decode("ascii"), 16)
-
-
-def is_hex(data: bytes) -> bool:
+def parse(raw: bytes) -> Frame:
+    """Validate the complete envelope (SOI/EOI, VER, CID1, LENGTH incl. check nibble, hex, checksum)."""
+    if len(raw) < OVERHEAD or raw[:1] != SOI or raw[-1:] != EOI:
+        raise FrameError("bad SOI/EOI or too short")
     try:
-        bytes.fromhex(data.decode("ascii"))
-        return True
-    except (ValueError, UnicodeDecodeError):
-        return False
-
-
-def checksum_ok(raw: bytes) -> bool:
-    """Character checksum of a received frame (raw incl. ~ and CR)."""
-    try:
-        return checksum(raw[1:-5]) == hex_word(raw, -5)
-    except (ValueError, UnicodeDecodeError):
-        return False
-
-
-def address_of(raw: bytes) -> int | None:
-    try:
-        return hex_byte(raw, 3)
-    except (ValueError, UnicodeDecodeError):
-        return None
-
-
-def rtn_of(raw: bytes) -> int | None:
-    """RTN (or the CID2 0x5A echo of intra-pack answers)."""
-    try:
-        return hex_byte(raw, 7)
-    except (ValueError, UnicodeDecodeError):
-        return None
-
-
-def info_ascii(raw: bytes) -> bytes:
-    return raw[13:-5]
+        header = bytes.fromhex(raw[1:13].decode("ascii"))
+        info = bytes.fromhex(raw[13:-5].decode("ascii"))
+        received_checksum = int(raw[-5:-1].decode("ascii"), 16)
+    except (ValueError, UnicodeDecodeError) as e:
+        raise FrameError(f"non-hex characters: {e}") from e
+    ver, address, cid1, code, length = header[0], header[1], header[2], header[3], int.from_bytes(header[4:6], "big")
+    if ver != VER or cid1 != CID1:
+        raise FrameError(f"VER/CID1 {ver:02X}/{cid1:02X}")
+    if length != length_field(2 * len(info)):
+        raise FrameError(f"LENGTH {length:04X} does not match {2 * len(info)} INFO characters")
+    if checksum(raw[1:-5]) != received_checksum:
+        raise FrameError("checksum mismatch")
+    return Frame(address, code, info, raw)
 
 
 # Expected binary INFO length: a fixed number, or a function of the decoded INFO
@@ -92,38 +80,24 @@ def info_ascii(raw: bytes) -> bytes:
 ExpectedLength = int | Callable[[bytes], int | None]
 
 
-def min_frame_length(expected: ExpectedLength) -> int:
-    return OVERHEAD + (2 * expected if isinstance(expected, int) else 6)
-
-
 def validate_response(raw: bytes, address: int, expected: ExpectedLength) -> bytes | None:
-    """
-    Validate a normal response (RTN 00) from `address` whose INFO has the expected binary length.
-    Returns the binary INFO or None.
-    """
-    if len(raw) < min_frame_length(expected):
-        logger.debug("Frame too short: %s", len(raw))
+    """A normal answer (RTN 00) from `address` whose INFO has the expected length; returns the INFO."""
+    try:
+        frame = parse(raw)
+    except FrameError as e:
+        logger.debug("Invalid frame: %s", e)
         return None
-    adr = raw[3:5]
-    info = info_ascii(raw)
-    if not is_hex(adr) or hex_byte(adr, 0) != address:
-        logger.debug("Frame address mismatch: %s", adr)
+    if frame.address != address:
+        logger.debug("Frame address mismatch: %s", frame.address)
         return None
-    if len(info) % 2 or not is_hex(info):
-        logger.debug("Frame includes non-hexadecimal characters: %s", info)
+    if frame.code != 0x00:
+        logger.debug("Frame RTN set: %02X", frame.code)
         return None
-    payload = bytes.fromhex(info.decode("ascii"))
-    length = expected if isinstance(expected, int) else expected(payload)
-    if length is None or len(payload) != length:
-        logger.debug("Frame length mismatch - expected: %s, got: %s", length, len(payload))
+    length = expected if isinstance(expected, int) else expected(frame.info)
+    if length is None or len(frame.info) != length:
+        logger.debug("Frame length mismatch - expected: %s, got: %s", length, len(frame.info))
         return None
-    if not checksum_ok(raw):
-        logger.debug("Frame checksum mismatch")
-        return None
-    if raw[7:9] != b"00":
-        logger.debug("Frame error flag (RTN) set: %s", raw[7:9])
-        return None
-    return payload
+    return frame.info
 
 
 def is_intra_pack(raw: bytes) -> bool:
@@ -131,17 +105,15 @@ def is_intra_pack(raw: bytes) -> bool:
     return len(raw) >= OVERHEAD and raw[:1] == SOI and raw[7:9] == b"5A"
 
 
+INTRA_PACK_INFO_LEN = 32
+
+
 def validate_intra_pack_answer(raw: bytes, address: int) -> bytes | None:
     """A pack's own intra-pack record: 32 byte INFO, CID2 0x5A instead of a RTN."""
     try:
-        if (
-            len(raw) == 64 + OVERHEAD
-            and raw[:1] == SOI
-            and raw[7:13] == b"5AC040"
-            and hex_byte(raw, 3) == address
-            and checksum_ok(raw)
-        ):
-            return bytes.fromhex(info_ascii(raw).decode("ascii"))
-    except (ValueError, UnicodeDecodeError):
-        pass
+        frame = parse(raw)
+    except FrameError:
+        return None
+    if frame.address == address and frame.code == CID2_INTRA_PACK and len(frame.info) == INTRA_PACK_INFO_LEN:
+        return frame.info
     return None

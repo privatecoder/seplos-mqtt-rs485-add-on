@@ -9,6 +9,7 @@ from datetime import datetime
 
 from .config import Config
 from .decoders import alarms, identity, intrapack, parameters, telemetry
+from .energy import EnergyGuard
 from .framing.ascii import ExpectedLength
 from .state import StateStore
 from .transport import NO_ANSWER, SerialBus
@@ -37,14 +38,6 @@ PARAMETER_LEN = 169
 # the extended status (0x5A) is kept over failed requests for at most this long
 STATUS_MAX_AGE_SECONDS = 60
 
-# A pause between consecutive requests is mandatory or the responses get corrupted
-REQUEST_GAP_SECONDS = 1
-
-
-def request_gap() -> None:
-    time.sleep(REQUEST_GAP_SECONDS)
-
-
 def now_iso() -> str:
     """Local time with UTC offset, for HA timestamp sensors."""
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -69,12 +62,12 @@ class BatteryPack:
         self.extended_status: dict | None = None
         self.extended_status_ts = 0.0
         self.cell_count: int | None = None
-        self.energy = telemetry.EnergyGuard(address, store if store is not None else StateStore(None))
+        self.energy = EnergyGuard(address, store if store is not None else StateStore(None))
 
     # --- request helpers ----------------------------------------------------------------------
 
     def _request(self, cid2: int, expected: ExpectedLength, decoder: Callable[[bytes], dict], label: str,
-                 info: bytes = b"01") -> dict | None:
+                 info: bytes = b"\x01") -> dict | None:
         payload = self.bus.request(self.address, cid2, expected, label, info)
         if payload is None:
             return None
@@ -103,7 +96,6 @@ class BatteryPack:
             return
         self.info_attempts += 1
 
-        request_gap()
         feedback = self._request(0x51, DEVICE_INFO_LEN, identity.decode_device_info, "DeviceInfo", info=b"")
         if feedback is None:
             if self.info_attempts >= self.INFO_MAX_ATTEMPTS:
@@ -115,7 +107,6 @@ class BatteryPack:
         # (UART1) only knows 0x42/0x44/0x4F/0x51/0x60-0x63
         if not self.config.multi_pack:
             for cid2, key, label in ((0xA2, "serial_number", "SerialNumber"), (0xA4, "bms_serial_number", "BmsSerialNumber")):
-                request_gap()
                 serial = self._request(cid2, SERIAL_LEN, lambda raw, k=key: identity.decode_serial_number(raw, k), label, info=b"")
                 if serial is not None:
                     info["normal"].update(serial["normal"])
@@ -147,14 +138,12 @@ class BatteryPack:
         """
         silent_rounds = 0
         for _ in range(3):
-            request_gap()
             rtn = self.bus.request_rtn(self.address, 0xAA)
             if rtn == 0x04:
                 return "16.06.03-16.06.12"
             if rtn != NO_ANSWER:
                 logger.debug("Pack%s:Patch probe 0xAA: unexpected answer %s", self.address, rtn)
                 return "16.06 (unknown)"
-            request_gap()
             if self.bus.request_rtn(self.address, 0x51) == 0x00:
                 silent_rounds += 1
         return "16.06.13+" if silent_rounds == 3 else "16.06 (unknown)"
@@ -171,18 +160,15 @@ class BatteryPack:
         if self.address != 0:
             return "16.06 (unknown, only derivable for the master)"
 
-        request_gap()
         if self.bus.request_rtn(0x02, 0x60) == 0x00:
             # Modbus answers can get lost on the shared bus, so retry and cross-check
             for _ in range(3):
-                request_gap()
                 result = self.bus.probe_modbus(0x03, 0x001F, 9)
                 logger.debug("Pack%s:Patch probe Modbus 0x001F x9: %s", self.address, result)
                 if result is True:
                     return "16.06.13+"
                 if result is False:
                     return "16.06.12"
-                request_gap()
                 result = self.bus.probe_modbus(0x03, 0x9000, 21)
                 logger.debug("Pack%s:Patch probe Modbus 0x9000 x21: %s", self.address, result)
                 if result is True:
@@ -191,9 +177,7 @@ class BatteryPack:
                     return "16.06.13+"
             return "16.06.12+"
 
-        request_gap()
         if self.bus.request_rtn(0x12, 0x60) == 0x00:
-            request_gap()
             result = self.bus.probe_modbus(0x04, 0x0000, 21)
             if result is True:
                 return "16.06.11"
@@ -201,7 +185,6 @@ class BatteryPack:
                 return "16.06.04-16.06.05"
             return "16.06.04-16.06.11"
 
-        request_gap()
         if self.bus.request_rtn(0x12, 0x61) == 0x00:
             return "16.06.03"
         return "16.06 (unknown)"
@@ -217,7 +200,6 @@ class BatteryPack:
         if time.time() - self.parameters_ts < self.PARAMETER_REFRESH_SECONDS:
             return
         self.parameters_ts = time.time()
-        request_gap()
         try:
             feedback = self._request(
                 0x47, PARAMETER_LEN, lambda raw: {"normal": parameters.decode_ascii_answer(raw)}, "Parameters", info=b""
@@ -248,7 +230,6 @@ class BatteryPack:
                 return None, False
             data["telemetry"] = telemetry_feedback
 
-            request_gap()
             telesignal_feedback = self._request(0x44, TELESIGNAL_LEN, alarms.decode, "Telesignalization")
             if telesignal_feedback is None:
                 return None, False
@@ -259,7 +240,6 @@ class BatteryPack:
                 data["info"] = self.info
 
             if not self.config.multi_pack:
-                request_gap()
                 extended_status = self._fetch_extended_status()
                 now = time.time()
                 if extended_status is not None:

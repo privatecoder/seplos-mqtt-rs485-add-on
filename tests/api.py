@@ -61,7 +61,7 @@ def no_sleep(monkeypatch) -> None:
 
 # --- framing ----------------------------------------------------------------------------------
 
-def encode_request(address: int, cid2: int, info: bytes = b"01") -> bytes:
+def encode_request(address: int, cid2: int, info: bytes = b"\x01") -> bytes:
     return af.encode(address, cid2, info)
 
 
@@ -275,3 +275,53 @@ def run_main(
             pass
     assert not bms.protocol_errors, bms.protocol_errors
     return client, port
+
+
+def length_field(n: int) -> int:
+    return af.length_field(n)
+
+
+def with_checksum(raw: bytes) -> bytes:
+    """Recompute the character checksum of a (deliberately modified) frame."""
+    body = raw[1:-5]
+    return b"~" + body + f"{(-sum(body)) & 0xFFFF:04X}".encode() + b"\r"
+
+
+def bus_trace_poll(monkeypatch, bms: FakeBms, flaky_first_42: bool = False) -> list[tuple[str, float]]:
+    """One poll on a bus with a simulated clock; returns (write|read, time) events."""
+    monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
+    clock = {"t": 0.0}
+    trace: list[tuple[str, float]] = []
+
+    class TracingSerial(FakeSerial):
+        def write(self, data):
+            trace.append(("write", clock["t"]))
+            clock["t"] += 0.02
+            return super().write(data)
+
+        def read_until(self, terminator=b"\n", size=None):
+            clock["t"] += 0.1
+            trace.append(("read", clock["t"]))
+            return super().read_until(terminator, size)
+
+        def read(self, size=1):
+            clock["t"] += 0.1
+            trace.append(("read", clock["t"]))
+            return super().read(size)
+
+    if flaky_first_42:
+        from frames import ascii_frame, telemetry_info
+        calls = {"n": 0}
+
+        def flaky(req):
+            calls["n"] += 1
+            return b"garbage\r" if calls["n"] == 1 else ascii_frame(0, 0, telemetry_info())
+        bms.ascii[(0, 0x42)] = flaky
+
+    def sleep(seconds):
+        clock["t"] += seconds
+
+    bus = SerialBus(TracingSerial(bms), clock=lambda: clock["t"], sleep=sleep)
+    pack = BatteryPack(0, bus, config())
+    pack.read()
+    return trace

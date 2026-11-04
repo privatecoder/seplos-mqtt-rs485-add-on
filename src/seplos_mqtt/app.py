@@ -19,7 +19,7 @@ from . import health, topics
 from .config import Config
 from .decoders.identity import device_firmware
 from .discovery import Discovery
-from .pack import BatteryPack, now_iso, request_gap
+from .pack import BatteryPack, now_iso
 from .state import StateStore
 from .system import SystemReader
 from .transport import SerialBus
@@ -127,7 +127,6 @@ def publish_system_data(state: AppState, reader: SystemReader) -> None:
     """Read and publish the system values (multi pack mode via the CAN port RS485 bus only)."""
     if not state.config.multi_pack or not state.packs:
         return
-    request_gap()
     data = reader.read(state.bus)
     base = state.config.mqtt_topic
     state.client.publish(topics.system_availability(base), "online" if data is not None else "offline", retain=False)
@@ -240,8 +239,6 @@ def main(config: Config | None = None) -> None:
         while True:
             try:
                 poll_pack(state, state.packs[index], discovery)
-                # mandatory delay between requests
-                request_gap()
                 index += 1
                 if index >= len(state.packs):
                     index = 0

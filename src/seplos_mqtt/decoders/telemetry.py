@@ -1,11 +1,7 @@
 """CID2 0x42 telemetry (analog values)."""
 from __future__ import annotations
 
-import logging
-
 from .common import KELVIN_OFFSET, s16, u16
-
-logger = logging.getLogger("SeplosBMS.telemetry")
 
 # The layout depends on the cell count M (byte 2): cell voltages at 3..2+2M, all later fields
 # relative to BASE = 3 + 2M (for 16 cells BASE = 35).
@@ -95,39 +91,3 @@ def decode(info: bytes, min_cell_voltage: float, max_cell_voltage: float) -> dic
         "delta_cell_temperature": round(max(temps) - min(temps), 1),
     })
     return {"normal": feedback}
-
-
-class EnergyGuard:
-    """
-    The firmware sends 6500 (650.0 kWh) once a counter reaches 65000 (6500 kWh). A 650.0 after a
-    larger value is that fallback: keep the last valid value instead of publishing a false reset.
-    The last value survives restarts via the state store; without any history a 650.0 is ambiguous
-    and published as unknown (None) until the counter moves.
-    """
-
-    def __init__(self, pack_address: int, store=None) -> None:
-        self.pack_address = pack_address
-        self.store = store
-        self.overflow_logged = False
-
-    def _key(self, counter: str) -> str:
-        return f"pack{self.pack_address}.{counter}"
-
-    def _last(self, counter: str) -> float | None:
-        return self.store.get(self._key(counter)) if self.store is not None else None
-
-    def apply(self, normal: dict) -> None:
-        for counter in ENERGY_KEYS:
-            value = normal[counter]
-            last = self._last(counter)
-            if value == ENERGY_FALLBACK_KWH:
-                if last is None:
-                    value = None
-                elif last > ENERGY_FALLBACK_KWH:
-                    if not self.overflow_logged:
-                        logger.warning("Pack%s:Energy counter exceeded 6500 kWh, the BMS no longer reports it", self.pack_address)
-                        self.overflow_logged = True
-                    value = last
-            if value is not None and self.store is not None:
-                self.store.set(self._key(counter), value)
-            normal[counter] = value

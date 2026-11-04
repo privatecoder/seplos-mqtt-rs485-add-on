@@ -8,7 +8,6 @@ import logging
 
 from .decoders import system as system_decoder
 from .framing.modbus import Status
-from .pack import request_gap
 from .transport import SerialBus
 
 logger = logging.getLogger("SeplosBMS.system")
@@ -63,7 +62,6 @@ class SystemReader:
         """Force charge flags; disabled after repeated exceptions (firmware < 16.06.11)."""
         if self.flags_unsupported:
             return None
-        request_gap()
         status, value = bus.read_modbus_single_wide(0x03, FLAGS_REGISTER)
         if status is Status.OK and value is not None:
             self.flags_failures = 0

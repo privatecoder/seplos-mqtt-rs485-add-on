@@ -1,12 +1,16 @@
 """
-The serial bus. All requests to the BMS (Seplos ASCII and Modbus RTU) go through one SerialBus,
-so later additions (MAINT binary frames, a gated command path) share the same owner.
+The serial bus: the single owner of the serial port. Every request (Seplos ASCII, Modbus RTU,
+later MAINT binary frames and gated commands) runs as one transaction under one lock, and every
+transmission waits for a quiet gap after the last bus activity. Without that gap the BMS answers
+get corrupted, so callers never sleep on their own.
 """
 from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
+from collections.abc import Callable
 from typing import Protocol
 
 from .decoders import intrapack
@@ -17,6 +21,9 @@ logger = logging.getLogger("SeplosBMS.bus")
 
 # request_rtn(): nothing received at all (distinct from an invalid answer)
 NO_ANSWER = -1
+
+# minimum quiet time between the end of one exchange and the next transmission
+QUIET_GAP_SECONDS = 1.0
 
 
 class SerialPort(Protocol):
@@ -30,10 +37,21 @@ class SerialPort(Protocol):
 
 class SerialBus:
     FRAME_READ_RETRIES = 5
-    INTRA_PACK_RETRY_DELAY = 0.2
 
-    def __init__(self, port: SerialPort) -> None:
+    def __init__(
+        self,
+        port: SerialPort,
+        gap: float = QUIET_GAP_SECONDS,
+        clock: Callable[[], float] | None = None,
+        sleep: Callable[[float], None] | None = None,
+    ) -> None:
         self.port = port
+        self.gap = gap
+        # looked up at call time, so a patched time module is honored
+        self._clock = clock or (lambda: time.monotonic())
+        self._sleep = sleep or (lambda seconds: time.sleep(seconds))
+        self._lock = threading.Lock()
+        self._last_activity: float | None = None
 
     @property
     def is_open(self) -> bool:
@@ -47,15 +65,40 @@ class SerialBus:
         return False
 
     def close(self) -> None:
-        self.port.close()
+        with self._lock:
+            self.port.close()
 
     def flush(self) -> None:
-        self.port.flushOutput()
-        self.port.flushInput()
+        with self._lock:
+            self.port.flushOutput()
+            self.port.flushInput()
+
+    # --- timing ---------------------------------------------------------------------------
+
+    def _wait_quiet(self) -> None:
+        if self._last_activity is not None:
+            remaining = self.gap - (self._clock() - self._last_activity)
+            if remaining > 0:
+                self._sleep(remaining)
+
+    def _mark_activity(self) -> None:
+        self._last_activity = self._clock()
+
+    def _send(self, data: bytes, reset_input: bool = False) -> None:
+        self._wait_quiet()
+        if reset_input:
+            self.port.flushInput()
+        self.port.write(data)
+
+    def _receive_frame(self, max_skipped: int = 5) -> bytes:
+        try:
+            return self._read_frame(max_skipped)
+        finally:
+            self._mark_activity()
 
     # --- Seplos ASCII ---------------------------------------------------------------------
 
-    def read_frame(self, max_skipped: int = 5) -> bytes:
+    def _read_frame(self, max_skipped: int) -> bytes:
         """Read the next frame, logging and skipping interleaved intra-pack frames."""
         raw = self.port.read_until(af.EOI)
         for _ in range(max_skipped):
@@ -67,36 +110,32 @@ class SerialBus:
     @staticmethod
     def _skip_intra_pack(raw: bytes) -> bool:
         """Master polling its slaves (CID2 0x5A on RS485-1/2): debug-log and skip."""
-        try:
-            if not af.is_intra_pack(raw):
-                return False
-            address = int(raw[3:5], 16)
-            if logger.isEnabledFor(logging.DEBUG):
-                if raw[9:13] == b"0000":
-                    logger.debug("Intra-pack: master requests pack %s", address)
-                elif raw[9:13] == b"C040" and len(raw) == 82:
-                    decoded = intrapack.decode_record(bytes.fromhex(af.info_ascii(raw).decode("ascii")))
-                    logger.debug("Intra-pack: pack %s answers %s", address, json.dumps(decoded))
+        if not af.is_intra_pack(raw):
+            return False
+        if logger.isEnabledFor(logging.DEBUG):
+            try:
+                frame = af.parse(raw)
+                if not frame.info:
+                    logger.debug("Intra-pack: master requests pack %s", frame.address)
+                elif len(frame.info) == af.INTRA_PACK_INFO_LEN:
+                    logger.debug("Intra-pack: pack %s answers %s", frame.address, json.dumps(intrapack.decode_record(frame.info)))
                 else:
                     logger.debug("Intra-pack: unexpected frame %s", raw)
-            return True
-        except (UnicodeDecodeError, ValueError):
-            return False
+            except af.FrameError:
+                logger.debug("Intra-pack: invalid frame %s", raw)
+        return True
 
-    def request(self, address: int, cid2: int, expected: af.ExpectedLength, label: str, info: bytes = b"01") -> bytes | None:
-        """Request a normal answer whose INFO has the expected binary length; returns the binary INFO."""
+    def request(self, address: int, cid2: int, expected: af.ExpectedLength, label: str, info: bytes = b"\x01") -> bytes | None:
+        """Request a normal answer whose binary INFO has the expected length; returns that INFO."""
         command = af.encode(address, cid2, info)
         logger.debug("Pack%s:%s_command: %s", address, label, command)
-        for attempt in range(self.FRAME_READ_RETRIES):
-            self.port.write(command)
-            raw = self.read_frame()
-            if len(raw) < af.min_frame_length(expected):
-                logger.debug("Pack%s:%s attempt %s: insufficient length", address, label, attempt + 1)
-                continue
-            payload = af.validate_response(raw, address, expected)
-            if payload is not None:
-                return payload
-            logger.debug("Pack%s:%s attempt %s: validation failed", address, label, attempt + 1)
+        with self._lock:
+            for attempt in range(self.FRAME_READ_RETRIES):
+                self._send(command)
+                payload = af.validate_response(self._receive_frame(), address, expected)
+                if payload is not None:
+                    return payload
+                logger.debug("Pack%s:%s attempt %s: no valid answer", address, label, attempt + 1)
         logger.error("Pack%s:Failed to read %s after %s retries", address, label.lower(), self.FRAME_READ_RETRIES)
         return None
 
@@ -105,42 +144,47 @@ class SerialBus:
         Send a command without INFO and return the RTN of the answer: NO_ANSWER if nothing at all
         was received, None for an invalid answer.
         """
-        self.port.flushInput()
-        self.port.write(af.encode(address, cid2, b""))
-        raw = self.read_frame()
+        with self._lock:
+            self._send(af.encode(address, cid2, b""), reset_input=True)
+            raw = self._receive_frame()
         if not raw:
             return NO_ANSWER
-        if len(raw) < af.OVERHEAD or raw[:1] != af.SOI:
+        try:
+            frame = af.parse(raw)
+        except af.FrameError:
             return None
-        if af.address_of(raw) != address or not af.checksum_ok(raw):
-            return None
-        return af.rtn_of(raw)
+        return frame.code if frame.address == address else None
 
     def request_intra_pack(self, address: int) -> bytes | None:
         """The pack's own intra-pack record (CID2 0x5A), only served on RS485-1/2 (UART0)."""
         command = af.encode(address, af.CID2_INTRA_PACK, b"")
-        for _ in range(self.FRAME_READ_RETRIES):
-            self.port.flushInput()
-            self.port.write(command)
-            payload = af.validate_intra_pack_answer(self.port.read_until(af.EOI), address)
-            if payload is not None:
-                return payload
-            time.sleep(self.INTRA_PACK_RETRY_DELAY)
+        with self._lock:
+            for _ in range(self.FRAME_READ_RETRIES):
+                self._send(command, reset_input=True)
+                payload = af.validate_intra_pack_answer(self._receive_frame(max_skipped=0), address)
+                if payload is not None:
+                    return payload
         logger.debug("Pack%s:No valid intra-pack (0x5A) answer", address)
         return None
 
     # --- Modbus RTU -----------------------------------------------------------------------
 
+    def _modbus_exchange(self, request: bytes, response_length: int) -> bytes:
+        with self._lock:
+            self._send(request, reset_input=True)
+            try:
+                return self.port.read(response_length)
+            finally:
+                self._mark_activity()
+
     def read_modbus(self, function_code: int, register: int, count: int) -> tuple[modbus.Status | None, list[int] | None]:
-        self.port.flushInput()
-        self.port.write(modbus.encode_read(function_code, register, count))
-        return modbus.parse_read(self.port.read(modbus.response_length(count)), function_code, count)
+        response = self._modbus_exchange(modbus.encode_read(function_code, register, count), modbus.response_length(count))
+        return modbus.parse_read(response, function_code, count)
 
     def read_modbus_single_wide(self, function_code: int, register: int) -> tuple[modbus.Status | None, int | None]:
         """One register from a handler with the non-standard 16-bit byte count (8 byte answer)."""
-        self.port.flushInput()
-        self.port.write(modbus.encode_read(function_code, register, 1))
-        return modbus.parse_single_wide_count(self.port.read(8), function_code)
+        response = self._modbus_exchange(modbus.encode_read(function_code, register, 1), 8)
+        return modbus.parse_single_wide_count(response, function_code)
 
     def probe_modbus(self, function_code: int, register: int, count: int) -> bool | None:
         """True for a valid response, False for an exception response, None for no/invalid answer."""
