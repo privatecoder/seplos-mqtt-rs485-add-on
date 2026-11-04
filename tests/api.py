@@ -603,3 +603,7 @@ def app_with_discovery(monkeypatch):
 
 def retry_discovery(state) -> None:
     app.retry_discovery(state)
+
+
+def state_store(path) -> StateStore:
+    return StateStore(str(path))

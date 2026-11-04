@@ -1308,3 +1308,41 @@ def test_failed_discovery_publish_is_reconciled(monkeypatch):
     api.retry_discovery(state)
     assert any(r["topic"].endswith("/maint_version/config") and r["payload"] for r in client.as_records())
     assert not disc.failed
+
+
+def test_energy_source_write_failure_retried_and_unknown(monkeypatch, tmp_path):
+    """C01: until the source marker is on disk the energy is unknown; the write is retried unchanged."""
+    api.no_sleep(monkeypatch)
+    import json
+    import os
+    state_file = tmp_path / "state.json"
+    state_file.write_text(json.dumps({"pack0.energy_charged": 6499.9, "pack0.energy_discharged": 1234.5}))
+    real_replace = os.replace
+    calls = {"n": 0}
+
+    def flaky_replace(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 2:                    # the source marker write
+            raise OSError("disk full")
+        return real_replace(src, dst)
+    monkeypatch.setattr(os, "replace", flaky_replace)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500, energy_discharged=12346)
+        bms.ascii[(0, 0x64)] = _maint_responder(energy=f.maint_energy(charged=70001, discharged=12346))
+        pack = api.make_pack(0, state_file=state_file)
+        data, ok = api.poll(pack, bms)
+        assert ok and data["telemetry"]["normal"]["energy_charged"] is None          # not on disk yet
+        assert "pack0.energy_source" not in json.loads(state_file.read_text())
+        data, ok = api.poll(pack, bms)                                               # unchanged values: retried
+        assert data["telemetry"]["normal"]["energy_charged"] == 7000.1
+        assert json.loads(state_file.read_text())["pack0.energy_source"] == "maint"
+
+
+def test_durable_marker_unaffected_by_throttled_counters(tmp_path):
+    """C01: a throttled ordinary update doesn't make an already durable marker 'failed'."""
+    store = api.state_store(tmp_path / "state.json")
+    assert store.set_durable("pack0.energy_source", "maint")
+    store.set("pack0.energy_charged", 1.0)
+    store.set("pack0.energy_charged", 2.0)        # throttled, store dirty
+    assert store.set_durable("pack0.energy_source", "maint")

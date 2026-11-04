@@ -26,6 +26,7 @@ class StateStore:
         self.data: dict = {}
         self._dirty = False
         self._last_write: float | None = None
+        self._durable_pending: set[str] = set()
         if self.path and self.path.exists():
             try:
                 data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -49,13 +50,27 @@ class StateStore:
     def get(self, key: str, default=None):
         return self.data.get(key, default)
 
-    def set(self, key: str, value, durable: bool = False) -> bool:
-        """Store a value; durable=True writes it to disk right away (not throttled). False if that write failed."""
+    def set(self, key: str, value) -> None:
+        """Store a value; written to disk throttled."""
         if self.data.get(key) != value:
             self.data[key] = value
             self._dirty = True
-            self.flush(force=durable)
-        return not (durable and self._dirty and self.path is not None)
+            self.flush(force=False)
+
+    def set_durable(self, key: str, value) -> bool:
+        """
+        Store a value and write it to disk right away (not throttled). True once it is on disk (or
+        there is no file); a failed write stays pending and is retried by the next call.
+        """
+        if self.data.get(key) == value and key not in self._durable_pending:
+            return True
+        self.data[key] = value
+        self._dirty = True
+        self._durable_pending.add(key)
+        self.flush(force=True)
+        if self.path is None or not self._dirty:
+            self._durable_pending.discard(key)
+        return key not in self._durable_pending
 
     def flush(self, force: bool = True) -> None:
         if not self._dirty or self.path is None:
@@ -71,6 +86,7 @@ class StateStore:
             os.replace(tmp, self.path)
             tmp = None
             self._dirty = False
+            self._durable_pending.clear()
             self._last_write = now
         except OSError as e:
             logger.warning("Could not write state file %s: %s", self.path, e)

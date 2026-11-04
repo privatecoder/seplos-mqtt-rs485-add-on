@@ -256,7 +256,7 @@ class BatteryPack:
         maint = self.maint
         store = self.energy.store
         if maint.state == "absent" and store.get(self._energy_source_key()):
-            store.set(self._energy_source_key(), None, durable=True)   # confirmed OEM now (e.g. replaced pack)
+            store.set_durable(self._energy_source_key(), None)   # confirmed OEM now (e.g. replaced pack)
         if maint.identity is None:
             if store.get(self._energy_source_key()) == "maint":
                 # the totals came from the wide MAINT counters before: never fall back to the narrow
@@ -277,10 +277,12 @@ class BatteryPack:
         energy = maint.live_energy()
         if energy is not None:
             # the source choice must be on disk before the first wide value is published
-            if not store.set(self._energy_source_key(), "maint", durable=True):
-                logger.warning("Pack%s:Could not persist the MAINT energy source", self.address)
-            # full-width counters replace the 0x42 values with their 6500 kWh fallback
-            data["telemetry"]["normal"].update(energy)
+            if store.set_durable(self._energy_source_key(), "maint"):
+                # full-width counters replace the 0x42 values with their 6500 kWh fallback
+                data["telemetry"]["normal"].update(energy)
+            else:
+                logger.warning("Pack%s:Could not persist the MAINT energy source, energy unknown until it is", self.address)
+                data["telemetry"]["normal"].update(energy_charged=None, energy_discharged=None)
         if self.config.multi_pack:
             if maint.parameters.value is not None:
                 if maint.parameters.ts != self._uart1_parameters_ts:

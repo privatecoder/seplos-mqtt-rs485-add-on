@@ -14,7 +14,7 @@ The add-on is built by the HA Supervisor from `Dockerfile` + `build.json` (HA ba
 - Tests (no hardware, no broker): `.venv/bin/pytest`; one test: `.venv/bin/pytest tests/test_characterization.py::test_single_pack_poll`
 - Lint: `.venv/bin/ruff check src tests`
 - Golden files (`tests/golden/*.json`) pin the public output (decoder JSON, every discovery publish, main-loop topics). A test fails on any difference; regenerate deliberately with `UPDATE_GOLDEN=1 .venv/bin/pytest` and review the diff.
-- Import smoke test in a real base image: `docker build --platform linux/arm/v7 --build-arg BUILD_FROM=ghcr.io/home-assistant/armv7-base:latest -t seplos-test .` then `docker run --rm --entrypoint sh seplos-test -c 'cd /usr/src/app && python3 -c "import seplos_mqtt.app"'`
+- Import smoke test in a real base image: `docker build --platform linux/arm/v7 --build-arg BUILD_FROM=ghcr.io/home-assistant/armv7-base:3.22 -t seplos-test .` then `docker run --rm --entrypoint sh seplos-test -c 'cd /usr/src/app && python3 -c "import seplos_mqtt.app"'`
 - Run locally (needs a reachable BMS on a serial device and an MQTT broker): configure via the env vars `run.sh` exports (`SERIAL_INTERFACE`, `NUMBER_OF_PACKS`, `MQTT_HOST`, `MQTT_PORT`, `MQTT_USERNAME`, `MQTT_PASSWORD`, `MQTT_TOPIC`, `LOGGING_LEVEL`, …), then `cd src && python3 -u fetch_bms_data.py`. For a TCP RS485 gateway, create the pty first like `run.sh` does: `socat pty,link=/tmp/vcom0,raw tcp:<ip>:4196,retry,interval=.2,forever &`.
 
 ## Tests
