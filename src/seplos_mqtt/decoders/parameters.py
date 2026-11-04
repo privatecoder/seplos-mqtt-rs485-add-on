@@ -127,6 +127,7 @@ FUNCTION_SETTINGS: dict[str, tuple[int, int]] = {
     "uart2_binary_protocol": (7, 3),
     "uart2_extended_format": (7, 4),
     "automatic_addressing": (7, 5),
+    "automatic_addressing_never_master": (7, 6),
 }
 
 

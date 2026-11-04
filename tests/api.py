@@ -404,3 +404,9 @@ def fake_monotonic(monkeypatch) -> dict:
     clock = {"t": 1_000.0}
     monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
     return clock
+
+
+def system_reader(bms: FakeBms):
+    reader = SystemReader()
+    bus = SerialBus(FakeSerial(bms))
+    return reader, lambda: reader.read(bus)

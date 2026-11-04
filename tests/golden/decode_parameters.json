@@ -9,6 +9,7 @@
   "ambient_under_temperature_protection_c": 47.4,
   "ambient_under_temperature_recovery_c": 47.5,
   "automatic_addressing": false,
+  "automatic_addressing_never_master": false,
   "automatic_charge_activation": false,
   "balancing_enabled": true,
   "balancing_in_idle": true,

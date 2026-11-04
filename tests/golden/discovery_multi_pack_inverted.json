@@ -4096,7 +4096,7 @@
       "sug_dsp_prc": 3,
       "uniq_id": "seplos_bms_pack_0_current",
       "unit_of_meas": "A",
-      "val_tpl": "{{ (value_json.telemetry.normal.current | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.telemetry.normal.current is none else (value_json.telemetry.normal.current | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,
@@ -4244,7 +4244,7 @@
       "sug_dsp_prc": 2,
       "uniq_id": "seplos_bms_pack_0_dis_charge_current",
       "unit_of_meas": "A",
-      "val_tpl": "{{ (value_json.telemetry.normal.dis_charge_current | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.telemetry.normal.dis_charge_current is none else (value_json.telemetry.normal.dis_charge_current | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,
@@ -4280,7 +4280,7 @@
       "sug_dsp_prc": 2,
       "uniq_id": "seplos_bms_pack_0_dis_charge_power",
       "unit_of_meas": "W",
-      "val_tpl": "{{ (value_json.telemetry.normal.dis_charge_power | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.telemetry.normal.dis_charge_power is none else (value_json.telemetry.normal.dis_charge_power | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,
@@ -6948,7 +6948,7 @@
       "sug_dsp_prc": 3,
       "uniq_id": "seplos_bms_pack_1_current",
       "unit_of_meas": "A",
-      "val_tpl": "{{ (value_json.telemetry.normal.current | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.telemetry.normal.current is none else (value_json.telemetry.normal.current | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,
@@ -7101,7 +7101,7 @@
       "sug_dsp_prc": 2,
       "uniq_id": "seplos_bms_pack_1_dis_charge_current",
       "unit_of_meas": "A",
-      "val_tpl": "{{ (value_json.telemetry.normal.dis_charge_current | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.telemetry.normal.dis_charge_current is none else (value_json.telemetry.normal.dis_charge_current | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,
@@ -7138,7 +7138,7 @@
       "sug_dsp_prc": 2,
       "uniq_id": "seplos_bms_pack_1_dis_charge_power",
       "unit_of_meas": "W",
-      "val_tpl": "{{ (value_json.telemetry.normal.dis_charge_power | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.telemetry.normal.dis_charge_power is none else (value_json.telemetry.normal.dis_charge_power | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,
@@ -9002,7 +9002,7 @@
       "sug_dsp_prc": 1,
       "uniq_id": "seplos_bms_system_system_current",
       "unit_of_meas": "A",
-      "val_tpl": "{{ (value_json.normal.system_current | float) * -1 }}"
+      "val_tpl": "{{ none if value_json.normal.system_current is none else (value_json.normal.system_current | float) * -1 }}"
     },
     "qos": 1,
     "retain": true,

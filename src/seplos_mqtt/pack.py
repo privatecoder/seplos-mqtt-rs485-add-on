@@ -19,25 +19,36 @@ logger = logging.getLogger("SeplosBMS.pack")
 
 BatteryData = dict
 
-MIN_CELLS, MAX_CELLS = 1, 16
+# OEM parameter P65 allows 7-16 cells
+MIN_CELLS, MAX_CELLS = 7, 16
 
 
-def _cell_dependent(length: Callable[[int], int]) -> Callable[[bytes], int | None]:
-    """Expected INFO length of 0x42/0x44, derived from the cell count in byte 2."""
+def _cell_dependent(length: Callable[[int], int], bytes_per_cell: int, markers: dict[int, int]) -> Callable[[bytes], int | None]:
+    """
+    Expected INFO length of 0x42/0x44 from the cell count in byte 2; None (invalid) for an implausible
+    count or wrong count markers (offsets relative to BASE = 3 + bytes_per_cell * M).
+    """
     def expected(info: bytes) -> int | None:
-        return length(info[2]) if len(info) > 2 and MIN_CELLS <= info[2] <= MAX_CELLS else None
+        if len(info) < 3 or not MIN_CELLS <= info[2] <= MAX_CELLS:
+            return None
+        total, base = length(info[2]), 3 + bytes_per_cell * info[2]
+        if len(info) != total or any(info[base + offset] != value for offset, value in markers.items()):
+            return None
+        return total
     return expected
 
 
-# binary INFO lengths
-TELEMETRY_LEN: ExpectedLength = _cell_dependent(telemetry.info_length)
-TELESIGNAL_LEN: ExpectedLength = _cell_dependent(alarms.info_length)
+# binary INFO lengths; markers: 0x42 temperature count 6 and custom count 10, 0x44 temperature count 6 and bit alarm count 20
+TELEMETRY_LEN: ExpectedLength = _cell_dependent(telemetry.info_length, 2, {0: 6, 19: 10})
+TELESIGNAL_LEN: ExpectedLength = _cell_dependent(alarms.info_length, 1, {0: 6, 9: 20})
 DEVICE_INFO_LEN = 32
 SERIAL_LEN = 30
 PARAMETER_LEN = 169
 
 # the extended status (0x5A) is kept over failed requests for at most this long
 STATUS_MAX_AGE_SECONDS = 60
+# all extended status keys with unknown values
+UNKNOWN_STATUS = {group: dict.fromkeys(values) for group, values in intrapack.decode_extended_status(bytes(32)).items()}
 
 def now_iso() -> str:
     """Local time with UTC offset, for HA timestamp sensors."""
@@ -79,6 +90,11 @@ class BatteryPack:
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Pack%s:%s: %s", self.address, label, json.dumps(feedback, indent=2))
         return feedback
+
+    def _decode_telesignal(self, payload: bytes) -> dict:
+        if payload[2] != self.cell_count:
+            raise ValueError(f"0x44 reports {payload[2]} cells, 0x42 {self.cell_count}")
+        return alarms.decode(payload)
 
     def _decode_telemetry(self, payload: bytes) -> dict:
         feedback = telemetry.decode(payload, self.config.min_cell_voltage, self.config.max_cell_voltage)
@@ -268,7 +284,7 @@ class BatteryPack:
                 return None, False
             data["telemetry"] = telemetry_feedback
 
-            telesignal_feedback = self._request(0x44, TELESIGNAL_LEN, alarms.decode, "Telesignalization")
+            telesignal_feedback = self._request(0x44, TELESIGNAL_LEN, self._decode_telesignal, "Telesignalization")
             if telesignal_feedback is None:
                 return None, False
             data["telesignalization"] = telesignal_feedback
@@ -288,12 +304,9 @@ class BatteryPack:
                 if extended_status is not None:
                     self.extended_status = extended_status
                     self.extended_status_ts = now
-                # bridge single failed requests, but don't present an old status as current
-                if self.extended_status is not None:
-                    if now - self.extended_status_ts <= max(STATUS_MAX_AGE_SECONDS, 3 * self.config.mqtt_update_interval):
-                        data["status"] = self.extended_status
-                    else:
-                        data["status"] = {group: dict.fromkeys(values) for group, values in self.extended_status.items()}
+                # bridge single failed requests, but never present an old (or a previous run's) status as current
+                fresh = now - self.extended_status_ts <= max(STATUS_MAX_AGE_SECONDS, 3 * self.config.mqtt_update_interval)
+                data["status"] = self.extended_status if self.extended_status is not None and fresh else UNKNOWN_STATUS
                 self._fetch_parameters()
                 if self.parameters:
                     data["parameters"] = self.parameters

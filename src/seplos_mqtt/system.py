@@ -7,13 +7,14 @@ from __future__ import annotations
 import logging
 
 from .decoders import system as system_decoder
-from .framing.modbus import Status
+from .framing.modbus import UNSUPPORTED_CODES, Status
 from .transport import SerialBus
 
 logger = logging.getLogger("SeplosBMS.system")
 
 
 FLAGS_REGISTER = 0x0074
+FLAG_KEYS = ("force_charge_1", "force_charge_2")
 
 
 def decode_flags(value: int) -> dict:
@@ -43,6 +44,9 @@ class SystemReader:
             return None
         status, regs = bus.read_modbus(0x03, system_decoder.REGISTER, system_decoder.COUNT)
         if status is Status.EXCEPTION:
+            if regs not in UNSUPPORTED_CODES:
+                logger.debug("System:Modbus exception 0x%02X (busy/device failure)", regs)
+                return None
             self.exceptions += 1
             if self.exceptions >= self.MAX_FAILURES:
                 self.unsupported = True
@@ -53,9 +57,8 @@ class SystemReader:
             return None
         self.exceptions = 0
         data = system_decoder.decode(regs)
-        flags = self._read_flags(bus)
-        if flags is not None:
-            data["binary"].update(flags)
+        # unknown (null) instead of leaving an old value when the flags are unavailable
+        data["binary"].update(self._read_flags(bus) or dict.fromkeys(FLAG_KEYS))
         return data
 
     def _read_flags(self, bus: SerialBus) -> dict | None:
@@ -66,7 +69,7 @@ class SystemReader:
         if status is Status.OK and value is not None:
             self.flags_failures = 0
             return decode_flags(value)
-        if status is Status.EXCEPTION:
+        if status is Status.EXCEPTION and value in UNSUPPORTED_CODES:
             self.flags_failures += 1
             if self.flags_failures >= self.MAX_FAILURES:
                 self.flags_unsupported = True

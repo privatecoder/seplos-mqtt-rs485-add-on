@@ -131,7 +131,8 @@ STATUS: list[Entity] = [
     # normal during recharge waiting with hard stop or before a shutdown, so not a problem class
     Entity("charge_forbidden", "Charge Blocked (Charge MOSFET Off Request)", "status", "binary_sensor", category=DIAG,
            when=PACK_BUS),
-    Entity("limiter_charging_from_10a", "Current Limiter Active (Charging >= 10 A)", "status", "binary_sensor", category=DIAG,
+    # active limiting (BitGroup6 bit 6): charging detected (normally from +0.6 A) or >= 10 A in the 5 ms path
+    Entity("limiter_charging_from_10a", "Current Limiter Active (Charging Detected)", "status", "binary_sensor", category=DIAG,
            when=PACK_BUS),
     Entity("limiter_after_charge_overcurrent_warning", "Current Limiter Active (After Charge Overcurrent Warning)", "status",
            "binary_sensor", category=DIAG, when=PACK_BUS),

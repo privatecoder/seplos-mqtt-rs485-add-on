@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 
 from .decoders.telemetry import ENERGY_FALLBACK_KWH, ENERGY_KEYS
 from .state import StateStore
@@ -26,7 +27,10 @@ class EnergyGuard:
         return f"pack{self.pack_address}.{counter}"
 
     def _last(self, counter: str) -> float | None:
-        return self.store.get(self._key(counter))
+        value = self.store.get(self._key(counter))
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value < 0:
+            return None    # no (valid) history
+        return float(value)
 
     def apply(self, normal: dict) -> None:
         for counter in ENERGY_KEYS:

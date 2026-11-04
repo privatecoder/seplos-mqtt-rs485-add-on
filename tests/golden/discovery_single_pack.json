@@ -1182,7 +1182,7 @@
         "ids": "seplos_bms_pack_0"
       },
       "ent_cat": "diagnostic",
-      "name": "Current Limiter Active (Charging >= 10 A)",
+      "name": "Current Limiter Active (Charging Detected)",
       "obj_id": "seplos_bms_pack_0_limiter_charging_from_10a",
       "stat_t": "seplos/pack-0/sensors",
       "uniq_id": "seplos_bms_pack_0_limiter_charging_from_10a",

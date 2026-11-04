@@ -28,9 +28,14 @@ class StateStore:
         self._last_write: float | None = None
         if self.path and self.path.exists():
             try:
-                self.data = json.loads(self.path.read_text(encoding="utf-8"))
+                data = json.loads(self.path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as e:
                 logger.warning("Ignoring unreadable state file %s: %s", self.path, e)
+            else:
+                if isinstance(data, dict):
+                    self.data = data
+                else:
+                    logger.warning("Ignoring state file %s: not a JSON object", self.path)
 
     @classmethod
     def default(cls, path: str | None) -> StateStore:
@@ -56,12 +61,17 @@ class StateStore:
         now = time.monotonic()
         if not force and self._last_write is not None and now - self._last_write < self.MIN_WRITE_INTERVAL:
             return
+        tmp = None
         try:
             fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=".seplos_state")
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(self.data, f)
             os.replace(tmp, self.path)
+            tmp = None
             self._dirty = False
             self._last_write = now
         except OSError as e:
             logger.warning("Could not write state file %s: %s", self.path, e)
+        finally:
+            if tmp is not None:
+                Path(tmp).unlink(missing_ok=True)

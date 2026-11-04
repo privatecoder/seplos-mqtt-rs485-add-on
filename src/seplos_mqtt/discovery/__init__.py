@@ -60,7 +60,8 @@ class Discovery:
         state = "binary" if entity.domain == "binary_sensor" else "normal"
         path = f"value_json.{state}.{entity.key}" if scope == SYSTEM_SCOPE else f"value_json.{entity.group}.{state}.{entity.key}"
         if entity.invert and self.invert and entity.domain == "sensor":
-            return f"{{{{ ({path} | float) * -1 }}}}"
+            # keep unknown (null) values unknown instead of a template error
+            return f"{{{{ none if {path} is none else ({path} | float) * -1 }}}}"
         return f"{{{{ {path} }}}}"
 
     def _device(self, scope, full: bool) -> dict:
@@ -178,13 +179,19 @@ class Discovery:
         self.publish_pack(pack_no, pack_bus)
 
     def update_cell_count(self, pack_no: int, cell_count: int) -> None:
-        """Remove the per-cell entities above the pack's actual cell count (packs with < 16 cells)."""
+        """Reconcile the per-cell entities with the pack's actual cell count (removed above it, restored up to it)."""
+        previous = self._cells.get(pack_no, 16)
         if self._cells.get(pack_no) == cell_count:
             return
         self._cells[pack_no] = cell_count
-        for domain, key in CELL_ENTITIES:
-            for i in range(cell_count + 1, 17):
-                self._remove(domain, pack_no, f"{key}_{i}")
+        for entity in PACK_ENTITIES:
+            if (entity.domain, entity.key) not in CELL_ENTITIES:
+                continue
+            for index, item in enumerate(entity.expand(), start=1):
+                if index > cell_count:
+                    self._remove(item.domain, pack_no, item.key)
+                elif index > previous:
+                    self._publish_entity(item, pack_no)
 
     def update_firmware(self, pack_no: int, firmware: str) -> None:
         """

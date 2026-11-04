@@ -305,7 +305,9 @@ def test_system_read_without_flags_register(monkeypatch):
     bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
     bms.modbus[(0x03, 0x0074, 1)] = ("exc", 0x02)
     out = api.read_system(api.make_pack(0), bms)
-    assert out == api.decode_system(f.system_registers())
+    expected = api.decode_system(f.system_registers())
+    expected["binary"].update({"force_charge_1": None, "force_charge_2": None})   # review T02: unknown, not stale
+    assert out == expected
 
 
 # --- discovery ----------------------------------------------------------------------------------
@@ -881,3 +883,128 @@ def test_discovery_publishes_maint_entities_per_capability(golden):
     assert configs["balancing_active"] == ""          # 0x5A stays RS485-1/2 only
     assert not any("pack-1" in r["topic"] for r in records)
     golden("discovery_maint_capabilities", _discovery(records))
+
+
+# --- review step 2 (T01-T07) --------------------------------------------------------------------------
+
+def test_status_unknown_without_any_5a_after_restart(monkeypatch):
+    """T01: no successful 0x5A in this process -> the status group is present with unknown values."""
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x5A)] = None
+        data, ok = api.poll(api.make_pack(0), bms)
+    assert ok and data["status"]["binary"]["charge_forbidden"] is None
+    assert data["status"]["normal"] == {"dis_charge_current_unfiltered": None}
+
+
+def test_inverted_templates_keep_null_unknown():
+    """T01: inverted current/power templates must not turn null into a template error."""
+    disc, client = api.discovery(invert=True)
+    api.discovery_startup(disc, 1)
+    tpl = next(r["payload"]["val_tpl"] for r in client.as_records()
+               if r["topic"].endswith("/dis_charge_current_unfiltered/config"))
+    assert tpl == ("{{ none if value_json.status.normal.dis_charge_current_unfiltered is none "
+                   "else (value_json.status.normal.dis_charge_current_unfiltered | float) * -1 }}")
+    jinja2 = __import__("pytest").importorskip("jinja2")
+    render = jinja2.Environment().from_string(tpl).render
+    assert render(value_json={"status": {"normal": {"dis_charge_current_unfiltered": None}}}) == "None"
+    assert render(value_json={"status": {"normal": {"dis_charge_current_unfiltered": 1.5}}}) == "-1.5"
+
+
+def test_force_charge_flags_unknown_after_failure(monkeypatch):
+    """T02: flags become unknown when 0x0074 stops answering; a busy exception doesn't disable them."""
+    api.no_sleep(monkeypatch)
+    bms = FakeBms()
+    bms.modbus[(0x03, 0x1000, 21)] = f.system_registers()
+    bms.modbus[(0x03, 0x0074, 1)] = ("raw", f.modbus_wide_count_response(1, 3, 0x20))
+    reader, read = api.system_reader(bms)
+    assert read()["binary"]["force_charge_1"] == "ON"
+    bms.modbus[(0x03, 0x0074, 1)] = None
+    assert read()["binary"]["force_charge_1"] is None
+    bms.modbus[(0x03, 0x0074, 1)] = ("exc", 0x06)    # busy
+    for _ in range(4):
+        read()
+    assert not reader.flags_unsupported
+    bms.modbus[(0x03, 0x0074, 1)] = ("exc", 0x02)    # illegal data address
+    for _ in range(3):
+        read()
+    assert reader.flags_unsupported
+
+
+def test_system_busy_exception_does_not_disable(monkeypatch):
+    api.no_sleep(monkeypatch)
+    bms = FakeBms()
+    bms.modbus[(0x03, 0x1000, 21)] = ("exc", 0x06)
+    reader, read = api.system_reader(bms)
+    for _ in range(4):
+        assert read() is None
+    assert not reader.unsupported
+
+
+def test_cell_count_validation(monkeypatch):
+    """T03: 7-16 cells, count markers, 0x42/0x44 must agree."""
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        cases = {
+            "six cells": (f.telemetry_info(cells_mv=[3300] * 6), f.telesignal_info(cell_alarms=[0] * 6)),
+            "42/44 disagree": (f.telemetry_info(), f.telesignal_info(cell_alarms=[0] * 15)),
+        }
+        bad_temp = bytearray(f.telemetry_info()); bad_temp[35] = 0          # noqa: E702
+        bad_custom = bytearray(f.telemetry_info()); bad_custom[54] = 0      # noqa: E702
+        cases["temperature count"] = (bytes(bad_temp), f.telesignal_info())
+        cases["custom count"] = (bytes(bad_custom), f.telesignal_info())
+        for name, (t, s) in cases.items():
+            bms = _single_pack_bms()
+            bms.ascii[(0, 0x42)], bms.ascii[(0, 0x44)] = t, s
+            assert api.poll(api.make_pack(0), bms) == (None, False), name
+        for m in (7, 16):
+            bms = _single_pack_bms()
+            bms.ascii[(0, 0x42)] = f.telemetry_info(cells_mv=[3300 + i for i in range(m)])
+            bms.ascii[(0, 0x44)] = f.telesignal_info(cell_alarms=[0] * m)
+            assert api.poll(api.make_pack(0), bms)[1], m
+
+
+def test_cell_entities_grow_shrink_replay():
+    """T04: per-cell entities follow the count in both directions and on a full republish."""
+    disc, client = api.discovery()
+    api.discovery_startup(disc, 1)
+
+    def last(topic_key):
+        recs = [r for r in client.as_records() if r["topic"] == f"homeassistant/sensor/seplos-mqtt-pack-0/{topic_key}/config"]
+        return recs[-1]["payload"]
+    api.cell_count(disc, 0, 15)
+    assert last("voltage_cell_16") == ""
+    api.cell_count(disc, 0, 16)
+    assert last("voltage_cell_16")["name"] == "Voltage Cell 16"
+    api.cell_count(disc, 0, 14)
+    api.discovery_startup(disc, 1)                      # replay after the count is known
+    assert last("voltage_cell_15") == "" and last("voltage_cell_14")["name"] == "Voltage Cell 14"
+
+
+def test_state_file_invalid_content(tmp_path):
+    """T07: an invalid cache degrades to 'no history' instead of failing the poll."""
+    for content in ("[]", '{"pack0.energy_charged": "bad"}', '{"pack0.energy_charged": true}', "not json"):
+        path = tmp_path / "state.json"
+        path.write_text(content)
+        out = api.decode_telemetry_sequence([f.telemetry_info(energy_charged=6500)], state_file=path)
+        assert out[0]["normal"]["energy_charged"] is None, content
+
+
+def test_energy_reset_sequences():
+    def run(raws):
+        return [o["normal"]["energy_charged"] for o in api.decode_telemetry_sequence([f.telemetry_info(energy_charged=r) for r in raws])]
+    assert run([64999, 6500]) == [6499.9, 6499.9]
+    assert run([6499, 6500, 6501]) == [649.9, 650.0, 650.1]
+    assert run([64999, 0, 6500]) == [6499.9, 0.0, 650.0]      # observed reset (clear history) resets the baseline
+    assert run([64999, 0, 1]) == [6499.9, 0.0, 0.1]
+
+
+def test_silence_after_skipped_traffic_is_inconclusive(monkeypatch):
+    """F16 detail: interleaved intra-pack traffic followed by nothing is not 'silence'."""
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0xAA)] = lambda req: f.ascii_frame(3, 0x5A, b"")
+        data, _ = api.poll(api.make_pack(0), bms)
+    assert data["info"]["normal"]["firmware_patch"] == "16.06 (unknown)"

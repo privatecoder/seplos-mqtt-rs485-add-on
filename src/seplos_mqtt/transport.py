@@ -53,6 +53,7 @@ class SerialBus:
         self._sleep = sleep or (lambda seconds: time.sleep(seconds))
         self._lock = threading.Lock()
         self._last_activity: float | None = None
+        self._skipped = 0
 
     @property
     def is_open(self) -> bool:
@@ -101,10 +102,12 @@ class SerialBus:
 
     def _read_frame(self, max_skipped: int) -> bytes:
         """Read the next frame, logging and skipping interleaved intra-pack frames."""
+        self._skipped = 0
         raw = self.port.read_until(af.EOI)
         for _ in range(max_skipped):
             if not self._skip_intra_pack(raw):
                 break
+            self._skipped += 1
             raw = self.port.read_until(af.EOI)
         return raw
 
@@ -148,8 +151,10 @@ class SerialBus:
         with self._lock:
             self._send(af.encode(address, cid2, b""), reset_input=True)
             raw = self._receive_frame()
+            skipped = self._skipped
         if not raw:
-            return NO_ANSWER
+            # silence only if nothing at all was received (other traffic makes it inconclusive)
+            return NO_ANSWER if not skipped else None
         try:
             frame = af.parse(raw)
         except af.FrameError:
