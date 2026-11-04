@@ -22,6 +22,12 @@
   },
   {
     "payload": {
+      "clock": {
+        "normal": {
+          "bms_time": "2026-11-04T11:59:30",
+          "clock_offset": -30
+        }
+      },
       "info": {
         "normal": {
           "can_protocol": "Pylon",

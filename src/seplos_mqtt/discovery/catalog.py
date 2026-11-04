@@ -218,9 +218,27 @@ MAINT: list[Entity] = [
            attributes=MAINT_ATTRIBUTES),
     Entity("storage_problem", "Flash Storage Problem", "maint", "binary_sensor", device_class="problem", category=DIAG,
            when=frozenset({"maint_storage"})),
+    # 1.6.4: runtime state of the persistent individual pack lock (64/04 cache), no HA "lock" class (ON would mean unlocked)
+    Entity("pack_lock_active", "Individual Pack Lock Active", "maint", "binary_sensor", icon="mdi:lock", category=DIAG,
+           when=frozenset({"maint_lock"})),
+    # 64/02: the master stopped polling its slaves; the system values then cover the local pack only
+    Entity("maintenance_mode", "Maintenance Mode (Slave Polling Paused)", "maint", "binary_sensor", icon="mdi:wrench",
+           category=DIAG, when=frozenset({"maint_marker"})),
+    Entity("effective_slave_count", "Effective Slave Count", "maint", icon="mdi:numeric", category=DIAG,
+           when=frozenset({"maint_marker"})),
+    # configuration (Group0 bits 6/7 + image default), not proof that charging is currently stopped
+    Entity("recharge_stop_mode", "Recharge Waiting Stop Mode", "maint", icon="mdi:battery-sync", category=DIAG,
+           when=frozenset({"maint_hard_stop"})),
 ]
 
-PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT]
+# BMS real time clock (0x4D): OEM on RS485-1/2, with MAINT also on the CAN port
+CLOCK: list[Entity] = [
+    Entity("clock_offset", "BMS Clock Offset", "clock", device_class="duration", state_class="measurement", unit="s",
+           icon="mdi:clock-alert-outline", category=DIAG, when=PACK_BUS_OR_MAINT_UART1,
+           attributes="{{ value_json.get('clock', {}).get('normal', {}) | tojson }}"),
+]
+
+PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT, *CLOCK]
 
 Y = "system"
 # System values from the master via Modbus 0x1000 (CAN port RS485 bus only), topic <topic>/system/sensors

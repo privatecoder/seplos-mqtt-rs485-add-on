@@ -24,6 +24,9 @@ DETECT_ATTEMPTS = 3
 ENERGY_INTERVAL = 60
 ENERGY_MAX_AGE = 600
 STORAGE_INTERVAL = 600
+LOCK_INTERVAL = 60            # 64/04 on 1.6.4: carries the runtime lock state
+MARKER_INTERVAL = 60
+CALIBRATION_INTERVAL = 600
 PARAMETER_INTERVAL = 3600
 RETRY_INTERVAL = 60
 
@@ -36,6 +39,9 @@ SERIAL_LEN = 30
 CAP_MAINT = "maint"
 CAP_STORAGE = "maint_storage"
 CAP_UART1 = "maint_uart1"
+CAP_LOCK = "maint_lock"
+CAP_MARKER = "maint_marker"
+CAP_HARD_STOP = "maint_hard_stop"
 
 
 @dataclass
@@ -61,6 +67,9 @@ class MaintSupport:
     serials: dict = field(default_factory=dict)
     serials_done: bool = False
     serial_attempts: int = 0
+    marker: Timed = field(default_factory=Timed)
+    calibration: Timed = field(default_factory=Timed)
+    group0: int | None = None           # BitGroup0 from the latest parameter read (ASCII or binary 47)
 
     # --- detection -------------------------------------------------------------------------
 
@@ -100,7 +109,19 @@ class MaintSupport:
             caps.add(CAP_STORAGE)
         if self.multi_pack:
             caps.add(CAP_UART1)
+        if self.identity.has_flag(md.FLAG_PACK_LOCK) and self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
+            caps.add(CAP_LOCK)
+        if self._marker_readable:
+            caps.add(CAP_MARKER)
+        caps.add(CAP_HARD_STOP)
         return caps
+
+    @property
+    def _marker_readable(self) -> bool:
+        """64/02: on UART1 only the master answers, on UART0 every pack with image flag 0x10."""
+        if self.identity is None:
+            return False
+        return self.address == 0 if self.multi_pack else self.identity.has_flag(md.FLAG_UART0_MARKER)
 
     # --- periodic reads ----------------------------------------------------------------------
 
@@ -131,8 +152,15 @@ class MaintSupport:
             self._due(self.energy, now, ENERGY_INTERVAL,
                       lambda: self._decode(bus, md.INFO_ENERGY, md.ENERGY_LEN, md.decode_energy))
         if self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
-            self._due(self.storage, now, STORAGE_INTERVAL,
+            interval = LOCK_INTERVAL if self.identity.has_flag(md.FLAG_PACK_LOCK) else STORAGE_INTERVAL
+            self._due(self.storage, now, interval,
                       lambda: self._decode(bus, md.INFO_STORAGE, md.STORAGE_LEN, md.decode_storage))
+        if self._marker_readable:
+            self._due(self.marker, now, MARKER_INTERVAL,
+                      lambda: self._decode(bus, md.INFO_MARKER, md.MARKER_LEN, md.decode_marker))
+        if self.identity.has_capability(md.CAP_CALIBRATION):
+            self._due(self.calibration, now, CALIBRATION_INTERVAL,
+                      lambda: self._decode(bus, md.INFO_CALIBRATION_ACTIVE, md.CALIBRATION_ACTIVE_LEN, md.decode_calibration_active))
         if self.multi_pack:
             self._due(self.parameters, now, PARAMETER_INTERVAL, lambda: self._read_parameters(bus))
             if not self.serials_done:
@@ -194,6 +222,23 @@ class MaintSupport:
             binary["storage_problem"] = ("ON" if md.storage_problem(self.storage.value) else "OFF") if fresh else None
             if self.storage.value is not None:
                 attributes["storage"] = self.storage.value
+            if CAP_LOCK in self.capabilities:
+                lock_fresh = self.storage.fresh(now, 3 * LOCK_INTERVAL)
+                runtime = self.storage.value.get("lock_runtime") if lock_fresh else None
+                binary["pack_lock_active"] = None if runtime is None else ("ON" if runtime else "OFF")
+        if self._marker_readable:
+            marker = self.marker.value if self.marker.fresh(now, 3 * MARKER_INTERVAL) else None
+            active = marker["maintenance_active"] if marker else None
+            binary["maintenance_mode"] = None if active is None else ("ON" if active else "OFF")
+            normal["effective_slave_count"] = marker["effective_slave_count"] if marker else None
+        if self.calibration.value is not None:
+            attributes["calibration"] = self.calibration.value
+        if self.group0 is not None:
+            settings = md.decode_group0(self.group0, self.identity)
+            attributes["settings"] = settings
+            normal["recharge_stop_mode"] = "hard stop" if settings["recharge_hard_stop"] else "soft stop"
+        else:
+            normal["recharge_stop_mode"] = None
         return {"normal": normal, "binary": binary, "attributes": attributes}
 
     def uart1_parameters(self) -> dict | None:

@@ -255,6 +255,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | CAN Protocol | `info.normal.can_protocol` | manufacturer name field = active CAN protocol (0x51 bytes 12-31) |
 | Battery Serial Number | `info.normal.serial_number` | string 1 (CID2 0xA2, RS485-1/2 only) |
 | BMS Serial Number | `info.normal.bms_serial_number` | string 2 (CID2 0xA4, RS485-1/2 only) |
+| BMS Clock Offset | `clock.normal.clock_offset` (s, BMS minus host local time), attribute `bms_time` | CID2 0x4D (RS485-1/2; on the CAN port only with MAINT), every 10 min. The BMS clock has no time zone; it's compared with the add-on's local time |
 | Last Successful Poll | heartbeat `last_publish` | – (time of the last successful poll, also when no value changed) |
 | Current (incl. idle) | `status.normal.dis_charge_current_unfiltered` | intra-pack record current (undocumented CID2 0x5A) |
 | Balancing Active | `status.binary.balancing_active` | Alarm event 7 bit 0 "Inside bit" (0x5A) |
@@ -314,11 +315,19 @@ With the option `maint_firmware: true` the add-on also reads the extra data of t
 - Flash storage diagnostics (64/04, image flag 0x20, every 10 min): `Flash Storage Problem` turns on if a parameter or SOC mirror record is invalid. The raw classification and the 1.6.4 lock bytes are attributes (`null` = unavailable, not "unlocked").
 - Multiple pack mode (CAN port, UART1): parameters and function switches (binary 47, hourly) and the battery/BMS serial numbers (binary A2/A4) of every MAINT pack, which the OEM firmware only serves on RS485-1/2.
 - The derived firmware patch level is replaced by the OEM base version the MAINT image reports.
+- 1.6.4 (image flag 0x04): `Individual Pack Lock Active` from the runtime lock cache (64/04, every 60 s). `null`/unknown if the cache is not valid. It's the persistent lock set by a targeted off command; the add-on itself never sends one.
+- `Maintenance Mode (Slave Polling Paused)` and `Effective Slave Count` (64/02, every 60 s; on the CAN port only the master answers). While the marker is active the master doesn't poll its slaves, so the system values cover the local pack only.
+- `Recharge Waiting Stop Mode` (hard stop / soft stop): the configuration from BitGroup0 bits 6/7 and the image default (flag 0x80), not proof that charging is currently stopped. All MAINT meanings of BitGroup0 (UART1 write/maintenance/power permissions, extended off, recorded lock) are attributes (`settings`) of `MAINT Firmware`.
+- Active calibration (64/05 page 00, every 10 min): invalid calibration flags and the converted currents A/B in mA as attributes (`calibration`).
 
 | Home Assistant name | MQTT key (JSON path) | Source |
 |---|---|---|
 | MAINT Firmware | `maint.normal.maint_version`, attributes `maint.attributes` (identity, storage, checkpoint, live snapshot) | ASCII 64/03, 64/04, 64/06 |
 | Flash Storage Problem | `maint.binary.storage_problem` | ASCII 64/04 |
+| Individual Pack Lock Active | `maint.binary.pack_lock_active` | ASCII 64/04 byte 9 (1.6.4) |
+| Maintenance Mode (Slave Polling Paused) | `maint.binary.maintenance_mode` | ASCII 64/02 marker |
+| Effective Slave Count | `maint.normal.effective_slave_count` | ASCII 64/02 |
+| Recharge Waiting Stop Mode | `maint.normal.recharge_stop_mode` | BitGroup0 bits 6/7 + image flags (0x47) |
 
 The current MAINT images were validated offline only (emulator), not on hardware. Keep the option off unless your packs run MAINT firmware.
 

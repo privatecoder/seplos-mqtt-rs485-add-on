@@ -131,3 +131,56 @@ def decode_energy(info: bytes) -> dict:
             "boot_choice": BOOT_CHOICE[info[5]],
         },
     }
+
+
+# --- stage 2: maintenance marker, Group0 settings, calibration, RTC -----------------------------
+
+INFO_MARKER = b"\x02"
+MARKER_LEN = 5
+INFO_CALIBRATION_ACTIVE = b"\x05\x00"
+CALIBRATION_ACTIVE_LEN = 72
+
+
+def decode_marker(info: bytes) -> dict:
+    """64/02: little-endian marker (FFFFFFFF inactive, 00000000 active) and effective slave count."""
+    if len(info) != MARKER_LEN:
+        raise MaintFormatError(f"unknown marker answer: {info.hex()}")
+    marker = int.from_bytes(info[:4], "little")
+    state = {0xFFFFFFFF: False, 0: True}.get(marker)     # anything else: unresolved, never "active"
+    return {"maintenance_active": state, "marker": f"0x{marker:08X}", "effective_slave_count": info[4]}
+
+
+def decode_group0(group0: int, ident: Identity) -> dict:
+    """
+    MAINT meanings of function switch BitGroup0 (OEM: only bit 1 has a function). Configuration, not
+    live state: the lock state itself comes from 64/04, the recharge stop also needs Group5 bit 1.
+    """
+    out: dict = {
+        "uart1_parameter_write_allowed": bool(group0 & 0x01),
+        "uart1_maintenance_start_allowed": bool(group0 & 0x04),
+        # bit 3 = 1 means "permitted" only with positive polarity (image flag 0x08)
+        "uart1_power_rtc_allowed": bool(group0 & 0x08) if ident.has_flag(FLAG_POSITIVE_POLARITY) else None,
+    }
+    if ident.has_flag(FLAG_PACK_LOCK) and ident.has_flag(FLAG_POSITIVE_POLARITY):
+        out["extended_off_enabled"] = bool(group0 & 0x10)
+        out["pack_lock_recorded"] = not group0 & 0x20      # bit 5 = 0: individual lock active
+    if ident.has_flag(FLAG_CONFIGURABLE_HARD_STOP):
+        selection = group0 & 0xC0
+        if selection in (0x00, 0x40):
+            out["recharge_hard_stop"], out["recharge_hard_stop_source"] = selection == 0x40, "parameter"
+        else:
+            out["recharge_hard_stop"], out["recharge_hard_stop_source"] = bool(ident.image_flags & 0x01), "image default"
+    else:
+        out["recharge_hard_stop"], out["recharge_hard_stop_source"] = bool(ident.image_flags & 0x01), "image"
+    return out
+
+
+def decode_calibration_active(info: bytes) -> dict:
+    """64/05 page 00 (active RAM): invalid calibration bits and the converted currents A/B (mA)."""
+    if len(info) != CALIBRATION_ACTIVE_LEN or info[0] != 1 or info[1] != 0:
+        raise MaintFormatError(f"unknown calibration answer: {info[:2].hex()}")
+    return {
+        "invalid_calibration_flags": f"0x{info[2] & 0x1C:02X}",
+        "current_a_ma": int.from_bytes(info[64:68], "big", signed=True),
+        "current_b_ma": int.from_bytes(info[68:72], "big", signed=True),
+    }

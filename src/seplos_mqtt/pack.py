@@ -8,7 +8,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from .config import Config
-from .decoders import alarms, identity, intrapack, parameters, telemetry
+from .decoders import alarms, clock, identity, intrapack, parameters, telemetry
 from .energy import EnergyGuard
 from .framing.ascii import ExpectedLength
 from .maint import MaintSupport
@@ -50,6 +50,11 @@ STATUS_MAX_AGE_SECONDS = 60
 # all extended status keys with unknown values
 UNKNOWN_STATUS = {group: dict.fromkeys(values) for group, values in intrapack.decode_extended_status(bytes(32)).items()}
 
+def local_now() -> datetime:
+    """Host local time (naive), the convention the BMS clock is compared with."""
+    return datetime.now()
+
+
 def now_iso() -> str:
     """Local time with UTC offset, for HA timestamp sensors."""
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -75,6 +80,9 @@ class BatteryPack:
         self.cell_count: int | None = None
         self.maint = MaintSupport(address, config.multi_pack) if config.maint_firmware else None
         self._uart1_parameters_ts = 0.0
+        self.clock_value: dict | None = None
+        self.clock_ts = 0.0
+        self.clock_next = 0.0
         self._uart1_parameters_read_at: str | None = None
         self.energy = EnergyGuard(address, store if store is not None else StateStore(None))
 
@@ -246,6 +254,10 @@ class BatteryPack:
 
     def _merge_maint(self, data: BatteryData) -> None:
         maint = self.maint
+        if self.parameters is not None and not self.config.multi_pack:
+            maint.group0 = int(self.parameters["function_switches"][:2], 16)
+        elif maint.parameters.value is not None:
+            maint.group0 = int(maint.parameters.value["function_switches"][:2], 16)
         payload = maint.payload()
         if payload is None:
             return
@@ -262,6 +274,38 @@ class BatteryPack:
                 data["parameters"] = {**maint.parameters.value, "read_at": self._uart1_parameters_read_at}
             if maint.serials and "info" in data:
                 data["info"] = {"normal": {**data["info"]["normal"], **{k: v for k, v in maint.serials.items() if v}}}
+
+    # --- BMS clock (0x4D): OEM on RS485-1/2, with MAINT also on UART1 --------------------------------
+
+    CLOCK_INTERVAL = 600
+
+    def _clock_readable(self) -> bool:
+        if not self.config.multi_pack:
+            return True
+        return self.maint is not None and self.maint.identity is not None
+
+    def _read_clock(self) -> None:
+        now = time.monotonic()
+        if not self._clock_readable() or now < self.clock_next:
+            return
+        answer = self.bus.query(self.address, clock.CID2, b"")
+        if not isinstance(answer, int) and answer is not None and answer.code == 0x00 and len(answer.info) == clock.LEN:
+            try:
+                bms_time = clock.decode(answer.info)
+            except ValueError as e:
+                logger.debug("Pack%s:Invalid clock answer: %s", self.address, e)
+            else:
+                host = local_now()
+                self.clock_value = {"bms_time": bms_time.isoformat(), "clock_offset": round((bms_time - host).total_seconds())}
+                self.clock_ts, self.clock_next = now, now + self.CLOCK_INTERVAL
+                return
+        self.clock_next = now + 60
+
+    def _clock_payload(self) -> dict | None:
+        if not self._clock_readable():
+            return None
+        fresh = self.clock_value is not None and time.monotonic() - self.clock_ts <= 3 * self.CLOCK_INTERVAL
+        return {"normal": self.clock_value if fresh else {"bms_time": None, "clock_offset": None}}
 
     @property
     def capabilities(self) -> set[str]:
@@ -297,6 +341,10 @@ class BatteryPack:
             if self.maint is not None:
                 self._guarded(self.maint.poll)
                 self._merge_maint(data)
+            self._guarded(lambda _bus: self._read_clock())
+            clock_payload = self._clock_payload()
+            if clock_payload is not None:
+                data["clock"] = clock_payload
 
             if not self.config.multi_pack:
                 extended_status = self._fetch_extended_status()

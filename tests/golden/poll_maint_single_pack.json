@@ -1,4 +1,10 @@
 {
+  "clock": {
+    "normal": {
+      "bms_time": "2026-11-04T11:59:30",
+      "clock_offset": -30
+    }
+  },
   "info": {
     "normal": {
       "can_protocol": "Pylon",
@@ -52,10 +58,14 @@
       }
     },
     "binary": {
+      "maintenance_mode": null,
+      "pack_lock_active": "OFF",
       "storage_problem": "OFF"
     },
     "normal": {
-      "maint_version": "1.6.4"
+      "effective_slave_count": null,
+      "maint_version": "1.6.4",
+      "recharge_stop_mode": null
     }
   },
   "parameters": {

@@ -1017,6 +1017,12 @@
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/low_temperature_heating/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/maintenance_mode/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -1165,6 +1171,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/output_reverse_polarity_protection/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/pack_lock_active/config"
   },
   {
     "payload": {
@@ -2401,6 +2413,12 @@
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-1/low_temperature_heating/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-1/maintenance_mode/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -2554,6 +2572,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-1/output_reverse_polarity_protection/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-1/pack_lock_active/config"
   },
   {
     "payload": {
@@ -3990,6 +4014,12 @@
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/charging_temperature_low/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/clock_offset/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -4392,6 +4422,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/discharging_temperature_low/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/effective_slave_count/config"
   },
   {
     "payload": {
@@ -4994,6 +5030,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/rated_capacity/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/recharge_stop_mode/config"
   },
   {
     "payload": "",
@@ -6838,6 +6880,12 @@
     "topic": "homeassistant/sensor/seplos-mqtt-pack-1/charging_temperature_low/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/clock_offset/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -7254,6 +7302,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-1/discharging_temperature_low/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/effective_slave_count/config"
   },
   {
     "payload": {
@@ -7876,6 +7930,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-1/rated_capacity/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/recharge_stop_mode/config"
   },
   {
     "payload": "",

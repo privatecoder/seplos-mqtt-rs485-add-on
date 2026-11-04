@@ -1220,6 +1220,12 @@
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/low_temperature_heating/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/maintenance_mode/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -1368,6 +1374,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/output_reverse_polarity_protection/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/pack_lock_active/config"
   },
   {
     "payload": {
@@ -2750,6 +2762,38 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_clock_offset",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "duration",
+      "ent_cat": "diagnostic",
+      "ic": "mdi:clock-alert-outline",
+      "json_attr_t": "seplos/pack-0/sensors",
+      "json_attr_tpl": "{{ value_json.get('clock', {}).get('normal', {}) | tojson }}",
+      "name": "BMS Clock Offset",
+      "obj_id": "seplos_bms_pack_0_clock_offset",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_clock_offset",
+      "unit_of_meas": "s",
+      "val_tpl": "{{ value_json.clock.normal.clock_offset }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/clock_offset/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_component_temperature_alarm",
       "dev": {
         "ids": "seplos_bms_pack_0"
@@ -3166,6 +3210,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/discharging_temperature_low/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/effective_slave_count/config"
   },
   {
     "payload": {
@@ -3792,6 +3842,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/rated_capacity/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/recharge_stop_mode/config"
   },
   {
     "payload": "",

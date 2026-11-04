@@ -198,6 +198,7 @@ def _single_pack_bms(adr: int = 0) -> FakeBms:
     bms.ascii[(adr, 0xAA)] = None          # 16.06.13+: silent
     bms.ascii[(adr, 0x47)] = f.parameter_info()
     bms.ascii[(adr, 0x5A)] = lambda req: f.ascii_frame(adr, 0x5A, f.intra_pack_info())
+    bms.ascii[(adr, 0x4D)] = bytes.fromhex("07EA0B040B3B1E")    # 2026-11-04 11:59:30
     return bms
 
 
@@ -210,7 +211,8 @@ def test_single_pack_poll(monkeypatch, golden):
         assert ok and data is not None
         assert data["info"]["normal"]["firmware_patch"] == "16.06.13+"
         assert data["info"]["normal"]["serial_number"] == "SN-BATTERY-0001"
-        assert set(data) == {"telemetry", "telesignalization", "info", "status", "parameters"}
+        assert set(data) == {"telemetry", "telesignalization", "info", "status", "parameters", "clock"}
+        assert data["clock"]["normal"] == {"bms_time": "2026-11-04T11:59:30", "clock_offset": -30}   # G09
         golden("poll_single_pack", data)
         # an unchanged second poll returns the same data; the publisher suppresses the publish
         data2, ok2 = api.poll(pack, bms)
@@ -776,9 +778,10 @@ def test_maint_single_pack(monkeypatch, golden):
     assert t["energy_charged"] == 7000.1 and t["energy_discharged"] == 6900.2   # full width from 64/06
     assert data["info"]["normal"]["firmware_patch"] == "16.06.13"               # reported, not probed
     assert not any(r.cid2 == 0xAA for r in bms.requests if r.kind == "ascii")
-    assert data["maint"]["normal"] == {"maint_version": "1.6.4"} and data["maint"]["binary"] == {"storage_problem": "OFF"}
+    assert data["maint"]["normal"]["maint_version"] == "1.6.4" and data["maint"]["binary"]["storage_problem"] == "OFF"
+    assert data["maint"]["binary"]["maintenance_mode"] is None     # 64/02 not answered: unknown
     assert data["maint"]["attributes"]["checkpoint"]["boot_choice"] == "primary"
-    assert api.capabilities(pack) == {"maint", "maint_storage"}
+    assert api.capabilities(pack) == {"maint", "maint_storage", "maint_lock", "maint_marker", "maint_hard_stop"}
     golden("poll_maint_single_pack", data)
 
 
@@ -855,7 +858,7 @@ def test_maint_multi_pack_mixed_bank(monkeypatch, golden):
     assert ok0 and ok1
     assert m["parameters"]["cells_in_series"] == 16 and m["parameters"]["read_at"] == api.FIXED_NOW
     assert m["info"]["normal"]["serial_number"] == "BAT-SN-0" and m["info"]["normal"]["bms_serial_number"] == "BMS-SN-0"
-    assert api.capabilities(master) == {"maint", "maint_storage", "maint_uart1"}
+    assert api.capabilities(master) == {"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop"}
     assert "maint" not in s and "parameters" not in s and api.capabilities(slave) == set()
     golden("poll_maint_multi_pack", {"master": m, "slave": s})
 
@@ -1008,3 +1011,77 @@ def test_silence_after_skipped_traffic_is_inconclusive(monkeypatch):
         bms.ascii[(0, 0xAA)] = lambda req: f.ascii_frame(3, 0x5A, b"")
         data, _ = api.poll(api.make_pack(0), bms)
     assert data["info"]["normal"]["firmware_patch"] == "16.06 (unknown)"
+
+
+# --- MAINT stage 2 ------------------------------------------------------------------------------------
+
+def test_maint_group0_settings():
+    full = api.decode_maint_identity(f.MAINT_FULL_IDENTITY)                  # flags FE: lock, positive, hard stop config
+    d = api.decode_group0(0xFF, full)
+    assert d["uart1_power_rtc_allowed"] is True and d["extended_off_enabled"] is True
+    assert d["pack_lock_recorded"] is False                                    # bit 5 = 1: no lock
+    assert (d["recharge_hard_stop"], d["recharge_hard_stop_source"]) == (False, "image default")   # FE: default soft
+    assert api.decode_group0(0x7F, full)["recharge_hard_stop"] is True          # explicit hard
+    assert api.decode_group0(0x3F, full)["recharge_hard_stop_source"] == "parameter"
+    assert api.decode_group0(0xDF, full)["pack_lock_recorded"] is True          # bit 5 = 0
+    light = api.decode_maint_identity(f.maint_identity(patch=(1, 5, 4), flags=f.MAINT_LIGHT_FLAGS))
+    d = api.decode_group0(0xFF, light)
+    assert "pack_lock_recorded" not in d and d["recharge_hard_stop_source"] == "image"
+
+
+def test_maint_marker_decoder():
+    assert api.decode_marker(bytes.fromhex("FFFFFFFF03"))["maintenance_active"] is False
+    assert api.decode_marker(bytes.fromhex("0000000000")) == {"maintenance_active": True, "marker": "0x00000000", "effective_slave_count": 0}
+    assert api.decode_marker(bytes.fromhex("12345678FF"))["maintenance_active"] is None   # unresolved, never "active"
+
+
+def test_maint_stage2_master(monkeypatch, golden):
+    """UART1 master with MAINT 1.6.4: lock state, maintenance marker, recharge stop mode, calibration, clock."""
+    api.no_sleep(monkeypatch)
+    responder = _maint_responder(storage=f.maint_storage(locks=(1, 1), cache=0x07))
+    calibration = bytes([1, 0, 0x08, 16]) + bytes(60) + (250).to_bytes(4, "big", signed=True) + (-12).to_bytes(4, "big", signed=True)
+
+    def respond(req):
+        if req.info == b"\x02":
+            return f.ascii_frame(req.adr, 0, bytes.fromhex("0000000000"))
+        if req.info == b"\x05\x00":
+            return f.ascii_frame(req.adr, 0, calibration)
+        return responder(req)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        bms.ascii[(0, 0x64)] = respond
+        bms.ascii[(0, 0x4D)] = bytes.fromhex("07EA0B040C0000")
+        bms.binary[(0, 0x47)] = f.parameter_info(switches=bytes([0x5F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x80]))[1:]
+        bms.binary[(0, 0xA2)] = f.serial_info("BAT-SN-0")
+        bms.binary[(0, 0xA4)] = f.serial_info("BMS-SN-0")
+        pack = api.make_pack(0)
+        api.poll(pack, bms)
+        data, ok = api.poll(pack, bms)
+    assert ok
+    maint = data["maint"]
+    assert maint["binary"] == {"storage_problem": "OFF", "pack_lock_active": "ON", "maintenance_mode": "ON"}
+    assert maint["normal"]["effective_slave_count"] == 0 and maint["normal"]["recharge_stop_mode"] == "hard stop"
+    assert maint["attributes"]["settings"]["pack_lock_recorded"] is True
+    assert maint["attributes"]["calibration"] == {"invalid_calibration_flags": "0x08", "current_a_ma": 250, "current_b_ma": -12}
+    assert data["clock"]["normal"] == {"bms_time": "2026-11-04T12:00:00", "clock_offset": 0}
+    assert {"maint_lock", "maint_marker", "maint_hard_stop"} <= api.capabilities(pack)
+    golden("poll_maint_stage2_master", data)
+
+
+def test_maint_slave_has_no_marker_on_uart1(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        bms.ascii[(1, 0x64)] = _maint_responder()
+        data, ok = api.poll(api.make_pack(1), bms)
+    assert ok and "maintenance_mode" not in data["maint"]["binary"]
+    assert not any(r.cid2 == 0x64 and r.info == b"\x02" for r in bms.requests)
+
+
+def test_oem_multi_pack_has_no_clock(monkeypatch):
+    """OEM UART1 doesn't serve 0x4D: no clock request, no clock group."""
+    api.no_sleep(monkeypatch)
+    with api.mode(2):
+        bms = _multi_pack_bms()
+        data, ok = api.poll(api.make_pack(0), bms)
+    assert ok and "clock" not in data and not any(r.cid2 == 0x4D for r in bms.requests)

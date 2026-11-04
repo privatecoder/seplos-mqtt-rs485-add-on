@@ -1,5 +1,11 @@
 {
   "master": {
+    "clock": {
+      "normal": {
+        "bms_time": null,
+        "clock_offset": null
+      }
+    },
     "info": {
       "normal": {
         "bms_serial_number": "BMS-SN-0",
@@ -37,6 +43,15 @@
           "remaining_capacity": 150.0,
           "state_of_charge": 53.6
         },
+        "settings": {
+          "extended_off_enabled": true,
+          "pack_lock_recorded": false,
+          "recharge_hard_stop": false,
+          "recharge_hard_stop_source": "image default",
+          "uart1_maintenance_start_allowed": true,
+          "uart1_parameter_write_allowed": true,
+          "uart1_power_rtc_allowed": true
+        },
         "storage": {
           "lock_recorded_backup": false,
           "lock_recorded_primary": false,
@@ -54,10 +69,14 @@
         }
       },
       "binary": {
+        "maintenance_mode": null,
+        "pack_lock_active": "OFF",
         "storage_problem": "OFF"
       },
       "normal": {
-        "maint_version": "1.6.4"
+        "effective_slave_count": null,
+        "maint_version": "1.6.4",
+        "recharge_stop_mode": "soft stop"
       }
     },
     "parameters": {

@@ -58,6 +58,8 @@ def no_sleep(monkeypatch) -> None:
     import time
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
+    import datetime as _datetime
+    monkeypatch.setattr(pack_module, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
 
 
 # --- framing ----------------------------------------------------------------------------------
@@ -273,7 +275,9 @@ def run_main(
     monkeypatch.setattr(time, "time", fake_time)
     monkeypatch.setattr(time, "monotonic", fake_time)
     monkeypatch.setattr(app, "now_iso", lambda: FIXED_NOW)
-    monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
+    no_sleep(monkeypatch)
+    import datetime as _datetime
+    monkeypatch.setattr(pack_module, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
     monkeypatch.setattr(app, "initialize_mqtt", lambda _config: connection)
     monkeypatch.setattr(app, "initialize_serial", lambda _config: port)
     monkeypatch.setattr(app, "start_health_server", lambda _state: None)
@@ -301,6 +305,8 @@ def with_checksum(raw: bytes) -> bytes:
 def bus_trace_poll(monkeypatch, bms: FakeBms, flaky_first_42: bool = False) -> list[tuple[str, float]]:
     """One poll on a bus with a simulated clock; returns (write|read, time) events."""
     monkeypatch.setattr(pack_module, "now_iso", lambda: FIXED_NOW)
+    import datetime as _datetime
+    monkeypatch.setattr(pack_module, "local_now", lambda: _datetime.datetime(2026, 11, 4, 12, 0, 0))
     clock = {"t": 0.0}
     trace: list[tuple[str, float]] = []
 
@@ -410,3 +416,13 @@ def system_reader(bms: FakeBms):
     reader = SystemReader()
     bus = SerialBus(FakeSerial(bms))
     return reader, lambda: reader.read(bus)
+
+
+def decode_group0(group0: int, identity):
+    from seplos_mqtt.decoders import maint
+    return maint.decode_group0(group0, identity)
+
+
+def decode_marker(info: bytes) -> dict:
+    from seplos_mqtt.decoders import maint
+    return maint.decode_marker(info)
