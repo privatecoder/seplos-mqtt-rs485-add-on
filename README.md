@@ -9,7 +9,8 @@ This Home Assistant add-on reads one or more Seplos V2/V16 BMS packs over RS485 
 - Single pack mode only: extended status (balancing, charge blocked request, current limiter reasons, precharge, external voltage/charger detected, current incl. idle) and all BMS parameters and named function switches as attributes
 - Multiple pack mode only: a "Seplos BMS System" device with the master's aggregate over all packs via Modbus (charge/discharge voltage and current limits, charge/discharge allowed, force charge requests, system SOC/voltage/current, min/max cell per pack) plus the calculated System Power and Total Full Energy
 - Calculated values: power and full energy (kWh, from the option `nominal_cell_voltage`) per pack and for the system
-- A settings app in the Home Assistant sidebar: overview of all packs, connection settings, read-only pack detection
+- A settings app in the Home Assistant sidebar: overview of all packs, connection settings, read-only pack detection (incl. MAINT version), parallel sets
+- Parallel sets (multiple pack mode): packs on a common feeder grouped into one "Seplos Parallel Set" device with net current, power, capacity-weighted SOC, voltage spread and cell extrema
 - Packs with 7 to 16 cells
 - Home Assistant MQTT discovery (optional)
 - Per-pack heartbeat and availability
@@ -136,6 +137,33 @@ them in the Seplos BMS app. Saving a changed connection restarts the add-on's pr
 discovery entities and the gateway bridge are rebuilt from the saved settings. The MQTT, discovery and logging
 options stay in the add-on configuration.
 
+### Parallel sets
+
+In the **Parallel sets** tab you group packs that hang on one common feeder to the bank busbars (packs connected in
+parallel, e.g. pairs). Per set: a name, the member packs in their physical order, the wiring (diagonal, common
+busbar or unknown) and, for diagonal wiring, the packs carrying the plus and minus cable. "Propose neighbour pairs"
+fills a draft with (0, 1), (2, 3), … that you check before saving. Saving takes effect at the next poll cycle,
+without a restart; nothing is written to the BMS.
+
+Each active set becomes a Home Assistant device "Seplos Parallel Set <name>" (entity IDs
+`sensor.seplos_bms_set_<id>_<key>`; the id is assigned once and never reused). The pack devices stay as they are.
+After each poll cycle the add-on computes from the members' latest telemetry:
+
+| HA name | MQTT JSON path (`seplos/set-{id}/sensors`) | Meaning |
+| --- | --- | --- |
+| Current | `normal.current` | sum of the member currents (follows `invert_ha_dis_charge_measurements`) |
+| Power | `normal.power` | sum of pack voltage × current per member (W) |
+| SOC | `normal.soc` | SOC weighted with each member's learned full capacity |
+| Voltage Median / Voltage Range | `normal.voltage_median` / `normal.voltage_range` | median and max − min of the pack voltages |
+| Highest / Lowest Cell Voltage (+ Pack) | `normal.highest_cell_voltage[_pack]`, `normal.lowest_cell_voltage[_pack]` | cell extrema and the pack (DIP address) |
+| Highest / Lowest Cell Temperature (+ Pack) | `normal.highest_cell_temperature[_pack]`, `normal.lowest_cell_temperature[_pack]` | temperature extrema and the pack |
+| Members Reporting | `normal.members_reporting` | members with fresh data; the membership is in its attributes |
+| Sample Age | `normal.sample_age` | age of the oldest member sample (s) |
+
+If a member is offline or has no fresh data, all aggregates are unknown (never computed from a part of the set).
+A set whose packs are not all configured, or any set in single pack mode, is inactive; deleted or inactive sets
+are removed from Home Assistant.
+
 Example log output:
 
 ```text
@@ -172,6 +200,8 @@ Example log output:
 - seplos/pack-{n}/availability: per-pack online/offline
 - seplos/system/sensors: system aggregate of the master over all packs (multiple pack mode only)
 - seplos/system/availability: system online/offline (multiple pack mode only)
+- seplos/set-{id}/sensors: values of a parallel set (`normal`) and its membership (`set`)
+- seplos/set-{id}/availability: online while the set is active
 - seplos/availability: global online/offline
 
 Home Assistant discovery uses the prefix defined by ha_discovery_prefix (default: homeassistant).
