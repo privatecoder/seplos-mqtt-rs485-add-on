@@ -83,3 +83,50 @@ the pack's unit. The add-on's own backup export additionally carries every refer
 4. Poll order by sets, aligned cohorts, sharing/gap verdicts.
 5. Observed balancer values: MQTT bridge, then optional HA entity picker.
 6. Import/export with OpenBMS (can move earlier once 2 and 3 exist).
+
+## Stage 2 in detail (parallel sets)
+
+Sub-stages, each reviewed: **2a** model + API + live apply, **2b** values + HA devices + status, **2c** UI.
+
+### 2a: model and API
+
+- `parallel_sets` (top level of `/data/monitoring.json`, optional, default `[]`) and `next_set_id` (int ≥ 1,
+  default 1). A set: `{id: int ≥ 1, name: str 1..40 (trimmed, unique case-insensitively), packs: [int] (2..16
+  distinct DIP addresses 0..15, physical order), wiring: "diagonal" | "common_busbar" | "unknown", plus: int|null,
+  minus: int|null}`. `plus`/`minus` must be members; `diagonal` requires both and `plus != minus`. A pack is in at
+  most one set. Unknown keys of a set survive load/save (like `connection`).
+- Ids are assigned by the server (`next_set_id`, then incremented) and never reused, so HA entity IDs of a deleted
+  set never come back for a different set.
+- A set whose packs are not all below `connection.pack_count` stays stored but is **inactive** (reason
+  `pack_not_configured`); saving the connection with a lower pack count is allowed. Sets need multi pack mode
+  (`pack_count > 1`); in single pack mode all sets are inactive (reason `single_pack`).
+- `GET /api/sets` → `{revision, pack_count, sets: [... + {active, reason}]}`. `PUT /api/sets` (CSRF + If-Match) with
+  `{sets: [...]}`: the whole list; entries without `id` are new; an `id` that is not stored → `invalid_fields`
+  (`value`); `active`/`reason` in the body are ignored. 422 `invalid_fields` with paths like `sets[1].plus`.
+- A saved set change applies **without a restart**: the web thread hands the validated set list to the main loop
+  (callback like `on_connection_saved`), which picks it up at the next cycle boundary.
+
+### 2b: values and Home Assistant
+
+- After each full poll cycle (next to the system data), per **active** set from the members' latest valid 0x42
+  data: `current` (sum), `power` (sum of pack voltage × current, W), `soc` (capacity-weighted with the learned full
+  capacity; unknown unless every member has SOC and a capacity > 0), `voltage_median`, `voltage_range` (max − min
+  pack voltage), `highest_cell_voltage` + `_pack`, `lowest_cell_voltage` + `_pack`, `highest_cell_temperature` +
+  `_pack`, `lowest_cell_temperature` + `_pack`, `members_reporting` (count), `sample_age` (s, oldest member
+  sample). A member counts as reporting when it is online and its data is not older than the pack availability
+  limit; if any member is missing, every aggregate is unknown (null), only `members_reporting`/`sample_age` stay.
+- MQTT: `<base>/set-<id>/sensors` (JSON `{"normal": {...}, "set": {name, packs, wiring, plus, minus}}`),
+  `<base>/set-<id>/availability` (online while the set is active). HA device `Seplos Parallel Set <name>`, ids
+  `seplos_bms_set_<id>`, node `seplos-mqtt-set-<id>`, entity IDs `seplos_bms_set_<id>_<key>`, `via_device` the
+  master; packs are not re-parented; membership as JSON attributes. Current/power follow the `invert` option.
+- Deleted or inactive sets: retained discovery configs and availability are cleared. The published set ids are kept
+  in `/data/seplos_state.json`, so a set deleted while the add-on was stopped is cleaned up at the next start.
+- `/api/status` gains `sets: [{id, name, active, reason, values...}]`.
+
+### 2c: UI
+
+- New tab "Sets": list of sets (name, members in order, wiring, taps, active/inactive with reason), editor
+  (name, pack chips in physical order with move up/down, wiring, plus/minus selects limited to members), delete.
+  "Propose neighbour pairs" fills a draft with (0,1), (2,3), … for packs not yet in a set; nothing is saved
+  until the user saves. Same revision/CSRF/read-only rules as the settings tab.
+- Overview: one card per set with the 2b values; inactive sets show the reason.
