@@ -728,3 +728,156 @@ def test_health_decision():
     assert health.max_poll_age(4, 60, True) == (4 * 3 + 60 + 3) * 3 + 10
     assert health.is_healthy(True, True, 5, 30) and not health.is_healthy(True, True, 31, 30)
     assert not health.is_healthy(False, True, 5, 30) and not health.is_healthy(True, False, 5, 30)
+
+
+# --- MAINT stage 1 ------------------------------------------------------------------------------------
+
+def _maint_responder(identity=None, storage=None, energy=None):
+    identity = f.MAINT_FULL_IDENTITY if identity is None else identity
+    storage = f.maint_storage() if storage is None else storage
+    energy = f.maint_energy() if energy is None else energy
+
+    def respond(req):
+        payload = {b"\x03": identity, b"\x04": storage, b"\x06": energy}.get(req.info)
+        return f.ascii_frame(req.adr, 0x00, payload) if payload is not None else f.ascii_frame(req.adr, 0x05, b"")
+    return respond
+
+
+def test_binary_frame_kb_literals():
+    assert api.binary_encode(1, 0x47) == bytes.fromhex("550147 00A36BAA".replace(" ", ""))
+    assert api.binary_encode(1, 0xA2) == bytes.fromhex("5501A2004C2CAA")
+    assert api.binary_encode(1, 0xA4) == bytes.fromhex("5501A400E68AAA")
+    assert api.binary_encode(11, 0xA4) == bytes.fromhex("550BA400214BAA")
+
+
+def test_maint_identity_release_metadata():
+    ident = api.decode_maint_identity(f.MAINT_FULL_IDENTITY)
+    assert ident.base_version == "16.06.13" and ident.patch_version == "1.6.4"
+    assert ident.build_id == "a8676b52bae281ff" and ident.image_flags == 0xFE and ident.capabilities == 0x000F
+    import pytest
+    with pytest.raises(ValueError):
+        api.decode_maint_identity(f.maint_identity(caps=0x0010))    # unknown capability bit
+    with pytest.raises(ValueError):
+        api.decode_maint_identity(b"MNT\x06" + bytes(17))
+
+
+def test_maint_single_pack(monkeypatch, golden):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500)    # 0x42 fallback 650.0
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        pack = api.make_pack(0)
+        data, ok = api.poll(pack, bms)
+    assert ok
+    t = data["telemetry"]["normal"]
+    assert t["energy_charged"] == 7000.1 and t["energy_discharged"] == 6900.2   # full width from 64/06
+    assert data["info"]["normal"]["firmware_patch"] == "16.06.13"               # reported, not probed
+    assert not any(r.cid2 == 0xAA for r in bms.requests if r.kind == "ascii")
+    assert data["maint"]["normal"] == {"maint_version": "1.6.4"} and data["maint"]["binary"] == {"storage_problem": "OFF"}
+    assert data["maint"]["attributes"]["checkpoint"]["boot_choice"] == "primary"
+    assert api.capabilities(pack) == {"maint", "maint_storage"}
+    golden("poll_maint_single_pack", data)
+
+
+def test_maint_storage_problem_and_light_profile(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        light = f.maint_identity(patch=(1, 5, 4), flags=f.MAINT_LIGHT_FLAGS)
+        bms.ascii[(0, 0x64)] = _maint_responder(identity=light, storage=f.maint_storage(classes=(1, 2, 0, 1, 1, 1), locks=(0xFF, 0xFF), cache=0))
+        data, ok = api.poll(api.make_pack(0), bms)
+    assert ok and data["maint"]["binary"]["storage_problem"] == "ON"
+    storage = data["maint"]["attributes"]["storage"]
+    assert storage["parameters"] == {"primary": "valid", "backup": "invalid", "comparison": "not comparable"}
+    assert storage["lock_recorded_primary"] is None and storage["lock_runtime"] is None   # 1.5.4: unavailable, not "unlocked"
+
+
+def test_maint_oem_firmware_answers_rtn04(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = ("rtn", 0x04)
+        pack = api.make_pack(0)
+        data, ok = api.poll(pack, bms)
+        api.poll(pack, bms)
+    assert ok and "maint" not in data and api.capabilities(pack) == set()
+    assert data["info"]["normal"]["firmware_patch"] == "16.06.13+"
+    assert sum(1 for r in bms.requests if r.cid2 == 0x64) == 1     # detected once
+
+
+def test_maint_silent_gives_up_after_three_polls(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        pack = api.make_pack(0)
+        for _ in range(5):
+            data, ok = api.poll(pack, bms)
+            assert ok
+    assert sum(1 for r in bms.requests if r.cid2 == 0x64) == 6     # 3 polls x 2 attempts
+    assert "maint" not in data
+
+
+def test_maint_energy_failure_does_not_fall_back_to_oem(monkeypatch):
+    api.no_sleep(monkeypatch)
+    clock = api.fake_monotonic(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500)
+        responder = _maint_responder()
+        bms.ascii[(0, 0x64)] = responder
+        pack = api.make_pack(0)
+        api.poll(pack, bms)
+        bms.ascii[(0, 0x64)] = lambda req: b"" if req.info == b"\x06" else responder(req)
+        clock["t"] += 120
+        data, _ = api.poll(pack, bms)
+        assert data["telemetry"]["normal"]["energy_charged"] == 7000.1        # last wide value, still fresh
+        clock["t"] += 700
+        data, ok = api.poll(pack, bms)
+    assert ok and data["telemetry"]["normal"]["energy_charged"] is None      # stale: unknown, never 650.0
+
+
+def test_maint_multi_pack_mixed_bank(monkeypatch, golden):
+    """UART1: pack 0 runs MAINT (binary 47/A2/A4), pack 1 is OEM."""
+    api.no_sleep(monkeypatch)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        bms.binary[(0, 0x47)] = f.parameter_info()[1:]
+        bms.binary[(0, 0xA2)] = f.serial_info("BAT-SN-0")
+        bms.binary[(0, 0xA4)] = f.serial_info("BMS-SN-0")
+        bms.echo_binary = True
+        master, slave = api.make_pack(0), api.make_pack(1)
+        m, ok0 = api.poll(master, bms)
+        s, ok1 = api.poll(slave, bms)
+    assert ok0 and ok1
+    assert m["parameters"]["cells_in_series"] == 16 and m["parameters"]["read_at"] == api.FIXED_NOW
+    assert m["info"]["normal"]["serial_number"] == "BAT-SN-0" and m["info"]["normal"]["bms_serial_number"] == "BMS-SN-0"
+    assert api.capabilities(master) == {"maint", "maint_storage", "maint_uart1"}
+    assert "maint" not in s and "parameters" not in s and api.capabilities(slave) == set()
+    golden("poll_maint_multi_pack", {"master": m, "slave": s})
+
+
+def test_maint_read_errors_do_not_fail_poll(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        bms.ascii[(0, 0x64)] = _maint_responder(energy=bytes(68))      # unknown format
+        bms.binary[(0, 0x47)] = ("rej", 0x81)
+        data, ok = api.poll(api.make_pack(0), bms)
+    assert ok and data["maint"]["normal"]["maint_version"] == "1.6.4" and "parameters" not in data
+
+
+def test_discovery_publishes_maint_entities_per_capability(golden):
+    disc, client = api.discovery()
+    api.discovery_startup(disc, 2)
+    client.published.clear()
+    api.set_capabilities(disc, 0, {"maint", "maint_storage", "maint_uart1"}, pack_bus=False)
+    records = client.as_records()
+    configs = {r["topic"].split("/")[-2]: r["payload"] for r in records if r["topic"].split("/")[2] == "seplos-mqtt-pack-0"}
+    for key in ("maint_version", "storage_problem", "parameters", "serial_number", "bms_serial_number"):
+        assert configs[key], key
+    assert configs["maint_version"]["json_attr_tpl"].startswith("{{ value_json.get('maint'")
+    assert configs["balancing_active"] == ""          # 0x5A stays RS485-1/2 only
+    assert not any("pack-1" in r["topic"] for r in records)
+    golden("discovery_maint_capabilities", _discovery(records))

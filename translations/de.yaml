@@ -52,6 +52,10 @@ configuration:
     description: "Invertiert die Messwerte der Lade- und Entlade-Sensoren in Home Assistant"
   
   # System-Einstellungen
+
+  maint_firmware:
+    name: "MAINT-Custom-Firmware"
+    description: "Zusätzlich die Daten der MAINT-Custom-Firmware 1.5.4 / 1.6.4 lesen, wo ein Pack sie meldet (Energiezähler in voller Breite, Flash-Speicherdiagnose, am CAN-Port: Parameter und Seriennummern jedes Packs). Nur lesend. Packs mit OEM-Firmware sind nicht betroffen."
   logging_level:
     name: "Log-Level"
     description: "Detailgrad der Logs (debug zeigt die meisten Details)"

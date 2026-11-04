@@ -30,6 +30,7 @@ _FIELDS = {
     "ENABLE_HA_DISCOVERY_CONFIG": "enable_ha_discovery",
     "MQTT_TOPIC": "mqtt_topic",
     "HA_DISCOVERY_PREFIX": "ha_discovery_prefix",
+    "MAINT_FIRMWARE": "maint_firmware",
 }
 
 
@@ -378,3 +379,28 @@ def mqtt_connection():
 def config_from(env: dict) -> Config:
     import os
     return Config.from_env({**os.environ, **env})
+
+
+def binary_encode(address: int, command: int, data: bytes = b"") -> bytes:
+    from seplos_mqtt.framing import binary
+    return binary.encode(address, command, data)
+
+
+def decode_maint_identity(info: bytes):
+    from seplos_mqtt.decoders import maint
+    return maint.decode_identity(info)
+
+
+def capabilities(pack) -> set:
+    return pack.capabilities
+
+
+def set_capabilities(disc: Discovery, pack_no: int, caps: set, pack_bus: bool) -> None:
+    disc.set_capabilities(pack_no, caps, pack_bus)
+
+
+def fake_monotonic(monkeypatch) -> dict:
+    import time
+    clock = {"t": 1_000.0}
+    monkeypatch.setattr(time, "monotonic", lambda: clock["t"])
+    return clock

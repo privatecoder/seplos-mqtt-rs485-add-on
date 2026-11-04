@@ -215,3 +215,39 @@ def system_registers() -> list[int]:
         448,           # 19 discharge voltage limit 0.1 V
         560,           # 20 total capacity Ah
     ]
+
+
+# --- MAINT 1.5.4 / 1.6.4 ----------------------------------------------------------------------
+
+# release metadata maint-full.json "info_hex" (MNT05, 1.6.4 on 16.06.13)
+MAINT_FULL_IDENTITY = bytes.fromhex("4D4E540510060D010604A8676B52BAE281FFFE000F")
+MAINT_LIGHT_FLAGS = 0x3A
+
+
+def maint_identity(patch=(1, 6, 4), base=(16, 6, 13), flags=0xFE, caps=0x000F, build="a8676b52bae281ff") -> bytes:
+    return b"MNT\x05" + bytes(base) + bytes(patch) + bytes.fromhex(build) + u8(flags) + u16(caps)
+
+
+def maint_storage(classes=(1, 1, 1, 1, 1, 1), locks=(0, 0), cache=0x06) -> bytes:
+    return u8(1) + bytes(classes) + bytes(locks) + u8(cache)
+
+
+def _soc_record(remaining=15000, full=28000, charged=70000, discharged=69000, cycles=42) -> bytes:
+    le = lambda v, n=2: v.to_bytes(n, "little")  # noqa: E731
+    body = b"\xa0\x14" + le(remaining) + le(full) + le(charged, 4) + le(discharged, 4) + le(cycles) + le(500) + le(30)
+    return body + le(0xBEEF)
+
+
+def maint_energy(charged=70001, discharged=69002, classes=(1, 1), comparison=1, crc_mask=3, boot=1) -> bytes:
+    out = u8(1) + bytes(classes) + u8(comparison) + u8(crc_mask) + u8(boot)
+    out += u16(28000) + u16(14000) + struct.pack(">I", charged) + struct.pack(">I", discharged)
+    out += u16(15000) + u16(28000) + u16(536)
+    out += _soc_record() + _soc_record()
+    assert len(out) == 68
+    return out
+
+
+def binary_frame(adr: int, cmd: int, data: bytes = b"") -> bytes:
+    import binascii
+    body = bytes([adr, cmd, len(data)]) + data
+    return b"\x55" + body + binascii.crc_hqx(body, 0).to_bytes(2, "big") + b"\xaa"

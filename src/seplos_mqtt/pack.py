@@ -11,6 +11,7 @@ from .config import Config
 from .decoders import alarms, identity, intrapack, parameters, telemetry
 from .energy import EnergyGuard
 from .framing.ascii import ExpectedLength
+from .maint import MaintSupport
 from .state import StateStore
 from .transport import NO_ANSWER, SerialBus
 
@@ -61,6 +62,9 @@ class BatteryPack:
         self.extended_status: dict | None = None
         self.extended_status_ts = 0.0
         self.cell_count: int | None = None
+        self.maint = MaintSupport(address, config.multi_pack) if config.maint_firmware else None
+        self._uart1_parameters_ts = 0.0
+        self._uart1_parameters_read_at: str | None = None
         self.energy = EnergyGuard(address, store if store is not None else StateStore(None))
 
     # --- request helpers ----------------------------------------------------------------------
@@ -118,6 +122,9 @@ class BatteryPack:
         The firmware only reports major.minor (e.g. 16.06), so the patch level is derived from
         features that only exist since a certain patch level.
         """
+        if self.maint is not None and self.maint.identity is not None:
+            # reported by the MAINT image itself, no probing needed
+            return self.maint.identity.base_version
         if firmware_version == "16.04":
             return "16.04.x"
         if firmware_version != "16.06":
@@ -212,6 +219,38 @@ class BatteryPack:
             # retry after a minute instead of waiting for the next regular refresh
             self.parameters_ts = time.time() - self.PARAMETER_REFRESH_SECONDS + 60
 
+    # --- MAINT custom firmware (optional, read-only) ----------------------------------------------
+
+    def _guarded(self, step) -> None:
+        """Optional MAINT reads never fail the regular poll."""
+        try:
+            step(self.bus)
+        except Exception as e:
+            logger.warning("Pack%s:MAINT read failed: %s", self.address, e)
+
+    def _merge_maint(self, data: BatteryData) -> None:
+        maint = self.maint
+        payload = maint.payload()
+        if payload is None:
+            return
+        data["maint"] = payload
+        energy = maint.live_energy()
+        if energy is not None:
+            # full-width counters replace the 0x42 values with their 6500 kWh fallback
+            data["telemetry"]["normal"].update(energy)
+        if self.config.multi_pack:
+            if maint.parameters.value is not None:
+                if maint.parameters.ts != self._uart1_parameters_ts:
+                    self._uart1_parameters_ts = maint.parameters.ts
+                    self._uart1_parameters_read_at = now_iso()
+                data["parameters"] = {**maint.parameters.value, "read_at": self._uart1_parameters_read_at}
+            if maint.serials and "info" in data:
+                data["info"] = {"normal": {**data["info"]["normal"], **{k: v for k, v in maint.serials.items() if v}}}
+
+    @property
+    def capabilities(self) -> set[str]:
+        return self.maint.capabilities if self.maint is not None else set()
+
     # --- poll -----------------------------------------------------------------------------------
 
     def read(self) -> tuple[BatteryData | None, bool]:
@@ -234,9 +273,14 @@ class BatteryPack:
                 return None, False
             data["telesignalization"] = telesignal_feedback
 
+            if self.maint is not None:
+                self._guarded(self.maint.detect)
             self._fetch_device_info()
             if self.info:
                 data["info"] = self.info
+            if self.maint is not None:
+                self._guarded(self.maint.poll)
+                self._merge_maint(data)
 
             if not self.config.multi_pack:
                 extended_status = self._fetch_extended_status()

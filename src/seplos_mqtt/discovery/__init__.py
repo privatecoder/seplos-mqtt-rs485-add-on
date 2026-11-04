@@ -44,6 +44,8 @@ class Discovery:
         self._sw: dict = {}
         # cell count per pack once known
         self._cells: dict[int, int] = {}
+        # MAINT capabilities per pack (discovery conditions)
+        self._caps: dict[int, set[str]] = {}
         self._system_active = False
 
     # --- rendering ----------------------------------------------------------------------------
@@ -102,6 +104,9 @@ class Discovery:
         if entity.kind == "parameters":
             config["json_attr_t"] = topics.pack_sensors(self.topic, scope)
             config["json_attr_tpl"] = "{{ value_json.get('parameters', {}) | tojson }}"
+        elif entity.attributes:
+            config["json_attr_t"] = topics.pack_sensors(self.topic, scope)
+            config["json_attr_tpl"] = entity.attributes
         # newer HA versions derive the entity ID from device and entity name; default_entity_id keeps
         # the IDs stable (seplos_bms_pack_<n>_<key>)
         config["default_entity_id"] = f"{entity.domain}.{object_id}"
@@ -140,9 +145,10 @@ class Discovery:
         removed: list[Entity] = []
         cells = self._cells.get(pack_no, 16)
         cell_keys = {key for _domain, key in CELL_ENTITIES}
+        conditions = {"always", *(["pack_bus"] if pack_bus else []), *self._caps.get(pack_no, set())}
         for entity in PACK_ENTITIES:
             for index, item in enumerate(entity.expand(), start=1):
-                if entity.key in cell_keys and index > cells or item.pack_bus_only and not pack_bus:
+                if entity.key in cell_keys and index > cells or not item.when & conditions:
                     removed.append(item)
                 else:
                     self._publish_entity(item, pack_no)
@@ -163,6 +169,13 @@ class Discovery:
     def remove_system(self) -> None:
         for entity in SYSTEM:
             self._remove(entity.domain, SYSTEM_SCOPE, entity.key)
+
+    def set_capabilities(self, pack_no: int, caps: set[str], pack_bus: bool) -> None:
+        """MAINT capabilities of a pack changed: republish its configs with the matching entities."""
+        if self._caps.get(pack_no, set()) == caps:
+            return
+        self._caps[pack_no] = set(caps)
+        self.publish_pack(pack_no, pack_bus)
 
     def update_cell_count(self, pack_no: int, cell_count: int) -> None:
         """Remove the per-cell entities above the pack's actual cell count (packs with < 16 cells)."""

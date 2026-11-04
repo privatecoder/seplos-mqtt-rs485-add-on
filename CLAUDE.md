@@ -54,13 +54,14 @@ The UART1 bus only answers 0x42/0x44/0x4F/0x51/0x60-0x63 plus Modbus. Don't add 
 - `energy.py` keeps the 0x42 energy counters continuous across the 6500 kWh fallback, persisted via `state.py` (`/data/seplos_state.json`).
 - `app.py`: composition and main loop. Polls the packs round-robin, publishes data/heartbeat/availability, after each full cycle the system data, then sleeps `MQTT_UPDATE_INTERVAL`. SIGTERM raises `SystemExit`; cleanup runs once in `main()`'s `finally`. `health.py` serves `/health` on :8080 for the Supervisor watchdog.
 - `mqtt_client.py`: `MqttConnection` supports the Paho 1.x and 2.x callback APIs (callbacks only set flags; a reconnect or the HA birth message `<prefix>/status` = `online` requests a resync in the main loop). `Publisher.state()` suppresses a payload only if the same payload was already accepted by the client, and `replay()` resends all latest states.
+- `maint.py` (option `maint_firmware`): per-board MAINT 1.5.4/1.6.4 support. `MaintSupport.detect()` identifies a board via ASCII 64/03 only; every read is gated by that board's image flags/capability mask, never fails the regular poll and never writes. `framing/binary.py` handles the UART1 binary frames (`55 … AA`, CRC-16/XMODEM, read by LEN). Discovery entities carry `when` conditions (`pack_bus`, `maint`, `maint_storage`, `maint_uart1`); `Discovery.set_capabilities()` republishes a pack when its capabilities change.
 - `topics.py`: MQTT state topics and HA identifiers. These are public interfaces (automations, dashboards, retained discovery); keep them stable.
 
 ### Discovery (`src/seplos_mqtt/discovery/`)
 
 - `catalog.py` is data: `Entity` entries keyed by the JSON key the decoder writes (`value_json.<group>.<normal|binary>.<key>`). Binary payloads of telesignalization entities come from the decoder's `alarms.BIT_FIELDS`, so they can't drift apart.
 - `Discovery` renders and publishes retained configs to `<prefix>/<sensor|binary_sensor>/seplos-mqtt-pack-<n>/<key>/config` (system: `seplos-mqtt-system`) with short-form keys. `default_entity_id` keeps entity IDs stable (`seplos_bms_pack_<n>_<key>`). The full device block travels with the first config per device; `update_firmware()` republishes one config once the real firmware is known.
-- **When renaming or dropping an entity key, add the old `(domain, key)` to `OBSOLETE`** so the retained discovery config gets cleared for existing users. Mode-specific entities (`pack_bus_only`, system) are cleared automatically.
+- **When renaming or dropping an entity key, add the old `(domain, key)` to `OBSOLETE`** so the retained discovery config gets cleared for existing users. Entities whose `when` conditions don't hold for a pack, and the system device in single pack mode, are cleared automatically.
 
 ### Docs and the Lovelace card
 

@@ -1289,6 +1289,12 @@
     "topic": "ha/binary_sensor/seplos-mqtt-pack-0/severe_fault/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/binary_sensor/seplos-mqtt-pack-0/storage_problem/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -2674,6 +2680,12 @@
     "qos": 1,
     "retain": true,
     "topic": "ha/binary_sensor/seplos-mqtt-pack-1/severe_fault/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/binary_sensor/seplos-mqtt-pack-1/storage_problem/config"
   },
   {
     "payload": {
@@ -4723,6 +4735,12 @@
     "qos": 1,
     "retain": true,
     "topic": "ha/sensor/seplos-mqtt-pack-0/lowest_cell_voltage/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/sensor/seplos-mqtt-pack-0/maint_version/config"
   },
   {
     "payload": "",
@@ -7591,6 +7609,12 @@
     "qos": 1,
     "retain": true,
     "topic": "ha/sensor/seplos-mqtt-pack-1/lowest_cell_voltage/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/sensor/seplos-mqtt-pack-1/maint_version/config"
   },
   {
     "payload": "",

@@ -10,6 +10,9 @@ from dataclasses import dataclass, replace
 from ..decoders import alarms
 
 DIAG = "diagnostic"
+ALWAYS = frozenset({"always"})
+PACK_BUS = frozenset({"pack_bus"})
+PACK_BUS_OR_MAINT_UART1 = frozenset({"pack_bus", "maint_uart1"})
 
 
 @dataclass(frozen=True)
@@ -29,7 +32,10 @@ class Entity:
     payload_on: str | None = None
     payload_off: str | None = None
     count: int = 0                  # > 0: key_1..key_n, "name 1".."name n"
-    pack_bus_only: bool = False     # only served on RS485-1/2 (single pack mode)
+    # published if any of these conditions holds for the pack: "always", "pack_bus" (RS485-1/2, single
+    # pack mode) or a MAINT capability ("maint", "maint_storage", "maint_uart1"); removed otherwise
+    when: frozenset = ALWAYS
+    attributes: str | None = None   # Jinja expression for json_attr_tpl
 
     def expand(self) -> list[Entity]:
         if not self.count:
@@ -106,38 +112,39 @@ INFO: list[Entity] = [
     Entity("firmware_version", "Firmware Version", group="info", kind="info", icon="mdi:chip", category=DIAG),
     Entity("firmware_patch", "Firmware Patch (derived)", group="info", kind="info", icon="mdi:chip", category=DIAG),
     Entity("can_protocol", "CAN Protocol", group="info", kind="info", icon="mdi:swap-horizontal", category=DIAG),
-    Entity("serial_number", "Battery Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG, pack_bus_only=True),
-    Entity("bms_serial_number", "BMS Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG, pack_bus_only=True),
+    Entity("serial_number", "Battery Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG, when=PACK_BUS_OR_MAINT_UART1),
+    Entity("bms_serial_number", "BMS Serial Number", group="info", kind="info", icon="mdi:barcode", category=DIAG,
+           when=PACK_BUS_OR_MAINT_UART1),
 ]
 FIRMWARE_ENTITY = INFO[1]
 
 # Extended status from the intra-pack record (CID2 0x5A, RS485-1/2 only), published under "status"
 STATUS: list[Entity] = [
     _sensor("dis_charge_current_unfiltered", "Current (incl. idle)", "status", invert=True, precision=2, icon="mdi:current-dc",
-            pack_bus_only=True, **A),
-    Entity("balancing_active", "Balancing Active", "status", "binary_sensor", device_class="running", category=DIAG, pack_bus_only=True),
+            when=PACK_BUS, **A),
+    Entity("balancing_active", "Balancing Active", "status", "binary_sensor", device_class="running", category=DIAG, when=PACK_BUS),
     Entity("balancing_blocked", "Balancing Not Running (Blocked / Not Needed)", "status", "binary_sensor", category=DIAG,
-           pack_bus_only=True),
-    Entity("balancing_time_limit", "Balancing Time Limit Reached", "status", "binary_sensor", category=DIAG, pack_bus_only=True),
+           when=PACK_BUS),
+    Entity("balancing_time_limit", "Balancing Time Limit Reached", "status", "binary_sensor", category=DIAG, when=PACK_BUS),
     Entity("balancing_temperature_blocked", "Balancing Blocked (Temperature)", "status", "binary_sensor", device_class="problem",
-           category=DIAG, pack_bus_only=True),
+           category=DIAG, when=PACK_BUS),
     # normal during recharge waiting with hard stop or before a shutdown, so not a problem class
     Entity("charge_forbidden", "Charge Blocked (Charge MOSFET Off Request)", "status", "binary_sensor", category=DIAG,
-           pack_bus_only=True),
+           when=PACK_BUS),
     Entity("limiter_charging_from_10a", "Current Limiter Active (Charging >= 10 A)", "status", "binary_sensor", category=DIAG,
-           pack_bus_only=True),
+           when=PACK_BUS),
     Entity("limiter_after_charge_overcurrent_warning", "Current Limiter Active (After Charge Overcurrent Warning)", "status",
-           "binary_sensor", category=DIAG, pack_bus_only=True),
+           "binary_sensor", category=DIAG, when=PACK_BUS),
     Entity("precharge_running", "Precharge Running", "status", "binary_sensor", device_class="running", category=DIAG,
-           pack_bus_only=True),
+           when=PACK_BUS),
     Entity("external_voltage_detected", "External Voltage Detected (Charger)", "status", "binary_sensor", device_class="plug",
-           category=DIAG, pack_bus_only=True),
-    Entity("charge_current_status", "Charge Current Status (>= 3 A)", "status", "binary_sensor", category=DIAG, pack_bus_only=True),
+           category=DIAG, when=PACK_BUS),
+    Entity("charge_current_status", "Charge Current Status (>= 3 A)", "status", "binary_sensor", category=DIAG, when=PACK_BUS),
     Entity("discharge_current_status", "Discharge Current Status (>= 3 A)", "status", "binary_sensor", category=DIAG,
-           pack_bus_only=True),
+           when=PACK_BUS),
     # all parameters (CID2 0x47) as attributes of one sensor, state: time of the last successful read
     Entity("parameters", "Parameters", kind="parameters", device_class="timestamp", icon="mdi:tune-vertical", category=DIAG,
-           pack_bus_only=True),
+           when=PACK_BUS_OR_MAINT_UART1),
 ]
 
 TELESIGNALIZATION: list[Entity] = [
@@ -203,7 +210,16 @@ TELESIGNALIZATION: list[Entity] = [
     _alarm_binary("heating_switch", "Heater", device_class="power"),
 ]
 
-PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION]
+# MAINT 1.5.4 / 1.6.4 custom firmware (option maint_firmware), published under "maint"
+MAINT_ATTRIBUTES = "{{ value_json.get('maint', {}).get('attributes', {}) | tojson }}"
+MAINT: list[Entity] = [
+    Entity("maint_version", "MAINT Firmware", "maint", icon="mdi:chip", category=DIAG, when=frozenset({"maint"}),
+           attributes=MAINT_ATTRIBUTES),
+    Entity("storage_problem", "Flash Storage Problem", "maint", "binary_sensor", device_class="problem", category=DIAG,
+           when=frozenset({"maint_storage"})),
+]
+
+PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT]
 
 Y = "system"
 # System values from the master via Modbus 0x1000 (CAN port RS485 bus only), topic <topic>/system/sensors

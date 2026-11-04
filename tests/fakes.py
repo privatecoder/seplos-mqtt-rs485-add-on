@@ -51,6 +51,11 @@ def check_ascii_request(raw: bytes) -> None:
 
 
 def parse_request(raw: bytes) -> Request:
+    if raw[:1] == b"\x55":
+        import binascii
+        assert len(raw) == raw[3] + 7 and raw[-1] == 0xAA, "bad binary request"
+        assert binascii.crc_hqx(raw[1:-3], 0) == int.from_bytes(raw[-3:-1], "big"), "bad binary CRC"
+        return Request(raw=raw, kind="binary", adr=raw[1], cid2=raw[2], info=raw[4:-3])
     if raw[:1] == b"~":
         check_ascii_request(raw)
         info_ascii = raw[13:-5]
@@ -72,13 +77,15 @@ class FakeBms:
         self.ascii: dict[tuple[int, int], object] = {}
         self.modbus: dict[tuple[int, int, int], object] = {}
         self.requests: list[Request] = []
+        self.binary: dict[tuple[int, int], object] = {}   # (adr, cmd) -> DATA | ("rej", code) | callable
+        self.echo_binary = False
         self.protocol_errors: list[str] = []
         self.noise: bytes = b""        # bytes put on the wire before the next answer (e.g. intra-pack traffic)
 
     def respond(self, raw: bytes) -> bytes:
         try:
             req = parse_request(raw)
-        except (ProtocolError, ValueError) as e:
+        except (ProtocolError, ValueError, AssertionError) as e:
             self.protocol_errors.append(str(e))
             return b""
         noise, self.noise = self.noise, b""
@@ -86,6 +93,17 @@ class FakeBms:
 
     def _answer(self, req: Request) -> bytes:
         self.requests.append(req)
+        if req.kind == "binary":
+            from frames import binary_frame
+            entry = self.binary.get((req.adr, req.cid2))
+            echo = req.raw if self.echo_binary else b""
+            if entry is None:
+                return echo
+            if callable(entry):
+                return echo + entry(req)
+            if isinstance(entry, tuple) and entry[0] == "rej":
+                return echo + binary_frame(req.adr, entry[1])
+            return echo + binary_frame(req.adr, req.cid2, entry)
         if req.kind == "ascii":
             entry = self.ascii.get((req.adr, req.cid2))
             if entry is None:

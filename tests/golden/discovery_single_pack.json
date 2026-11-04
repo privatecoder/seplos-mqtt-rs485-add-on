@@ -1513,6 +1513,12 @@
     "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/severe_fault/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/binary_sensor/seplos-mqtt-pack-0/storage_problem/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -3503,6 +3509,12 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/lowest_cell_voltage/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/maint_version/config"
   },
   {
     "payload": "",

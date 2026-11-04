@@ -146,6 +146,8 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
         state.publisher.publish(topics.pack_availability(base, address), "online")
         pack_state.availability = "online"
 
+    if discovery:
+        discovery.set_capabilities(address, pack_state.pack.capabilities, pack_bus=not state.config.multi_pack)
     if discovery and pack_state.pack.cell_count:
         discovery.update_cell_count(address, pack_state.pack.cell_count)
     # show the real firmware version in the HA device info once it's known

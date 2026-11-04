@@ -33,6 +33,7 @@ options:
   enable_ha_discovery: true
   ha_discovery_prefix: "homeassistant"
   invert_ha_dis_charge_measurements: false
+  maint_firmware: false
   logging_level: "info"
 schema:
   rs485_remote_ip: "str?"
@@ -47,4 +48,5 @@ schema:
   enable_ha_discovery: "bool"
   ha_discovery_prefix: "str"
   invert_ha_dis_charge_measurements: "bool"
+  maint_firmware: "bool"
   logging_level: "list(info|error|debug)"

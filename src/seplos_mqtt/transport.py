@@ -15,6 +15,7 @@ from typing import Protocol
 
 from .decoders import intrapack
 from .framing import ascii as af
+from .framing import binary as bf
 from .framing import modbus
 
 logger = logging.getLogger("SeplosBMS.bus")
@@ -154,6 +155,56 @@ class SerialBus:
         except af.FrameError:
             return None
         return frame.code if frame.address == address else None
+
+    def query(self, address: int, cid2: int, info: bytes, attempts: int = 2) -> af.Frame | int | None:
+        """
+        Optional request (e.g. a MAINT extension): the answer frame whatever its RTN, NO_ANSWER if the
+        pack stayed silent, None for invalid answers. Fewer retries than regular polls.
+        """
+        result: af.Frame | int | None = None
+        command = af.encode(address, cid2, info)
+        with self._lock:
+            for _ in range(attempts):
+                self._send(command, reset_input=True)
+                raw = self._receive_frame()
+                if not raw:
+                    result = NO_ANSWER
+                    continue
+                try:
+                    frame = af.parse(raw)
+                except af.FrameError:
+                    result = None
+                    continue
+                if frame.address == address:
+                    return frame
+        return result
+
+    def request_binary(self, address: int, command: int, data: bytes = b"") -> bytes | None:
+        """
+        MAINT binary frame on UART1; returns DATA, None if there's no valid answer. Raises
+        BinaryRejected for a valid rejection. A gateway echo of the request is skipped.
+        """
+        request = bf.encode(address, command, data)
+        with self._lock:
+            self._send(request, reset_input=True)
+            try:
+                for _ in range(2):
+                    header = self.port.read(4)
+                    if len(header) < 4 or header[0] != bf.SOF or header[3] > bf.MAX_DATA:
+                        return None
+                    raw = header + self.port.read(header[3] + 3)
+                    if raw == request:
+                        continue
+                    try:
+                        return bf.parse(raw, address, command)
+                    except bf.BinaryRejected:
+                        raise
+                    except bf.BinaryFrameError as e:
+                        logger.debug("Pack%s:Binary 0x%02X: %s", address, command, e)
+                        return None
+                return None
+            finally:
+                self._mark_activity()
 
     def request_intra_pack(self, address: int) -> bytes | None:
         """The pack's own intra-pack record (CID2 0x5A), only served on RS485-1/2 (UART0)."""

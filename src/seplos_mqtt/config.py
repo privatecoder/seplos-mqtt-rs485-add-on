@@ -53,6 +53,8 @@ class Config:
     enable_ha_discovery: bool = True
     ha_discovery_prefix: str = "homeassistant"
     invert_ha_dis_charge_measurements: bool = True
+    # read the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware (read-only)
+    maint_firmware: bool = False
     # Logging
     logging_level: str = "INFO"
     # persistent state (energy counters); empty = /data/seplos_state.json if writable
@@ -91,6 +93,7 @@ class Config:
             enable_ha_discovery=_env(env, "ENABLE_HA_DISCOVERY_CONFIG", d.enable_ha_discovery, bool),
             ha_discovery_prefix=_env(env, "HA_DISCOVERY_PREFIX", d.ha_discovery_prefix, str),
             invert_ha_dis_charge_measurements=_env(env, "INVERT_HA_DIS_CHARGE_MEASUREMENTS", d.invert_ha_dis_charge_measurements, bool),
+            maint_firmware=_env(env, "MAINT_FIRMWARE", d.maint_firmware, bool),
             logging_level=_env(env, "LOGGING_LEVEL", "info", str).upper(),
             state_file=_env(env, "STATE_FILE", d.state_file, str),
         )

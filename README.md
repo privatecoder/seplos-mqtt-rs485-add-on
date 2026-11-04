@@ -304,6 +304,23 @@ Notes:
 - Alarm/protection pairs report the more severe state (Protection/Lockout before Alarm).
 - The doc's "State of health" (always 100 %), "Disconnection state" (always 0) and alarm event 6 bit 5 "reverse polarity" (no firmware code sets it) are not published.
 
+## MAINT custom firmware (optional)
+
+With the option `maint_firmware: true` the add-on also reads the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware (built from OEM firmware with the offline patcher of the Seplos knowledge base). Everything is read-only, nothing is written to the BMS.
+
+- Each pack is identified on its own via ASCII 64/03 (MNT05: MAINT version, reported OEM base, build ID, image flags, read capabilities). Packs that answer with an error (OEM firmware) or stay silent three times keep the normal OEM reads. Mixed banks work; a patched master says nothing about its slaves.
+- Full-width energy counters (64/06, live, 0.1 kWh, no 6500 kWh fallback) replace `Energy Charged/Discharged (total)`. If that read fails for more than 10 minutes the counters become unknown instead of falling back to the 0x42 value. The same answer reports the two persisted SOC records (class, CRC acceptance, boot choice) as attributes of `MAINT Firmware`.
+- Flash storage diagnostics (64/04, image flag 0x20, every 10 min): `Flash Storage Problem` turns on if a parameter or SOC mirror record is invalid. The raw classification and the 1.6.4 lock bytes are attributes (`null` = unavailable, not "unlocked").
+- Multiple pack mode (CAN port, UART1): parameters and function switches (binary 47, hourly) and the battery/BMS serial numbers (binary A2/A4) of every MAINT pack, which the OEM firmware only serves on RS485-1/2.
+- The derived firmware patch level is replaced by the OEM base version the MAINT image reports.
+
+| Home Assistant name | MQTT key (JSON path) | Source |
+|---|---|---|
+| MAINT Firmware | `maint.normal.maint_version`, attributes `maint.attributes` (identity, storage, checkpoint, live snapshot) | ASCII 64/03, 64/04, 64/06 |
+| Flash Storage Problem | `maint.binary.storage_problem` | ASCII 64/04 |
+
+The current MAINT images were validated offline only (emulator), not on hardware. Keep the option off unless your packs run MAINT firmware.
+
 ## Home Assistant setup
 
 ### Auto-discovery

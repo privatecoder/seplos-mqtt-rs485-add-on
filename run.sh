@@ -21,6 +21,7 @@ export_option MQTT_UPDATE_INTERVAL mqtt_update_interval
 export_option ENABLE_HA_DISCOVERY_CONFIG enable_ha_discovery
 export_option INVERT_HA_DIS_CHARGE_MEASUREMENTS invert_ha_dis_charge_measurements
 export_option HA_DISCOVERY_PREFIX ha_discovery_prefix
+export_option MAINT_FIRMWARE maint_firmware
 export_option LOGGING_LEVEL logging_level
 export_option MQTT_TOPIC mqtt_topic
 
