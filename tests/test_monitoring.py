@@ -416,6 +416,12 @@ def test_model_defaults():
             _tcp(min_cell_voltage="bad", max_cell_voltage=7),
             [("connection.min_cell_voltage", "type"), ("connection.max_cell_voltage", "range")],
         ),
+        (_tcp(nominal_cell_voltage=0), [("connection.nominal_cell_voltage", "range")]),
+        (_tcp(nominal_cell_voltage=5.1), [("connection.nominal_cell_voltage", "range")]),
+        (_tcp(nominal_cell_voltage="x"), [("connection.nominal_cell_voltage", "type")]),
+        (_tcp(nominal_cell_voltage=True), [("connection.nominal_cell_voltage", "type")]),
+        (_tcp(nominal_cell_voltage=float("nan")), [("connection.nominal_cell_voltage", "range")]),
+        (_tcp(nominal_cell_voltage=10**400), [("connection.nominal_cell_voltage", "range")]),
         (_tcp(update_interval=-1), [("connection.update_interval", "range")]),
         (_tcp(update_interval=1.5), [("connection.update_interval", "type")]),
         (_tcp(update_interval=False), [("connection.update_interval", "type")]),
@@ -451,6 +457,21 @@ def test_model_section_problems():
     with pytest.raises(ConfigValidationError) as e:
         MonitoringConfig.from_dict([])
     assert e.value.problems == [("", "type")]
+
+
+def test_model_nominal_cell_voltage():
+    c = ConnectionSettings.from_dict(_tcp())              # a document without the key
+    assert c.nominal_cell_voltage == 3.2
+    assert c.to_dict()["nominal_cell_voltage"] == 3.2     # serialized
+    c = ConnectionSettings.from_dict(_tcp(nominal_cell_voltage=3))
+    assert c.nominal_cell_voltage == 3.0 and isinstance(c.nominal_cell_voltage, float)
+    # independent of min/max: no ordering check (nominal below min or above max is accepted)
+    ConnectionSettings.from_dict(_tcp(min_cell_voltage=3.0, max_cell_voltage=3.5, nominal_cell_voltage=2.0))
+    ConnectionSettings.from_dict(_tcp(min_cell_voltage=3.0, max_cell_voltage=3.5, nominal_cell_voltage=4.0))
+    # reported next to the other problems
+    with pytest.raises(ConfigValidationError) as e:
+        ConnectionSettings.from_dict(_tcp(pack_count=0, nominal_cell_voltage=9))
+    assert e.value.problems == [("connection.pack_count", "range"), ("connection.nominal_cell_voltage", "range")]
 
 
 def test_model_int_accepted_for_float():
@@ -531,6 +552,25 @@ def test_migration_serial():
 def test_migration_baud(value, expected):
     env = {} if value is None else {"SERIAL_BAUDRATE": value}
     assert from_legacy_env(env).connection.baud == expected
+
+
+def test_migration_nominal_cell_voltage():
+    assert from_legacy_env({"NOMINAL_CELL_VOLTAGE": "3.3"}).connection.nominal_cell_voltage == 3.3
+    assert from_legacy_env({"NOMINAL_CELL_VOLTAGE": ""}).connection.nominal_cell_voltage == 3.2
+    assert from_legacy_env({}).connection.nominal_cell_voltage == 3.2
+    with pytest.raises(ConfigError):
+        from_legacy_env({"NOMINAL_CELL_VOLTAGE": "high"})
+    with pytest.raises(ConfigValidationError) as e:
+        from_legacy_env({"NOMINAL_CELL_VOLTAGE": "9"})
+    assert ("connection.nominal_cell_voltage", "range") in e.value.problems
+
+
+def test_load_or_migrate_document_without_nominal_loads_default(tmp_path):
+    path = tmp_path / "monitoring.json"
+    _write(path, schema_version=1, revision=1, data={"connection": _tcp()})   # written before beta8
+    cfg, store = load_or_migrate(path, {"NOMINAL_CELL_VOLTAGE": "3.3"})
+    assert cfg is not None and cfg.connection.nominal_cell_voltage == 3.2     # the env is not consulted again
+    assert store.revision == 1
 
 
 def test_migration_other_values():
@@ -666,9 +706,12 @@ def test_from_monitoring_matches_from_env_tcp():
         "MAINT_FIRMWARE": "true",
         "MIN_CELL_VOLTAGE": "2.8",
         "MAX_CELL_VOLTAGE": "3.6",
+        "NOMINAL_CELL_VOLTAGE": "3.3",
         "MQTT_UPDATE_INTERVAL": "7",
     }
-    assert Config.from_monitoring(from_legacy_env(legacy), legacy) == Config.from_env(legacy)
+    cfg = Config.from_monitoring(from_legacy_env(legacy), legacy)
+    assert cfg == Config.from_env(legacy)
+    assert cfg.nominal_cell_voltage == 3.3
 
 
 def test_from_monitoring_matches_from_env_serial_auto():

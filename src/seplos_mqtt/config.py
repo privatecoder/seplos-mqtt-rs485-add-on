@@ -134,6 +134,7 @@ class Config:
             remote_port=conn.port if conn.transport == "tcp" else d.remote_port,
             min_cell_voltage=conn.min_cell_voltage,
             max_cell_voltage=conn.max_cell_voltage,
+            nominal_cell_voltage=conn.nominal_cell_voltage,
             number_of_packs=conn.pack_count,
             serial_interface=conn.device if conn.transport == "serial" else TCP_PTY_PATH,
             serial_baudrate=0 if conn.baud == "auto" else int(conn.baud),

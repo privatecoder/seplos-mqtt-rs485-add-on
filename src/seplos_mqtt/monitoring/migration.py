@@ -35,6 +35,7 @@ def from_legacy_env(env: Mapping[str, str]) -> MonitoringConfig:
     connection["maint_firmware"] = _env(env, "MAINT_FIRMWARE", False, bool)
     connection["min_cell_voltage"] = _env(env, "MIN_CELL_VOLTAGE", 2.5, float)
     connection["max_cell_voltage"] = _env(env, "MAX_CELL_VOLTAGE", 3.65, float)
+    connection["nominal_cell_voltage"] = _env(env, "NOMINAL_CELL_VOLTAGE", 3.2, float)
     connection["update_interval"] = _env(env, "MQTT_UPDATE_INTERVAL", 1, int)
     return MonitoringConfig.from_dict({"connection": connection})
 

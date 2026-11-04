@@ -54,6 +54,7 @@ _CONNECTION_KEYS = frozenset(
         "maint_firmware",
         "min_cell_voltage",
         "max_cell_voltage",
+        "nominal_cell_voltage",
         "update_interval",
     }
 )
@@ -70,6 +71,7 @@ class ConnectionSettings:
     maint_firmware: bool = False
     min_cell_voltage: float = 2.5
     max_cell_voltage: float = 3.65
+    nominal_cell_voltage: float = 3.2
     update_interval: int = 1
     # unknown keys (settings of later versions) survive load and save untouched
     _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
@@ -153,6 +155,15 @@ class ConnectionSettings:
             bad("min_cell_voltage", "range")
             bad("max_cell_voltage", "range")
 
+        # independent of min/max: no ordering check
+        nominal = 3.2
+        if "nominal_cell_voltage" in data:
+            kind = _voltage_problem(data["nominal_cell_voltage"])
+            if kind is not None:
+                bad("nominal_cell_voltage", kind)
+            else:
+                nominal = float(data["nominal_cell_voltage"])
+
         update_interval = 1
         if "update_interval" in data:
             update_interval = data["update_interval"]
@@ -173,6 +184,7 @@ class ConnectionSettings:
             maint_firmware=maint_firmware,
             min_cell_voltage=volts["min_cell_voltage"],
             max_cell_voltage=volts["max_cell_voltage"],
+            nominal_cell_voltage=nominal,
             update_interval=update_interval,
             _extra={k: copy.deepcopy(v) for k, v in data.items() if k not in _CONNECTION_KEYS},
         )
@@ -191,6 +203,7 @@ class ConnectionSettings:
             maint_firmware=self.maint_firmware,
             min_cell_voltage=self.min_cell_voltage,
             max_cell_voltage=self.max_cell_voltage,
+            nominal_cell_voltage=self.nominal_cell_voltage,
             update_interval=self.update_interval,
         )
         return out
