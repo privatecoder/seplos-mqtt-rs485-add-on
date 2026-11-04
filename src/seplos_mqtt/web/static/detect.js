@@ -19,13 +19,14 @@ function resultView(result, savedCount, ctx) {
   const rows = result.responding.map((pack) => h('tr', {},
     h('td', {}, String(pack.address).padStart(2, '0')),
     h('td', {}, orDash(pack.device_name)),
-    h('td', {}, orDash(pack.firmware_version))));
+    h('td', {}, orDash(pack.firmware_patch || pack.firmware_version || null)),
+    h('td', {}, orDash(pack.maint_version || null))));
   const differs = n >= 1 && savedCount !== null && n !== savedCount;
   return h('div', { class: 'stack' },
     result.responding.length === 0
       ? h('p', {}, t('detect.none'))
       : h('table', { class: 'table' },
-        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, t('detect.col.address')), h('th', { scope: 'col' }, t('detect.col.device')), h('th', { scope: 'col' }, t('detect.col.firmware')))),
+        h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, t('detect.col.address')), h('th', { scope: 'col' }, t('detect.col.device')), h('th', { scope: 'col' }, t('detect.col.firmware')), h('th', { scope: 'col' }, t('detect.col.maint')))),
         h('tbody', {}, rows)),
     h('p', {}, t('detect.busy'), ' ', h('strong', {}, addressList(result.busy))),
     h('p', {}, t('detect.silent'), ' ', h('strong', {}, addressList(result.silent))),

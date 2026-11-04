@@ -134,8 +134,8 @@ def test_detect_two_packs():
     job, final, result = run(bms)
     assert final == "done"
     assert result["responding"] == [
-        {"address": 0, "device_name": "PACK0", "firmware_version": "16.06"},
-        {"address": 1, "device_name": "PACK1", "firmware_version": "16.06"},
+        {"address": 0, "device_name": "PACK0", "firmware_version": "16.06", "firmware_patch": None, "maint_version": None},
+        {"address": 1, "device_name": "PACK1", "firmware_version": "16.06", "firmware_patch": None, "maint_version": None},
     ]
     assert result["silent"] == list(range(2, 16))
     assert result["busy"] == []
@@ -144,6 +144,47 @@ def test_detect_two_packs():
     # read-only: exactly one 0x51 request per address, nothing else, all valid frames
     assert [(r.adr, r.cid2) for r in bms.requests] == [(a, 0x51) for a in range(16)]
     assert not bms.protocol_errors
+
+
+def run_maint(bms: FakeBms):
+    q = JobQueue()
+    job = q.submit("detect")
+    q.take()
+    return run_detect(make_bus(bms), job, maint=True)
+
+
+def test_detect_reads_the_maint_identity_of_responding_packs():
+    bms = bms_with(0, 1, 2)
+    bms.ascii[(0, 0x64)] = f.maint_identity()                       # MAINT 1.6.4 on 16.06.13
+    bms.ascii[(1, 0x64)] = ("rtn", 0x04)                            # OEM firmware
+    bms.ascii[(2, 0x64)] = f.maint_identity(base=(16, 6, 0xFF))     # revision unknown
+    final, result = run_maint(bms)
+    assert final == "done"
+    assert [(e["firmware_patch"], e["maint_version"]) for e in result["responding"]] == [
+        ("16.06.13", "1.6.4"), (None, None), (None, "1.6.4"),
+    ]
+    # one MAINT identity request per responding pack, single attempt, none to silent addresses
+    assert [(r.adr, r.cid2) for r in bms.requests if r.cid2 == 0x64] == [(0, 0x64), (1, 0x64), (2, 0x64)]
+    assert all(r.info == b"\x03" for r in bms.requests if r.cid2 == 0x64)
+    assert not bms.protocol_errors
+
+
+def test_detect_maint_silence_or_busy_is_no_maint():
+    bms = bms_with(0)
+    bms.ascii[(0, 0x64)] = None
+    _, result = run_maint(bms)
+    assert result["responding"][0]["maint_version"] is None
+    assert [(r.adr, r.cid2) for r in bms.requests if r.adr == 0] == [(0, 0x51), (0, 0x64)]
+
+    class BusyOnMaint(SerialBus):
+        def query(self, *args, **kwargs):
+            raise BusBusy()
+
+    q = JobQueue()
+    job = q.submit("detect")
+    q.take()
+    _, result = run_detect(make_bus(bms_with(0), BusyOnMaint), job, maint=True)
+    assert result["responding"][0]["maint_version"] is None and result["silent"] == list(range(1, 16))
 
 
 def test_detect_with_a_gap():

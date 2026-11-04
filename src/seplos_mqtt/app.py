@@ -284,7 +284,7 @@ def run_job(state: AppState, job: Any) -> None:
         if job.kind == "detect":
             if job.scan is None:
                 logger.info("Running job %s (%s)", job.id, job.kind)
-            if step_detect(state.bus, job):
+            if step_detect(state.bus, job, maint=state.config.maint_firmware):
                 jobs.complete(job, job.scan.final, result=job.scan.result())
         else:
             jobs.complete(job, "failed", error="unknown_job_kind")

@@ -13,8 +13,9 @@ import uuid
 from typing import Any
 
 from .decoders import identity
+from .decoders import maint as md
 from .pack import DEVICE_INFO_LEN
-from .transport import BusBusy, SerialBus
+from .transport import NO_ANSWER, BusBusy, SerialBus
 
 logger = logging.getLogger("SeplosBMS.jobs")
 
@@ -178,9 +179,28 @@ class DetectScan:
         }
 
 
-def step_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES) -> bool:
-    """One step of the read-only pack detection: exactly one ASCII 0x51 request (single attempt)
-    for the next DIP address. Returns True when the job is finished (``job.scan.final`` says how).
+def probe_maint(bus: SerialBus, address: int) -> tuple[str | None, str | None]:
+    """Read-only MAINT identity request (ASCII 64/03, single attempt) for the detection:
+    (exact base firmware or None, MAINT version or None). OEM firmware, silence, a busy bus or an
+    unknown identity format all give (None, None)."""
+    try:
+        answer = bus.query(address, md.CID2, md.INFO_IDENTITY, attempts=1)
+    except BusBusy:
+        return None, None
+    if answer is None or answer == NO_ANSWER or answer.code != 0x00:
+        return None, None
+    try:
+        ident = md.decode_identity(answer.info)
+    except md.MaintFormatError:
+        return None, None
+    base = None if ident.base_version.endswith(".?") else ident.base_version
+    return base, ident.patch_version
+
+
+def step_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES, maint: bool = False) -> bool:
+    """One step of the read-only pack detection: one ASCII 0x51 request (single attempt) for the
+    next DIP address, plus, with ``maint``, one MAINT identity request to a pack that answered.
+    Returns True when the job is finished (``job.scan.final`` says how).
 
     A cancel request is honoured before the step. The loop calls this once per iteration, so the
     scan spreads over the normal polling instead of blocking it. It never changes a setting.
@@ -208,9 +228,14 @@ def step_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES) -> bool
             scan.silent.append(address)
         else:
             normal = identity.decode_device_info(payload)["normal"]
-            scan.responding.append(
-                {"address": address, "device_name": normal["device_name"], "firmware_version": normal["firmware_version"]}
-            )
+            firmware_patch, maint_version = probe_maint(bus, address) if maint else (None, None)
+            scan.responding.append({
+                "address": address,
+                "device_name": normal["device_name"],
+                "firmware_version": normal["firmware_version"],
+                "firmware_patch": firmware_patch,
+                "maint_version": maint_version,
+            })
     scan.next_index += 1
     job.update(done=scan.next_index, result=scan.result())
     if scan.next_index >= len(scan.addresses):
@@ -219,9 +244,9 @@ def step_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES) -> bool
     return False
 
 
-def run_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES) -> tuple[str, dict[str, Any]]:
+def run_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES, maint: bool = False) -> tuple[str, dict[str, Any]]:
     """The whole detection in one go (tests, tools): the final job state and the result."""
-    while not step_detect(bus, job, addresses=addresses):
+    while not step_detect(bus, job, addresses=addresses, maint=maint):
         pass
     assert job.scan is not None and job.scan.final is not None
     return job.scan.final, job.scan.result()
