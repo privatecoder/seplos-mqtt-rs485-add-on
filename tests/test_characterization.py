@@ -8,6 +8,8 @@ fix commit for that id updates the expectation.
 """
 from __future__ import annotations
 
+import json
+
 import api
 import frames as f
 from fakes import FakeBms
@@ -261,6 +263,21 @@ def test_system_read(monkeypatch):
 
 # --- discovery ----------------------------------------------------------------------------------
 
+def _discovery(records):
+    """
+    Retained discovery configs are independent of their publish order, except that the full device
+    block travels with the first config of each device. Assert that, then compare order-insensitively.
+    """
+    first_dev = {}
+    for r in records:
+        dev = r["payload"].get("dev") if isinstance(r["payload"], dict) else None
+        if dev and dev["ids"] not in first_dev:
+            first_dev[dev["ids"]] = dev
+    for ids, dev in first_dev.items():
+        assert "name" in dev and "mf" in dev, f"first config of {ids} lacks the full device block"
+    return sorted(records, key=lambda r: (r["topic"], json.dumps(r["payload"], sort_keys=True)))
+
+
 def test_discovery_single_pack(golden):
     disc, client = api.discovery(invert=False)
     api.discovery_startup(disc, 1)
@@ -268,19 +285,19 @@ def test_discovery_single_pack(golden):
     assert all(r["retain"] and r["qos"] == 1 for r in records)
     configs = [r for r in records if r["payload"]]
     assert any(r["topic"] == "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_1/config" for r in configs)
-    golden("discovery_single_pack", records)
+    golden("discovery_single_pack", _discovery(records))
 
 
 def test_discovery_multi_pack(golden):
     disc, client = api.discovery(invert=False)
     api.discovery_startup(disc, 2)
-    golden("discovery_multi_pack", client.as_records())
+    golden("discovery_multi_pack", _discovery(client.as_records()))
 
 
 def test_discovery_inverted(golden):
     disc, client = api.discovery(invert=True)
     api.discovery_startup(disc, 2)
-    golden("discovery_multi_pack_inverted", client.as_records())
+    golden("discovery_multi_pack_inverted", _discovery(client.as_records()))
 
 
 def test_discovery_firmware_refresh(golden):
@@ -326,4 +343,4 @@ def test_main_loop_multi_pack(monkeypatch, golden):
     golden("main_loop_multi_pack", records)
     # discovery as published by main() equals the startup sequence + firmware refresh
     disc_records = [r for r in client.as_records() if r["topic"].startswith("homeassistant/")]
-    golden("main_loop_multi_pack_discovery", disc_records)
+    golden("main_loop_multi_pack_discovery", _discovery(disc_records))
