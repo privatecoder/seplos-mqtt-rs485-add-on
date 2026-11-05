@@ -27,6 +27,7 @@ _OPTIONAL = {
     "ent_cat": "category",
     "pl_on": "payload_on",
     "pl_off": "payload_off",
+    "ops": "options",
 }
 
 SYSTEM_SCOPE = "system"
@@ -123,7 +124,9 @@ class Discovery:
         for short, attr in _OPTIONAL.items():
             value = getattr(entity, attr)
             if value is not None:
-                config[short] = value
+                config[short] = list(value) if short == "ops" else value
+        if entity.disabled:
+            config["en"] = False
         if entity.kind == "parameters":
             config["json_attr_t"] = topics.pack_sensors(self.topic, scope)
             config["json_attr_tpl"] = "{{ value_json.get('parameters', {}) | tojson }}"

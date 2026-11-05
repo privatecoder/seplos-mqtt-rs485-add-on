@@ -239,7 +239,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | Pack Voltage | `telemetry.normal.total_pack_voltage` | "Total battery voltage" (0x42) |
 | Rated Capacity (Setting) | `telemetry.normal.rated_capacity` | "Rated capacity" (0x42), setting P58 |
 | Full Capacity | `telemetry.normal.full_capacity` | "Battery capacity" (0x42), learned full capacity |
-| Full Energy | `telemetry.normal.full_energy` | – (calculated: Full Capacity × cell count × option `nominal_cell_voltage`, kWh) |
+| Full Energy | `telemetry.normal.full_energy` | – (calculated: Full Capacity × cell count × nominal voltage of the assigned cell type, else the connection setting `nominal_cell_voltage`; never × cells in parallel, kWh) |
 | Remaining Capacity | `telemetry.normal.residual_capacity` | "Residual capacity" (0x42) |
 | State of Charge | `telemetry.normal.state_of_charge` | "SOC" (0x42) |
 | Cycle Count | `telemetry.normal.charging_cycles` | "Number of cycles" (0x42) |
@@ -307,6 +307,11 @@ Home Assistant names describe what a value actually does (verified against the B
 | Battery Serial Number | `info.normal.serial_number` | string 1 (CID2 0xA2, RS485-1/2 only) |
 | BMS Serial Number | `info.normal.bms_serial_number` | string 2 (CID2 0xA4, RS485-1/2 only) |
 | BMS Clock Offset | `clock.normal.clock_offset` (s, BMS minus host local time), attribute `bms_time` | CID2 0x4D (RS485-1/2; on the CAN port only with MAINT), every 10 min. The BMS clock has no time zone; it's compared with the add-on's local time |
+| Cell Type | `cells.normal.cell_type` (text: manufacturer, model, variant), attributes `cells.cell_type` (`id`, `entry_version`, `manufacturer`, `model`, `chemistry`, `nominal_v`, `nominal_ah`, `parallel`, `series`, `update_available`) | – (the cell type assigned to the pack in the settings app; unknown without assignment) |
+| Datasheet Check (Live) | `cells.normal.datasheet_check_live` (`ok`, `near`, `over`, `not_evaluated`), attributes `cells.live` (`reason`, `checks`: `key`, `result`, `limit`, `unit`, `reason`; the measured values are not part of the attributes, they would rewrite the HA state on every poll, and are in the settings app's `/api/status`) | – (cell voltages, cell temperatures and currents against the datasheet of the assigned cell type; worst result, one `not_evaluated` check makes an otherwise `ok` summary `not_evaluated`) |
+| Datasheet Check (Parameters) | `cells.normal.datasheet_check_parameters`, attributes `cells.parameters` (same shape) | – (the BMS protection settings against the datasheet; only where the parameters are readable: RS485-1/2 or MAINT on the CAN port) |
+| Datasheet Charge Current Limit | `cells.normal.datasheet_charge_current_limit` (A, disabled by default) | – (advisory: charge current the datasheet allows at the present cell temperatures × cells in parallel; 0 when not allowed) |
+| Datasheet Discharge Current Limit | `cells.normal.datasheet_discharge_current_limit` (A, disabled by default) | – (advisory: continuous discharge current inside the discharge temperature range × cells in parallel; 0 outside) |
 | Last Successful Poll | heartbeat `last_publish` | – (time of the last successful poll, also when no value changed) |
 | Current (incl. idle) | `status.normal.dis_charge_current_unfiltered` | intra-pack record current (undocumented CID2 0x5A) |
 | Balancing Active | `status.binary.balancing_active` | Alarm event 7 bit 0 "Inside bit" (0x5A) |
@@ -327,7 +332,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | System Power (System) | `system: normal.system_power` | – (calculated: System Voltage × System Current) |
 | System SOC (System) | `system: normal.system_soc` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Total Full Capacity (System) | `system: normal.total_capacity` | – undocumented Modbus RTU FC03 0x1000 (master): sum of the learned full capacities |
-| Total Full Energy (System) | `system: normal.total_full_energy` | – (calculated: Total Full Capacity × cell count × option `nominal_cell_voltage`, kWh) |
+| Total Full Energy (System) | `system: normal.total_full_energy` | – (calculated: sum of the Full Energy of all configured packs, unknown while one of them is unknown, kWh) |
 | Charge Voltage Limit (System) | `system: normal.charge_voltage_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Charge Current Limit (System) | `system: normal.charge_current_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |
 | Discharge Current Limit (System) | `system: normal.discharge_current_limit` | – undocumented Modbus RTU FC03 0x1000 (master) |

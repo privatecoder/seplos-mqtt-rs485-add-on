@@ -249,6 +249,8 @@ def run_main(
     sets_after_polls: list[tuple[int, tuple]] | None = None,
     serial_error: str | None = None,
     cells_after_polls: list[tuple[int, tuple]] | None = None,
+    cell_types_after_polls: tuple = (),
+    cell_packs: dict | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -285,7 +287,8 @@ def run_main(
                     LAST_RUN["states"][0].request_sets(types.SimpleNamespace(parallel_sets=handed_over))
             for after, (packs, profiles) in cells_after_polls or []:
                 if counter["n"] == after + 1:
-                    LAST_RUN["states"][0].request_cells(types.SimpleNamespace(packs=packs, balancer_profiles=profiles))
+                    LAST_RUN["states"][0].request_cells(
+                        types.SimpleNamespace(packs=packs, balancer_profiles=profiles, cell_types=cell_types_after_polls))
             if entry is None:
                 return b""
             return entry(req) if callable(entry) else ascii_frame(adr, 0x00, entry)
@@ -325,6 +328,8 @@ def run_main(
     @dataclasses.dataclass
     class SpyState(app.AppState):      # a dataclass again, so the generated __init__ calls __post_init__
         def __post_init__(self):
+            if cell_packs:
+                self.cell_packs = dict(cell_packs)       # assignments as if loaded from the monitoring document
             LAST_RUN["states"].append(self)
 
     monkeypatch.setattr(app, "AppState", SpyState)
@@ -661,6 +666,10 @@ def simulated_bank_cycle(packs: int, seconds_per_pack: float) -> list[int]:
         def __init__(self, address):
             self.address, self.cell_count, self.info, self.info_revision, self.capabilities_resolved = address, None, None, 0, False
             self.core_success = 0.0
+            self.sample = None
+
+        def parameter_sample(self):
+            return None
 
         def read(self):
             clock["t"] += seconds_per_pack
@@ -695,3 +704,63 @@ def retry_discovery(state) -> None:
 
 def state_store(path) -> StateStore:
     return StateStore(str(path))
+
+
+# --- datasheet checks -----------------------------------------------------------------------------
+
+def checks_sample(values: dict, at: float = 0.0, max_age: float | None = None):
+    from seplos_mqtt.cells.checks import Sample
+    return Sample(values, at, max_age)
+
+
+def live_checks(entry, parallel, sample, now: float = 0.0, blocked: str | None = None) -> dict:
+    from seplos_mqtt.cells import checks
+    return checks.live_checks(entry, parallel, sample, now, blocked=blocked)
+
+
+def parameter_checks(entry, parallel, parameters, series, now: float = 0.0, blocked: str | None = None) -> dict:
+    from seplos_mqtt.cells import checks
+    return checks.parameter_checks(entry, parallel, parameters, series, now, blocked=blocked)
+
+
+def permitted_charge(entry, parallel, temps, soc=None):
+    from seplos_mqtt.cells import checks
+    return checks.permitted_charge_a(entry, parallel, temps, soc)
+
+
+def permitted_discharge(entry, parallel, temps):
+    from seplos_mqtt.cells import checks
+    return checks.permitted_discharge_a(entry, parallel, temps)
+
+
+def allowed_charge_rate(entry, temp, soc=None):
+    from seplos_mqtt.cells import checks
+    return checks.allowed_charge_rate(entry, temp, soc)
+
+
+def charge_range(entry):
+    from seplos_mqtt.cells import checks
+    return checks.charge_range(entry)
+
+
+def summarize_checks(results: list[str]) -> str:
+    from seplos_mqtt.cells import checks
+    return checks.summarize([{"result": r} for r in results])
+
+
+def stored_assignments(packs: dict, cell_types: list | None = None, pack_count: int = 2) -> dict:
+    """PackAssignment objects as the monitoring document would load them."""
+    from seplos_mqtt.monitoring.model import MonitoringConfig
+    doc = {"connection": {"transport": "tcp", "host": "h", "pack_count": pack_count}, "packs": packs}
+    if cell_types:
+        doc["cell_types"] = cell_types
+    return dict(MonitoringConfig.from_dict(doc).packs)
+
+
+def pack_report(state, pack_state, now: float) -> dict:
+    from seplos_mqtt.cells import evaluate
+    return evaluate.pack_report(state, pack_state, now)
+
+
+def total_full_energy(state, now: float):
+    return app.total_full_energy(state, now)

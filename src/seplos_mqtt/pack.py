@@ -7,6 +7,7 @@ import time
 from collections.abc import Callable
 
 from . import timeutil
+from .cells.checks import Sample
 from .config import Config
 from .decoders import alarms, clock, identity, intrapack, parameters, telemetry
 from .energy import EnergyGuard
@@ -67,7 +68,11 @@ class BatteryPack:
         self.info_attempts = 0
         self.info_revision = 0          # incremented when the cached device info changes
         self.parameters: dict | None = None
+        self.parameters_ts = 0.0         # monotonic time of the last successful 0x47 read
         self.parameters_next = 0.0       # monotonic deadline of the next 0x47 read (0: due now)
+        # latest valid 0x42 decode with its receive time, kept even when the following 0x44 fails (datasheet
+        # checks and energy; what is published is unaffected)
+        self.sample: Sample | None = None
         self.extended_status: dict | None = None
         self.extended_status_ts = 0.0
         self.cell_count: int | None = None
@@ -100,6 +105,8 @@ class BatteryPack:
         return alarms.decode(payload)
 
     def _decode_telemetry(self, payload: bytes) -> dict:
+        # full_energy here uses the connection's nominal voltage; the app derives the final value from the
+        # sample and the trusted assignment (cells.evaluate.full_energy)
         feedback = telemetry.decode(payload, self.config.min_cell_voltage, self.config.max_cell_voltage, self.config.nominal_cell_voltage)
         self.energy.apply(feedback["normal"])
         self.cell_count = payload[2]
@@ -236,6 +243,7 @@ class BatteryPack:
             feedback = None
         if feedback is not None:
             self.parameters = {**feedback["normal"], "read_at": timeutil.now_iso()}
+            self.parameters_ts = time.monotonic()
         else:
             # retry after a minute instead of waiting for the next regular refresh
             self.parameters_next = time.monotonic() + 60
@@ -324,6 +332,18 @@ class BatteryPack:
         fresh = self.clock_value is not None and time.monotonic() - self.clock_ts <= 3 * self.CLOCK_INTERVAL
         return {"normal": self.clock_value if fresh else {"bms_time": None, "clock_offset": None}}
 
+    def parameter_sample(self) -> Sample | None:
+        """The readable parameters with their read time: 0x47 on RS485-1/2, MAINT binary 47 on UART1. Stale after
+        two missed refreshes of the cadence."""
+        if not self.config.multi_pack:
+            if self.parameters is None:
+                return None
+            return Sample(self.parameters, self.parameters_ts, 3 * self.PARAMETER_REFRESH_SECONDS)
+        maint = self.maint
+        if maint is None or maint.parameters.value is None:
+            return None
+        return Sample(maint.parameters.value, maint.parameters.ts, 3 * maint.parameter_interval)
+
     @property
     def capabilities(self) -> set[str]:
         return self.maint.capabilities if self.maint is not None else set()
@@ -347,6 +367,7 @@ class BatteryPack:
             if telemetry_feedback is None:
                 return None, False
             data["telemetry"] = telemetry_feedback
+            self.sample = Sample(dict(telemetry_feedback["normal"]), time.monotonic())
 
             telesignal_feedback = self._request(0x44, TELESIGNAL_LEN, self._decode_telesignal, "Telesignalization")
             if telesignal_feedback is None:

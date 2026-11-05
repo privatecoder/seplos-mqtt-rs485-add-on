@@ -36,6 +36,8 @@ class Entity:
     # pack mode) or a MAINT capability ("maint", "maint_storage", "maint_uart1"); removed otherwise
     when: frozenset = ALWAYS
     attributes: str | None = None   # Jinja expression for json_attr_tpl
+    options: tuple[str, ...] | None = None   # device_class enum: the possible states
+    disabled: bool = False          # disabled by default in HA (enabled_by_default: false)
 
     def expand(self) -> list[Entity]:
         if not self.count:
@@ -240,7 +242,27 @@ CLOCK: list[Entity] = [
            attributes="{{ value_json.get('clock', {}).get('normal', {}) | tojson }}"),
 ]
 
-PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT, *CLOCK]
+# Cell type of the pack and its datasheet checks (cells/checks.py), published under "cells". The attributes carry
+# the checks (key, result, value, limit, unit, reason) but no timestamps.
+C_ = "cells"
+CHECK_RESULTS = ("ok", "near", "over", "not_evaluated")
+CELLS: list[Entity] = [
+    Entity("cell_type", "Cell Type", C_, icon="mdi:battery-heart-variant", category=DIAG,
+           attributes="{{ value_json.get('cells', {}).get('cell_type', {}) | tojson }}"),
+    Entity("datasheet_check_live", "Datasheet Check (Live)", C_, device_class="enum", options=CHECK_RESULTS,
+           icon="mdi:clipboard-check-outline", category=DIAG,
+           attributes="{{ value_json.get('cells', {}).get('live', {}) | tojson }}"),
+    Entity("datasheet_check_parameters", "Datasheet Check (Parameters)", C_, device_class="enum", options=CHECK_RESULTS,
+           icon="mdi:clipboard-check-outline", category=DIAG,
+           attributes="{{ value_json.get('cells', {}).get('parameters', {}) | tojson }}"),
+    # advisory: the currents the datasheet allows at the present cell temperatures
+    Entity("datasheet_charge_current_limit", "Datasheet Charge Current Limit", C_, precision=1, icon="mdi:battery-arrow-up",
+           category=DIAG, disabled=True, **A),
+    Entity("datasheet_discharge_current_limit", "Datasheet Discharge Current Limit", C_, precision=1,
+           icon="mdi:battery-arrow-down", category=DIAG, disabled=True, **A),
+]
+
+PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT, *CLOCK, *CELLS]
 
 Y = "system"
 # System values from the master via Modbus 0x1000 (CAN port RS485 bus only), topic <topic>/system/sensors

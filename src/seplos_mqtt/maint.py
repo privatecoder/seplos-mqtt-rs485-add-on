@@ -148,6 +148,10 @@ class MaintSupport:
         return LOCK_PARAMETER_INTERVAL if self._lock_from_group0 else PARAMETER_INTERVAL
 
     @property
+    def parameter_interval(self) -> float:
+        return self._parameter_interval
+
+    @property
     def _marker_readable(self) -> bool:
         """64/02: on UART1 only the master answers, on UART0 every pack with image flag 0x10."""
         if self.identity is None:

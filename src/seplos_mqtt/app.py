@@ -17,8 +17,8 @@ from serial.serialutil import SerialException
 
 from . import health, timeutil, topics
 from .bridge import BridgeError, SocatBridge
+from .cells import evaluate as cell_report
 from .config import Config, ConfigError
-from .decoders import telemetry
 from .decoders.identity import device_firmware
 from .discovery import Discovery
 from .jobs import JobQueue, step_detect
@@ -94,6 +94,7 @@ class AppState:
     # address) is changed by the main loop only; ``pending_cells`` is the web thread's latest save.
     cell_packs: dict[int, Any] = field(default_factory=dict)
     balancer_profiles: tuple = ()
+    cell_types: tuple = ()            # own cell types (the update offer needs them)
     pending_cells: tuple | None = None
     cells_adopted: tuple | None = None
     adopted_packs: dict[int, Any] = field(default_factory=dict)    # the assignments of the last hand-over (or startup)
@@ -103,7 +104,7 @@ class AppState:
     def request_cells(self, config: Any) -> None:
         """A saved change of assignments or balancer profiles (web thread): adopted at the next cycle
         boundary, no restart."""
-        self.pending_cells = (config.packs, config.balancer_profiles)
+        self.pending_cells = (config.packs, config.balancer_profiles, tuple(getattr(config, "cell_types", ())))
 
     def adopt_cells(self) -> bool:
         """True if a newer save was adopted now."""
@@ -126,6 +127,7 @@ class AppState:
         self.cell_packs = merged
         self.identity_unsaved &= set(merged)
         self.balancer_profiles = pending[1]
+        self.cell_types = pending[2]
         logger.info("Cell assignments updated: %s pack(s), %s balancer profile(s)", len(pending[0]), len(pending[1]))
         return True
 
@@ -152,6 +154,14 @@ class AppState:
 
     def max_age(self) -> float:
         return health.max_poll_age(self.config.number_of_packs, self.config.mqtt_update_interval, self.config.multi_pack)
+
+    def pack_max_age(self, now: float) -> float:
+        """
+        Per-pack freshness allowance: the nominal budget, but at least three observed full cycles and the
+        running cycle (optional/startup reads of the other packs on the shared bus can make a cycle long).
+        """
+        running = now - self.cycle_start if self.cycle_start else 0.0
+        return max(self.max_age(), 3 * self.last_cycle + 10, running + self.max_age())
 
     def is_healthy(self) -> bool:
         if self.connection_error is not None:
@@ -263,12 +273,8 @@ def refresh_states(state: AppState) -> None:
 
 
 def pack_max_age(state: AppState, now: float) -> float:
-    """
-    Per-pack freshness allowance: the nominal budget, but at least three observed full cycles and the
-    running cycle (optional/startup reads of the other packs on the shared bus can make a cycle long).
-    """
-    running = now - state.cycle_start if state.cycle_start else 0.0
-    return max(state.max_age(), 3 * state.last_cycle + 10, running + state.max_age())
+    """Per-pack freshness allowance (see ``AppState.pack_max_age``)."""
+    return state.pack_max_age(now)
 
 
 def pack_online(state: AppState, pack_state: PackState, now: float) -> bool:
@@ -284,16 +290,28 @@ def publish_pack_availability(state: AppState, pack_state: PackState, now: float
             pack_state.availability = desired
 
 
+def total_full_energy(state: AppState, now: float) -> float | None:
+    """Sum of the full energy of all configured packs (learned capacity x series cells x nominal voltage, never
+    x parallel), from each pack's latest valid 0x42 sample; unknown if any pack has no fresh value."""
+    total = 0.0
+    for pack_state in state.packs:
+        sample = pack_state.pack.sample
+        fresh = sample is not None and now - sample.at <= state.pack_max_age(now)
+        # derived now: an assignment or identity change applies to the stored sample without a new read
+        value = cell_report.full_energy(sample, state.cell_packs.get(pack_state.address), state.config.nominal_cell_voltage) if fresh else None
+        if value is None:
+            return None
+        total += value
+    return round(total, 2) if state.packs else None
+
+
 def publish_system_data(state: AppState, reader: SystemReader) -> None:
     """Read and publish the system values (multi pack mode via the CAN port RS485 bus only)."""
     if not state.config.multi_pack or not state.packs:
         return
     data = reader.read(state.bus)
     if data is not None:
-        # total full capacity (Ah, master) x series cells x configured nominal cell voltage
-        cells = next((p.pack.cell_count for p in state.packs if p.pack.cell_count), None)
-        data["normal"]["total_full_energy"] = telemetry.full_energy(
-            data["normal"].get("total_capacity"), cells, state.config.nominal_cell_voltage)
+        data["normal"]["total_full_energy"] = total_full_energy(state, time.monotonic())
         state.system_data = data
     base = state.config.mqtt_topic
     state.publisher.publish(topics.system_availability(base), "online" if data is not None else "offline")
@@ -405,6 +423,15 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
     if data is not None:
         pack_state.last_data = data
         check_identity(state, pack_state)
+        # the energy follows the identity found in this very poll
+        normal = data.get("telemetry", {}).get("normal")
+        if isinstance(normal, dict):
+            normal["full_energy"] = cell_report.full_energy(
+                pack_state.pack.sample, state.cell_packs.get(address), state.config.nominal_cell_voltage)
+        try:
+            data["cells"] = cell_report.mqtt_group(cell_report.pack_report(state, pack_state, now))
+        except Exception:
+            logger.exception("Pack%s:Datasheet report failed", address)
         if state.publisher.state(topics.pack_sensors(base, address), data):
             logger.info("Pack%s:Publishing updated data to MQTT", address)
         else:
@@ -637,6 +664,14 @@ def load_cells(store: JsonStore) -> tuple[dict, tuple]:
     return dict(config.packs), config.balancer_profiles
 
 
+def load_cell_types(store: JsonStore) -> tuple:
+    """The stored own cell types (for update offers); none when the document is missing or corrupt."""
+    try:
+        return tuple(MonitoringConfig.from_dict(store.snapshot()[3]).cell_types)
+    except ConfigValidationError:
+        return ()
+
+
 def start_web(state: AppState, store: JsonStore, port: str) -> None:
     """The Ingress app in its own thread; a failure only costs the UI, never the polling."""
     try:
@@ -709,6 +744,7 @@ def main(config: Config | None = None) -> None:
         if standalone and store is not None:
             state.parallel_sets = load_sets(store)
             state.cell_packs, state.balancer_profiles = load_cells(store)
+            state.cell_types = load_cell_types(store)
             state.adopted_packs = dict(state.cell_packs)
             state.monitoring_store = store
 

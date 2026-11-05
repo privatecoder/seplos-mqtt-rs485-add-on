@@ -28,6 +28,24 @@
   },
   {
     "payload": {
+      "cells": {
+        "cell_type": {},
+        "live": {
+          "checks": [],
+          "reason": "no_assignment"
+        },
+        "normal": {
+          "cell_type": null,
+          "datasheet_charge_current_limit": null,
+          "datasheet_check_live": "not_evaluated",
+          "datasheet_check_parameters": "not_evaluated",
+          "datasheet_discharge_current_limit": null
+        },
+        "parameters": {
+          "checks": [],
+          "reason": "no_assignment"
+        }
+      },
       "info": {
         "normal": {
           "can_protocol": "Pylon",

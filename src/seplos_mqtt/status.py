@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .cells import evaluate as cell_report
 from .monitoring.model import activity
 
 # fields of the last pack data (decoder keys, canonical values: the HA inversion is not applied)
@@ -48,7 +49,13 @@ def bms_serial(pack_state: Any) -> str | None:
     return value or None
 
 
-def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
+def _cells_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]:
+    """Datasheet assignment, both check summaries and the checks of one pack."""
+    report = cell_report.pack_report(state, pack_state, now_mono)
+    return {key: report[key] for key in ("assignment", "series", "live", "parameters", "sample_age_s", "parameters_age_s")}
+
+
+def _pack_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]:
     pack = pack_state.pack
     info = _normal(pack.info) if pack.info else {}
     values = _normal(pack_state.last_data, "telemetry")
@@ -65,6 +72,7 @@ def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
         "maint": _maint(pack),
         "maint_version": _maint_version(pack),
         **{key: values.get(key) for key in _PACK_VALUES},
+        "cells": _cells_status(state, pack_state, now_mono),
     }
 
 
@@ -95,7 +103,7 @@ def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
         "bridge": bridge,
         "connection_error": getattr(state, "connection_error", None),
         "last_cycle_s": round(state.last_cycle, 1) if state.last_cycle else None,
-        "packs": [_pack_status(p, now_mono) for p in state.packs],
+        "packs": [_pack_status(state, p, now_mono) for p in state.packs],
         "system": system,
         "sets": sets,
     }

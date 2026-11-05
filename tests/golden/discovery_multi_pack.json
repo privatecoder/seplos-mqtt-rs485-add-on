@@ -3398,6 +3398,35 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_cell_type",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "ic": "mdi:battery-heart-variant",
+      "json_attr_t": "seplos/pack-0/sensors",
+      "json_attr_tpl": "{{ value_json.get('cells', {}).get('cell_type', {}) | tojson }}",
+      "name": "Cell Type",
+      "obj_id": "seplos_bms_pack_0_cell_type",
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_cell_type",
+      "val_tpl": "{{ value_json.cells.normal.cell_type }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/cell_type/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_cell_voltage_alarm_1",
       "dev": {
         "ids": "seplos_bms_pack_0"
@@ -4162,6 +4191,142 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/current_offset/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_datasheet_charge_current_limit",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "current",
+      "en": false,
+      "ent_cat": "diagnostic",
+      "ic": "mdi:battery-arrow-up",
+      "name": "Datasheet Charge Current Limit",
+      "obj_id": "seplos_bms_pack_0_datasheet_charge_current_limit",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-0/sensors",
+      "sug_dsp_prc": 1,
+      "uniq_id": "seplos_bms_pack_0_datasheet_charge_current_limit",
+      "unit_of_meas": "A",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_charge_current_limit }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/datasheet_charge_current_limit/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_datasheet_check_live",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "enum",
+      "ent_cat": "diagnostic",
+      "ic": "mdi:clipboard-check-outline",
+      "json_attr_t": "seplos/pack-0/sensors",
+      "json_attr_tpl": "{{ value_json.get('cells', {}).get('live', {}) | tojson }}",
+      "name": "Datasheet Check (Live)",
+      "obj_id": "seplos_bms_pack_0_datasheet_check_live",
+      "ops": [
+        "ok",
+        "near",
+        "over",
+        "not_evaluated"
+      ],
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_datasheet_check_live",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_check_live }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/datasheet_check_live/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_datasheet_check_parameters",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "enum",
+      "ent_cat": "diagnostic",
+      "ic": "mdi:clipboard-check-outline",
+      "json_attr_t": "seplos/pack-0/sensors",
+      "json_attr_tpl": "{{ value_json.get('cells', {}).get('parameters', {}) | tojson }}",
+      "name": "Datasheet Check (Parameters)",
+      "obj_id": "seplos_bms_pack_0_datasheet_check_parameters",
+      "ops": [
+        "ok",
+        "near",
+        "over",
+        "not_evaluated"
+      ],
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_datasheet_check_parameters",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_check_parameters }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/datasheet_check_parameters/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_datasheet_discharge_current_limit",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "current",
+      "en": false,
+      "ent_cat": "diagnostic",
+      "ic": "mdi:battery-arrow-down",
+      "name": "Datasheet Discharge Current Limit",
+      "obj_id": "seplos_bms_pack_0_datasheet_discharge_current_limit",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-0/sensors",
+      "sug_dsp_prc": 1,
+      "uniq_id": "seplos_bms_pack_0_datasheet_discharge_current_limit",
+      "unit_of_meas": "A",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_discharge_current_limit }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/datasheet_discharge_current_limit/config"
   },
   {
     "payload": {
@@ -6271,6 +6436,36 @@
         }
       ],
       "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_cell_type",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "ent_cat": "diagnostic",
+      "ic": "mdi:battery-heart-variant",
+      "json_attr_t": "seplos/pack-1/sensors",
+      "json_attr_tpl": "{{ value_json.get('cells', {}).get('cell_type', {}) | tojson }}",
+      "name": "Cell Type",
+      "obj_id": "seplos_bms_pack_1_cell_type",
+      "stat_t": "seplos/pack-1/sensors",
+      "uniq_id": "seplos_bms_pack_1_cell_type",
+      "val_tpl": "{{ value_json.cells.normal.cell_type }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/cell_type/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_1_cell_voltage_alarm_1",
       "dev": {
         "ids": "seplos_bms_pack_1",
@@ -7063,6 +7258,146 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-1/current_offset/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_datasheet_charge_current_limit",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "dev_cla": "current",
+      "en": false,
+      "ent_cat": "diagnostic",
+      "ic": "mdi:battery-arrow-up",
+      "name": "Datasheet Charge Current Limit",
+      "obj_id": "seplos_bms_pack_1_datasheet_charge_current_limit",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-1/sensors",
+      "sug_dsp_prc": 1,
+      "uniq_id": "seplos_bms_pack_1_datasheet_charge_current_limit",
+      "unit_of_meas": "A",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_charge_current_limit }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/datasheet_charge_current_limit/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_datasheet_check_live",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "dev_cla": "enum",
+      "ent_cat": "diagnostic",
+      "ic": "mdi:clipboard-check-outline",
+      "json_attr_t": "seplos/pack-1/sensors",
+      "json_attr_tpl": "{{ value_json.get('cells', {}).get('live', {}) | tojson }}",
+      "name": "Datasheet Check (Live)",
+      "obj_id": "seplos_bms_pack_1_datasheet_check_live",
+      "ops": [
+        "ok",
+        "near",
+        "over",
+        "not_evaluated"
+      ],
+      "stat_t": "seplos/pack-1/sensors",
+      "uniq_id": "seplos_bms_pack_1_datasheet_check_live",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_check_live }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/datasheet_check_live/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_datasheet_check_parameters",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "dev_cla": "enum",
+      "ent_cat": "diagnostic",
+      "ic": "mdi:clipboard-check-outline",
+      "json_attr_t": "seplos/pack-1/sensors",
+      "json_attr_tpl": "{{ value_json.get('cells', {}).get('parameters', {}) | tojson }}",
+      "name": "Datasheet Check (Parameters)",
+      "obj_id": "seplos_bms_pack_1_datasheet_check_parameters",
+      "ops": [
+        "ok",
+        "near",
+        "over",
+        "not_evaluated"
+      ],
+      "stat_t": "seplos/pack-1/sensors",
+      "uniq_id": "seplos_bms_pack_1_datasheet_check_parameters",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_check_parameters }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/datasheet_check_parameters/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_datasheet_discharge_current_limit",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "dev_cla": "current",
+      "en": false,
+      "ent_cat": "diagnostic",
+      "ic": "mdi:battery-arrow-down",
+      "name": "Datasheet Discharge Current Limit",
+      "obj_id": "seplos_bms_pack_1_datasheet_discharge_current_limit",
+      "stat_cla": "measurement",
+      "stat_t": "seplos/pack-1/sensors",
+      "sug_dsp_prc": 1,
+      "uniq_id": "seplos_bms_pack_1_datasheet_discharge_current_limit",
+      "unit_of_meas": "A",
+      "val_tpl": "{{ value_json.cells.normal.datasheet_discharge_current_limit }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/datasheet_discharge_current_limit/config"
   },
   {
     "payload": {
