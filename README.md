@@ -169,6 +169,35 @@ If a member is offline or has no fresh data, all aggregates are unknown (never c
 A set whose packs are not all configured, or any set in single pack mode, is inactive; deleted or inactive sets
 are removed from Home Assistant.
 
+### Cell types and datasheet checks
+
+The **Cells** tab lists the bundled cell database (a pinned copy of the
+[OpenBMS Monitor](https://github.com/privatecoder/openbms-monitor) cell database, updated with add-on releases) with
+the datasheet limits and their source. Own cell types can be created, copied from a bundled type as a template,
+edited, deleted and exchanged as JSON (the OpenBMS cell array format); they are stored in `/data/monitoring.json` and
+are part of Home Assistant backups.
+
+In the **Packs** tab each pack gets a cell type and the number of cells in parallel (the series count is measured).
+The assignment keeps a copy of the datasheet entry: an add-on update never changes the limits of an existing
+assignment, a newer version of the entry is only offered (with the changed fields) and taken over when you accept it.
+If the pack reports a different BMS serial than when it was assigned (RS485-1/2, or MAINT on the CAN port), its
+checks pause until you confirm the replacement.
+
+With a cell type assigned, the add-on checks per pack:
+
+- **live**: cell voltages against the charge/discharge cut-off, the cell temperatures against the charge or
+  discharge range for the current direction, and the charge/discharge current against the datasheet (including
+  the temperature derating table, × cells in parallel);
+- **parameters** (only where the BMS parameters are readable): the BMS alarm/protection settings against the
+  datasheet.
+
+Each result is `ok`, `near`, `over` or `not evaluated` (missing data or values are never shown as ok). Full Energy
+uses the nominal voltage of the assigned cell type. Nothing is written to the BMS.
+
+**Balancer profiles** (Packs tab) describe an external active balancer (start/stop thresholds in mV and when it
+runs). For a pack with a profile the add-on estimates from the cell voltages whether the balancer is working
+(`active` / `inactive` / unknown); it does not talk to the balancer.
+
 Example log output:
 
 ```text
