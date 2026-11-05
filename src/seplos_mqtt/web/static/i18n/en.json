@@ -410,6 +410,7 @@
   "check.key.discharging_overcurrent_alarm_a": "Discharging overcurrent alarm",
   "check.key.discharging_overcurrent_protection_a": "Discharging overcurrent protection",
   "check.reason.no_assignment": "No cell type assigned.",
+  "check.reason.pending": "Saved, checked after the current polling cycle.",
   "check.reason.serial_mismatch": "The BMS serial number changed; confirm the pack first.",
   "check.reason.invalid_snapshot": "The stored assignment is not valid.",
   "check.reason.no_sample": "No measurement yet.",

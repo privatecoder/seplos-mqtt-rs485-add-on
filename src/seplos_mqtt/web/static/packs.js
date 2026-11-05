@@ -94,6 +94,8 @@ export function packsPayload(drafts, baseline) {
   return out;
 }
 
+const POLL_MS = 5000;       // the same pace as the overview
+
 // -- view ----------------------------------------------------------------------------------------
 
 export function packsView(ctx) {
@@ -113,6 +115,15 @@ export function packsView(ctx) {
   let profileErrors = [];
   let confirmAll = null;      // { source, addresses }
   const open = new Set();     // addresses whose full editor is expanded (drafts live in `drafts`, not in the DOM)
+  // The live status comes in by polling and only fills these slots (chip in the head, check lists in the editor),
+  // so a refresh never rebuilds a form: drafts, dirty state, focus and the caret stay as they are.
+  const statusSlots = new Map();     // address -> { chip, checks }
+  const openChecks = new Set();      // "<address>-<live|parameters>" check lists the user expanded
+  let pollTimer = null;
+  let destroyed = false;
+  // Every status request takes the next number; only the newest answer is applied. A reload and a save
+  // take a number too, so an answer that was already on its way before them is dropped as outdated.
+  let statusSeq = 0;
   let loaded = false;
   let loading = false;
   let saving = false;
@@ -216,18 +227,55 @@ export function packsView(ctx) {
     return kvRow(t('packs.identity'), h('span', { class: 'chips' }, chip(textOr('packs.identity', pack.identity), kind)));
   }
 
-  function checkList(live, key) {
-    const group = live && live.cells ? live.cells[key] : null;
-    if (!group) return null;
-    const items = Array.isArray(group.checks) ? group.checks : [];
-    return h('details', {},
-      h('summary', {}, t(`packs.check.${key}`), ' ', resultChip(group.summary)),
-      group.reason ? h('p', { class: 'help' }, textOr('check.reason', group.reason)) : null,
-      items.length === 0 ? null : h('ul', { class: 'checks' }, items.map((c) => h('li', {},
-        resultChip(c.result), ' ', textOr('check.key', c.key),
-        c.value !== null && c.value !== undefined ? ` ${fmt(c.value, c.unit || '', 3)}` : '',
-        c.limit !== null && c.limit !== undefined ? ` (${t('packs.check.limit')} ${fmt(c.limit, c.unit || '', 3)})` : '',
-        c.reason ? ` – ${textOr('check.reason', c.reason)}` : ''))));
+  // One check list. The <details>/<summary> nodes are created once and kept (focus, open state); a status
+  // update only replaces the chip in the summary and the content of the body.
+  function checkList(address, key) {
+    const memo = `${address}-${key}`;
+    const chipSlot = h('span', {});
+    const body = h('div', {});
+    const details = h('details', { open: openChecks.has(memo), hidden: true },
+      h('summary', {}, t(`packs.check.${key}`), ' ', chipSlot), body);
+    details.addEventListener('toggle', () => { if (details.open) openChecks.add(memo); else openChecks.delete(memo); });
+    return {
+      el: details,
+      update(group) {
+        details.hidden = !group;
+        if (!group) return;
+        const items = Array.isArray(group.checks) ? group.checks : [];
+        chipSlot.replaceChildren(resultChip(group.summary));
+        body.replaceChildren(...[
+          group.reason ? h('p', { class: 'help' }, textOr('check.reason', group.reason)) : null,
+          items.length === 0 ? null : h('ul', { class: 'checks' }, items.map((c) => h('li', {},
+            resultChip(c.result), ' ', textOr('check.key', c.key),
+            c.value !== null && c.value !== undefined ? ` ${fmt(c.value, c.unit || '', 3)}` : '',
+            c.limit !== null && c.limit !== undefined ? ` (${t('packs.check.limit')} ${fmt(c.limit, c.unit || '', 3)})` : '',
+            c.reason ? ` – ${textOr('check.reason', c.reason)}` : ''))),
+        ].filter((child) => child !== null));
+      },
+    };
+  }
+
+  function checksBlock(address) {
+    const pending = h('p', { class: 'help', hidden: true }, t('check.reason.pending'));
+    const lists = { live: checkList(address, 'live'), parameters: checkList(address, 'parameters') };
+    return { el: h('div', { class: 'stack' }, pending, lists.live.el, lists.parameters.el), pending, lists };
+  }
+
+  // the status-driven parts of one pack: the live summary chip and the check lists
+  function fillStatus(address) {
+    const slot = statusSlots.get(address);
+    if (!slot) return;
+    const live = statusOf(address);
+    const cells = live && live.cells ? live.cells : null;
+    slot.chip.replaceChildren(...(cells && cells.assignment && cells.live ? [resultChip(cells.live.summary)] : []));
+    if (!slot.checks) return;
+    // a saved assignment the main loop has not adopted yet: the old results (if any) are not the saved ones
+    slot.checks.pending.hidden = !(cells && cells.pending && !(cells.live && cells.live.reason === 'pending'));
+    for (const key of ['live', 'parameters']) slot.checks.lists[key].update(cells ? cells[key] : null);
+  }
+
+  function fillAllStatus() {
+    for (const address of statusSlots.keys()) fillStatus(address);
   }
 
   function selectField(label, select, errorKey, help) {
@@ -244,7 +292,6 @@ export function packsView(ctx) {
     const a = pack.address;
     const d = drafts[a];
     const e = packErrors[a] || {};
-    const live = statusOf(a);
     const options = cellOptions();
     const stored = pack.cell;
     const cellSelect = h('select', { 'data-fk': `cell-${a}` },
@@ -298,7 +345,9 @@ export function packsView(ctx) {
       d.cellId === '' ? t('packs.cell.none') : `${cellName(draftEntry) || d.cellId} × ${d.parallel.trim() || '?'}`,
       `${t('packs.profile')}: ${profileName || t('packs.profile.none')}`,
     ].join(' · ');
-    const liveSummary = live && live.cells && live.cells.assignment && live.cells.live ? resultChip(live.cells.live.summary) : null;
+    const chipSlot = h('span', { class: 'chips' });
+    const checks = expanded ? checksBlock(a) : null;
+    statusSlots.set(a, { chip: chipSlot, checks });
     const toggle = h('button', {
       class: 'btn small', type: 'button', 'data-fk': `toggle-${a}`, 'aria-expanded': expanded ? 'true' : 'false',
       'aria-controls': expanded ? `${id}-editor` : null,
@@ -316,9 +365,10 @@ export function packsView(ctx) {
           pack.identity === 'mismatch' ? chip(t('packs.identity.mismatch'), 'avail-offline') : null,
           stored && stored.update_available ? chip(t('packs.update.chip'), 'avail-unknown') : null,
           stored && !stored.valid ? chip(t('packs.invalid.chip'), 'avail-offline') : null,
-          liveSummary)),
+          chipSlot)),
       h('p', { class: 'muted' }, summaryText),
     ];
+    fillStatus(a);
     if (!expanded) return h('article', { class: 'card pack-row', 'aria-labelledby': id }, head, h('div', { class: 'actions' }, toggle));
     return h('article', { class: 'card stack', 'aria-labelledby': id },
       head,
@@ -333,7 +383,7 @@ export function packsView(ctx) {
       selectField(t('packs.parallel'), parallelInput, e.parallel, t('packs.parallel.help')),
       suggestBlock,
       selectField(t('packs.profile'), profileSelect, e.profile),
-      checkList(live, 'live'), checkList(live, 'parameters'),
+      checks ? checks.el : null,
       h('div', { class: 'actions' }, h('button', {
         class: 'btn small', type: 'button', 'data-fk': `all-${a}`,
         onClick: () => askApplyAll(a),
@@ -367,6 +417,7 @@ export function packsView(ctx) {
   }
 
   function renderPacks(focusKey) {
+    statusSlots.clear();
     const children = [applyAllBanner(), ...packs.map(packCard)].filter((x) => x !== null);
     if (packs.length === 0) children.push(h('p', { class: 'muted', role: 'status' }, loading ? t('boot.loading') : t('packs.empty')));
     packList.replaceChildren(...children);
@@ -461,7 +512,7 @@ export function packsView(ctx) {
     packs = packsData.packs;
     profiles = profilesData.profiles;
     cells = cellsData.cells;
-    status = statusData && statusData.status ? statusData.status : null;
+    if (statusData !== null) status = statusData.status ? statusData.status : null;      // null: a newer answer is in
     revision = Math.min(packsData.revision, profilesData.revision, cellsData.revision);    // the oldest: a stale save gets a 412
     loaded = true;
     resetPackDrafts();
@@ -472,6 +523,7 @@ export function packsView(ctx) {
   async function load(notes = null) {
     if (saving) return;
     const mine = ++generation;
+    const statusMine = ++statusSeq;
     notice.hidden = notes === null;
     if (notes !== null) showNotice(notes, 'warn');
     loadFailed = false;
@@ -490,7 +542,7 @@ export function packsView(ctx) {
       ]);
       if (mine !== generation) return;
       loading = false;
-      adoptAll(p, pr, c, s);
+      adoptAll(p, pr, c, statusMine === statusSeq || status === null ? s : null);
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
       if (mine !== generation) return;
@@ -508,6 +560,7 @@ export function packsView(ctx) {
     packNotice.hidden = true;
     profileNotice.hidden = true;
     generation += 1;
+    statusSeq += 1;
     loading = false;
     saving = true;
     setDisabled();
@@ -575,13 +628,30 @@ export function packsView(ctx) {
   }
 
   async function refreshStatus() {
+    if (destroyed) return;
+    const mine = ++statusSeq;
     try {
       const data = await api('GET', 'api/status');
+      if (destroyed || mine !== statusSeq) return;      // a newer request, a reload or a save has overtaken this answer
       status = data.status;
-      renderPacks();
+      fillAllStatus();               // only the status slots: no form is rebuilt
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
     }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshStatus(); }, POLL_MS);
+  }
+
+  function stopPolling() {
+    if (pollTimer !== null) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  function onVisibility() {
+    if (document.visibilityState === 'visible') { refreshStatus(); startPolling(); } else stopPolling();
   }
 
   async function acceptUpdate(address) {
@@ -657,11 +727,19 @@ export function packsView(ctx) {
   renderPacks();
   renderProfiles();
   load();
+  if (storeOk) {
+    document.addEventListener('visibilitychange', onVisibility);
+    startPolling();
+  }
 
   return {
     el,
     dirty: () => !lockedReason() && (packsDirty() || profilesDirty()),
     discardDraft() { baseline = JSON.parse(JSON.stringify(drafts)); profileInitial = JSON.stringify(profileDrafts.map(profilePayload)); },
-    destroy() {},
+    destroy() {
+      destroyed = true;
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+    },
   };
 }

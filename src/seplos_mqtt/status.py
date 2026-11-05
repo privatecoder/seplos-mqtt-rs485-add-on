@@ -49,10 +49,39 @@ def bms_serial(pack_state: Any) -> str | None:
     return value or None
 
 
+def cells_pending(state: Any, address: int) -> bool:
+    """A saved assignment of this pack the main loop has not adopted yet (adopted at the cycle boundary)."""
+    pending = getattr(state, "pending_cells", None)
+    if pending is None or pending is getattr(state, "cells_adopted", None):
+        return False
+    return pending[0].get(address) != state.adopted_packs.get(address)
+
+
 def _cells_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]:
-    """Datasheet assignment, both check summaries and the checks of one pack."""
+    """Datasheet assignment, both check summaries and the checks of one pack. ``pending`` is always False in
+    the snapshot: a save arrives between two snapshots, so ``with_pending`` overlays it at response time."""
     report = cell_report.pack_report(state, pack_state, now_mono)
-    return {key: report[key] for key in ("assignment", "series", "live", "parameters", "sample_age_s", "parameters_age_s")}
+    out = {key: report[key] for key in ("assignment", "series", "live", "parameters", "sample_age_s", "parameters_age_s")}
+    out["pending"] = False
+    return out
+
+
+def with_pending(state: Any, status: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The status snapshot as served: for a pack whose saved assignment the main loop has not adopted yet,
+    ``pending`` is set and a missing assignment is reported as ``pending`` instead of ``no_assignment``.
+    Plain reference reads only; the snapshot itself is not modified."""
+    if status is None or not any(cells_pending(state, p["address"]) for p in status.get("packs", ())):
+        return status
+    packs = []
+    for pack in status["packs"]:
+        if cells_pending(state, pack["address"]):
+            cells = {**pack["cells"], "pending": True}
+            for key in ("live", "parameters"):
+                if cells[key].get("reason") == "no_assignment":
+                    cells[key] = {**cells[key], "reason": "pending"}
+            pack = {**pack, "cells": cells}
+        packs.append(pack)
+    return {**status, "packs": packs}
 
 
 def _pack_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]:

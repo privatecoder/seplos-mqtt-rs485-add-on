@@ -776,7 +776,7 @@ def test_cell_and_pack_texts_for_built_keys_exist_in_both_languages():
         "stale_parameters", "check_error", "missing_sample", "missing_value", "missing_limit", "no_series",
         "above_charge_cutoff", "near_charge_cutoff", "below_discharge_cutoff", "near_discharge_cutoff",
         "outside_range", "near_range_edge", "charge_not_allowed", "above_limit", "below_limit", "near_limit",
-        "rated_capacity_mismatch", "series_mismatch",
+        "rated_capacity_mismatch", "series_mismatch", "pending",
     )
     source = Path(checks.__file__).read_text(encoding="utf-8")
     for reason in reasons:
@@ -784,6 +784,42 @@ def test_cell_and_pack_texts_for_built_keys_exist_in_both_languages():
     # every reason string the check module produces is covered by the list above
     produced = set(re.findall(r'"((?:above|below|near|missing|stale|outside|rated|series)_[a-z_]+)"', source))
     assert not [r for r in produced if r not in reasons and r != "rated_capacity_ah"], sorted(produced)
+
+
+def test_packs_tab_polls_the_status_and_stops_when_left():
+    source = (STATIC_DIR / "packs.js").read_text(encoding="utf-8")
+    assert "const POLL_MS = 5000;" in source
+    assert "setInterval(" in source and "clearInterval(pollTimer)" in source
+    destroy = source[source.index("destroy() {"):]
+    assert "stopPolling();" in destroy and "destroyed = true;" in destroy
+    assert "removeEventListener('visibilitychange', onVisibility)" in destroy
+    # a poll only fills the status slots: no form is rebuilt, so drafts, dirty state and focus stay
+    refresh = source[source.index("async function refreshStatus()"):source.index("function startPolling()")]
+    assert "fillAllStatus();" in refresh and "renderPacks(" not in refresh
+    # the pending text exists and the pending hint is shown even while old results are displayed
+    assert "check.reason.pending" in source
+
+
+def test_status_updates_keep_the_check_disclosure_nodes_and_drop_outdated_answers():
+    source = (STATIC_DIR / "packs.js").read_text(encoding="utf-8")
+    # R2: <details>/<summary> are made once per render (checkList factory); an update only touches the chip
+    # slot and the body, so a focused summary stays attached and focused
+    factory = source[source.index("function checkList("):source.index("function checksBlock(")]
+    update = factory[factory.index("update(group) {"):]
+    assert "h('details'" in factory and "h('summary'" in factory
+    assert "h('details'" not in update and "h('summary'" not in update
+    assert "chipSlot.replaceChildren(" in update and "body.replaceChildren(" in update
+    fill = source[source.index("function fillStatus("):source.index("function fillAllStatus()")]
+    assert "slot.checks.replaceChildren" not in fill and "checkList(" not in fill
+    # R3: one increasing sequence over polls, reloads and saves; only the newest answer is applied
+    assert source.count("statusSeq") >= 6
+    refresh = source[source.index("async function refreshStatus()"):source.index("function startPolling()")]
+    assert "const mine = ++statusSeq;" in refresh
+    assert refresh.index("await api('GET', 'api/status')") < refresh.index("mine !== statusSeq") < refresh.index("status = data.status")
+    load = source[source.index("async function load("):source.index("async function write(")]
+    assert "const statusMine = ++statusSeq;" in load and "statusMine === statusSeq" in load
+    write = source[source.index("async function write("):source.index("async function savePackAssignments")]
+    assert "statusSeq += 1;" in write.split("try {")[0]                  # a save outdates answers already on their way
 
 
 def test_cells_tab_is_wired_and_never_renders_links_it_did_not_validate():

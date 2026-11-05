@@ -410,6 +410,7 @@
   "check.key.discharging_overcurrent_alarm_a": "Überstromalarm Entladen",
   "check.key.discharging_overcurrent_protection_a": "Überstromschutz Entladen",
   "check.reason.no_assignment": "Kein Zelltyp zugewiesen.",
+  "check.reason.pending": "Gespeichert, wird nach dem laufenden Abfragezyklus geprüft.",
   "check.reason.serial_mismatch": "Die BMS-Seriennummer hat sich geändert; bestätige zuerst das Pack.",
   "check.reason.invalid_snapshot": "Die gespeicherte Zuweisung ist ungültig.",
   "check.reason.no_sample": "Noch keine Messung.",

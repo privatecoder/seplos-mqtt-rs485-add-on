@@ -29,7 +29,7 @@ from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
 from .sets import Member, set_values
 from .state import StateStore
-from .status import bms_serial, build_status
+from .status import bms_serial, build_status, with_pending
 from .supervisor import clear_legacy_options
 from .system import SystemReader
 from .transport import SerialBus
@@ -722,7 +722,7 @@ def start_web(state: AppState, store: JsonStore, port: str) -> None:
 
         web_app = WebApp(
             WebSettings(port=int(port)), store, on_connection_saved=state.request_restart,
-            on_sets_saved=state.request_sets, on_cells_saved=state.request_cells, status_provider=lambda: state.status,
+            on_sets_saved=state.request_sets, on_cells_saved=state.request_cells, status_provider=lambda: with_pending(state, state.status),
             jobs=state.jobs if state.connection_error is None else None,     # setup mode: nothing runs jobs
         )
         web = WebThread(web_app)

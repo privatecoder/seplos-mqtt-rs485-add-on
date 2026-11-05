@@ -5,6 +5,7 @@ import asyncio
 import dataclasses
 import json
 import tempfile
+import types
 from pathlib import Path
 
 from aiohttp.test_utils import TestClient, TestServer
@@ -15,7 +16,7 @@ from fakes import FakeBms
 from seplos_mqtt import app
 from seplos_mqtt.monitoring.migration import load_or_migrate
 from seplos_mqtt.pack import BatteryPack
-from seplos_mqtt.status import build_status
+from seplos_mqtt.status import build_status, with_pending
 from seplos_mqtt.web.server import WebApp, WebSettings
 
 PACK_KEYS = {
@@ -52,6 +53,42 @@ def fresh_state(packs: int) -> app.AppState:
     state = app.AppState(config=cfg)
     state.packs = [app.PackState(BatteryPack(i, None, cfg), i) for i in range(packs)]
     return state
+
+
+def test_saved_assignment_is_pending_until_the_cycle_boundary_adopts_it():
+    from test_cell_checks import assigned
+    state = fresh_state(2)
+
+    def served():
+        return with_pending(state, build_status(state, 100.0, "t"))["packs"]
+
+    before = served()
+    assert [p["cells"]["pending"] for p in before] == [False, False]
+    assert before[0]["cells"]["live"]["reason"] == "no_assignment"
+
+    new = assigned(address=0)
+    state.request_cells(types.SimpleNamespace(packs=new, balancer_profiles=(), cell_types=()))
+    saved = served()
+    assert [p["cells"]["pending"] for p in saved] == [True, False]       # only the pack whose assignment changed
+    assert saved[0]["cells"]["live"]["reason"] == saved[0]["cells"]["parameters"]["reason"] == "pending"
+    assert saved[1]["cells"]["live"]["reason"] == "no_assignment"
+
+    assert state.adopt_cells()
+    adopted = served()
+    assert adopted[0]["cells"]["pending"] is False
+    assert adopted[0]["cells"]["live"]["reason"] != "pending"            # now really evaluated (no sample yet)
+    assert adopted[0]["cells"]["assignment"]["id"] == new[0].cell.id
+
+
+def test_a_save_that_changes_nothing_for_a_pack_is_not_pending():
+    from test_cell_checks import assigned
+    state = fresh_state(1)
+    new = assigned(address=0)
+    state.request_cells(types.SimpleNamespace(packs=new, balancer_profiles=(), cell_types=()))
+    assert state.adopt_cells()
+    state.request_cells(types.SimpleNamespace(packs=new, balancer_profiles=(), cell_types=()))   # e.g. a profile edit
+    assert with_pending(state, build_status(state, 100.0, "t"))["packs"][0]["cells"]["pending"] is False
+    assert with_pending(state, None) is None
 
 
 # ---------------------------------------------------------------- build_status

@@ -465,7 +465,7 @@ def test_status_has_the_assignment_both_summaries_and_the_checks(monkeypatch):
     api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2, cell_packs=assigned(parallel=2))
     state = api.LAST_RUN["states"][0]
     cells = state.status["packs"][0]["cells"]
-    assert set(cells) == {"assignment", "series", "live", "parameters", "sample_age_s", "parameters_age_s"}
+    assert set(cells) == {"assignment", "series", "live", "parameters", "sample_age_s", "parameters_age_s", "pending"}
     assert cells["assignment"] == {
         "id": LF280K, "entry_version": 2, "parallel": 2, "valid": True, "serial_mismatch": False, "update_available": False,
         "name": "EVE LF280K Rev B (2021)",

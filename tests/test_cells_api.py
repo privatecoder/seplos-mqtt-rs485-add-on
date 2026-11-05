@@ -836,3 +836,39 @@ def test_parallel_has_no_small_ceiling(tmp_path):
             assert res.status == status, parallel
 
     run_with(app_, scenario)
+
+
+def test_status_api_shows_a_saved_assignment_as_pending_until_it_is_adopted(tmp_path):
+    """The served status is a cached snapshot; the main loop makes no new one while a poll runs. The pending
+    state must show up in GET /api/status right after the save, with no snapshot rebuild in between."""
+    from seplos_mqtt.status import with_pending
+    from test_cell_checks import LF280K
+    store = cells_store(tmp_path, pack_count=1)
+    state = app.AppState(config=api.config())
+    group = {"summary": "not_evaluated", "reason": "no_assignment", "checks": []}
+    state.status = {"packs": [{"address": 0, "cell_count": 16, "bms_serial": "S0", "rated_capacity": None,
+                               "cells": {"assignment": None, "series": 16, "live": group, "parameters": dict(group),
+                                         "pending": False}}]}
+    snapshot_before = copy.deepcopy(state.status)
+    app_ = WebApp(LOCAL, store, status_provider=lambda: with_pending(state, state.status),
+                  on_cells_saved=state.request_cells)
+
+    async def cells_of_status(client):
+        return (await (await client.get("/api/status")).json())["status"]["packs"][0]["cells"]
+
+    async def scenario(client):
+        before = await cells_of_status(client)
+        assert before["pending"] is False and before["live"]["reason"] == "no_assignment"
+        revision = (await (await client.get("/api/packs")).json())["revision"]
+        res = await call(client, "PUT", "/api/packs", {"packs": {
+            "0": {"cell": {"id": LF280K, "parallel": 1}, "balancer_profile": None}}}, revision)
+        assert res.status == 200
+        waiting = await cells_of_status(client)                       # polling is still blocked: no adoption yet
+        assert waiting["pending"] is True
+        assert waiting["live"]["reason"] == waiting["parameters"]["reason"] == "pending"
+        assert state.status == snapshot_before                        # the snapshot itself is untouched
+        assert state.adopt_cells()
+        adopted = await cells_of_status(client)
+        assert adopted["pending"] is False                            # the next snapshot carries the real result
+
+    run_with(app_, scenario)
