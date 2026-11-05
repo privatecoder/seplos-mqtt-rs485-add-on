@@ -48,7 +48,12 @@ fi
 
 # The connection options above are only read once, to create /data/monitoring.json; afterwards the
 # settings app (Ingress) owns them. Python starts the socat bridge for a remote RS485 gateway.
-INGRESS_PORT=$(bashio::addon.ingress_port)
+# bashio renamed addon.* to app.* (the old names warn); the Alpine 3.22 base images only have addon.*
+if declare -F bashio::app.ingress_port >/dev/null; then
+    INGRESS_PORT=$(bashio::app.ingress_port)
+else
+    INGRESS_PORT=$(bashio::addon.ingress_port)
+fi
 export INGRESS_PORT
 export MONITORING_FILE=/data/monitoring.json
 
