@@ -296,7 +296,7 @@ class BatteryPack:
                 if maint.parameters.ts != self._uart1_parameters_ts:
                     self._uart1_parameters_ts = maint.parameters.ts
                     self._uart1_parameters_read_at = timeutil.now_iso()
-                data["parameters"] = {**maint.parameters.value, "read_at": self._uart1_parameters_read_at}
+                data["parameters"] = {**parameters.public_view(maint.parameters.value), "read_at": self._uart1_parameters_read_at}
             if maint.serials and "info" in data:
                 data["info"] = {"normal": {**data["info"]["normal"], **{k: v for k, v in maint.serials.items() if v}}}
 
@@ -399,7 +399,7 @@ class BatteryPack:
                 data["status"] = self.extended_status if self.extended_status is not None and fresh else UNKNOWN_STATUS
                 self._fetch_parameters()
                 if self.parameters:
-                    data["parameters"] = self.parameters
+                    data["parameters"] = parameters.public_view(self.parameters)
 
             return data, True
         except Exception as e:

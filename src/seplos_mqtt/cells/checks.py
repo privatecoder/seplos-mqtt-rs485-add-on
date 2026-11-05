@@ -490,7 +490,8 @@ def parameter_checks(entry: Mapping[str, Any] | None, parallel: int, parameters:
             magnitude = abs(value) if kind == "maxabs" else value
             over = _lt(magnitude, limit) if kind == "min" else _gt(magnitude, limit)
             why = ("below_limit" if kind == "min" else "above_limit") if over else None
-            checks.append(_check(key, OVER if over else OK, value, limit, unit, why))
+            # discharge settings are shown as magnitudes (the BMS stores them negative), like the published ones
+            checks.append(_check(key, OVER if over else OK, magnitude if kind == "maxabs" else value, limit, unit, why))
     rated, nominal = _num(values.get("rated_capacity_ah")), entry_number(entry, "capacity", "nominal_ah")
     if rated is None:
         checks.append(_not_evaluated("rated_capacity_ah", "Ah", "missing_value"))

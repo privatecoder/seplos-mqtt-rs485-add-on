@@ -80,6 +80,25 @@ def _scaled(name: str, kind: str, value: int) -> tuple[str, object]:
     return name, value
 
 
+# The BMS stores these four discharge settings (P52, P53, P55, P56) as negative currents. The decoder stays
+# faithful to the wire; the public output (MQTT JSON, HA attributes) shows them as magnitudes.
+DISCHARGE_MAGNITUDES = (
+    "discharging_overcurrent_alarm_a", "discharging_overcurrent_recovery_a",
+    "discharging_overcurrent_protection_a", "transient_overcurrent_protection_a",
+)
+
+
+def public_view(values: dict) -> dict:
+    """A copy of decoded parameters for publication: the four discharge settings as magnitudes. Missing and
+    null values stay as they are; no other setting is touched."""
+    out = dict(values)
+    for key in DISCHARGE_MAGNITUDES:
+        value = out.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            out[key] = abs(value)
+    return out
+
+
 def decode_block(block: bytes) -> dict:
     """
     Decode the 168 byte parameter block: 0x3C + 60 x u16, 0x1B + 27 x u8, 0x08 + 8 switch bytes,
