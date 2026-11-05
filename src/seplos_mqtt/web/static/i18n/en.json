@@ -78,7 +78,7 @@
   "settings.hw.variant.value": "1101-10E",
   "settings.hw.hardware": "Hardware",
   "settings.hw.hardware.value": "V16",
-  "settings.hw.note": "The firmware (for example 16.06.13) is not the protocol version (V2.0).",
+  "settings.hw.note": "Each pack reports its own firmware version (for example 16.06.13), shown as \"Firmware\" in HA.",
   "settings.save": "Save",
   "settings.discard": "Discard changes",
   "settings.reload": "Reload",

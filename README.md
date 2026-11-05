@@ -41,7 +41,7 @@ Tested gateway: [Waveshare 2-CH RS485 to ETH](https://www.waveshare.com/2-ch-rs4
 | Variant | 1101-10E |
 | Hardware | V16 |
 
-The firmware (e.g. 16.06.13, shown as "Firmware" in Home Assistant) is not the protocol version (V2.0). In Home Assistant the facts appear on the device page of each pack: model, model ID (`model_id` needs HA 2024.8 or newer), hardware and, where the battery serial number can be read (CID2 0xA2 on RS485-1/2, or MAINT on the CAN port), the serial number exactly as the pack reports it (a placeholder value is shown as is). The BMS serial number (0xA4) is only the diagnostic sensor and the identity check. The System and Parallel Set devices are virtual and show no hardware, firmware or serial.
+Each pack reports its own firmware version (e.g. 16.06.13, shown as "Firmware" in Home Assistant). In Home Assistant the facts appear on the device page of each pack: model, model ID (`model_id` needs HA 2024.8 or newer), hardware and, where the battery serial number can be read (CID2 0xA2 on RS485-1/2, or MAINT on the CAN port), the serial number exactly as the pack reports it (a placeholder value is shown as is). The BMS serial number (0xA4) is only the diagnostic sensor and the identity check. The System and Parallel Set devices are virtual and show no hardware, firmware or serial.
 
 ## Wiring overview
 

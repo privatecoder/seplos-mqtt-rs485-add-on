@@ -78,7 +78,7 @@
   "settings.hw.variant.value": "1101-10E",
   "settings.hw.hardware": "Hardware",
   "settings.hw.hardware.value": "V16",
-  "settings.hw.note": "Die Firmware (z. B. 16.06.13) ist nicht die Protokollversion (V2.0).",
+  "settings.hw.note": "Die Firmware-Version (z. B. 16.06.13) meldet jedes Pack selbst, in HA steht sie unter „Firmware“.",
   "settings.save":"Speichern",
   "settings.discard": "Änderungen verwerfen",
   "settings.reload": "Neu laden",
