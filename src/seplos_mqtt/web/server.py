@@ -27,8 +27,19 @@ from typing import Any
 
 from aiohttp import web
 
+from .. import timeutil
+from ..cells import catalog
+from ..cells import validate as cell_validate
 from ..jobs import Job, JobBusy, JobQueue
-from ..monitoring.model import ConfigValidationError, MonitoringConfig, Problem, set_activity
+from ..monitoring.model import (
+    _PACK_KEYS,
+    ConfigValidationError,
+    MonitoringConfig,
+    Problem,
+    changed_fields,
+    find_cell,
+    set_activity,
+)
 from ..monitoring.store import JsonStore, LoadStatus, StaleRevision, StoreCorrupt
 
 log = logging.getLogger("SeplosBMS.web")
@@ -91,12 +102,14 @@ class WebApp:
         *,
         on_connection_saved: Callable[[MonitoringConfig], None] | None = None,
         on_sets_saved: Callable[[MonitoringConfig], None] | None = None,
+        on_cells_saved: Callable[[MonitoringConfig], None] | None = None,
         status_provider: Callable[[], dict[str, Any] | None] | None = None,
         jobs: JobQueue | None = None,
     ) -> None:
         """``on_connection_saved`` is called on the web event loop after each successful save, in
         commit order, and must return quickly (step 1c hands the work to the main thread);
-        ``on_sets_saved`` is the same for the parallel sets (it must not restart anything).
+        ``on_sets_saved`` is the same for the parallel sets (it must not restart anything) and
+        ``on_cells_saved`` for everything about cell types, pack assignments and balancer profiles.
         ``status_provider`` returns the latest status snapshot (a finished dict, read-only here);
         ``jobs`` is the queue the main loop thread works off (None: the job routes answer 503).
         The web thread never touches the serial bus."""
@@ -104,6 +117,7 @@ class WebApp:
         self.store = store
         self._on_connection_saved = on_connection_saved
         self._on_sets_saved = on_sets_saved
+        self._on_cells_saved = on_cells_saved
         self._status_provider = status_provider or (lambda: None)
         self._jobs = jobs
         # serialises PUT /api/connection and /api/sets from the corrupt check through callback and response
@@ -128,6 +142,15 @@ class WebApp:
         r.add_put("/api/connection", self._put_connection)
         r.add_get("/api/sets", self._get_sets)
         r.add_put("/api/sets", self._put_sets)
+        r.add_get("/api/cells", self._get_cells)
+        r.add_put("/api/cells", self._put_cells)
+        r.add_post("/api/cells/rename", self._post_rename_cell)
+        r.add_get("/api/packs", self._get_packs)
+        r.add_put("/api/packs", self._put_packs)
+        r.add_post("/api/packs/accept-update", self._post_accept_update)
+        r.add_post("/api/packs/confirm-identity", self._post_confirm_identity)
+        r.add_get("/api/balancer-profiles", self._get_profiles)
+        r.add_put("/api/balancer-profiles", self._put_profiles)
         r.add_get("/api/status", self._get_status)
         r.add_post("/api/jobs/detect", self._post_detect)
         r.add_get("/api/jobs/{job_id}", self._get_job)
@@ -404,6 +427,323 @@ class WebApp:
         data["next_set_id"] = next_id
         return problems
 
+    # -- cell types, pack assignments, balancer profiles ---------------------------------------
+
+    @staticmethod
+    def _cells_view(config: MonitoringConfig, revision: int) -> dict[str, Any]:
+        bundle = catalog.current()
+        conflicts = config.cell_conflicts()
+        cells = [
+            {"source": "bundled", "conflict": None, "entry": entry}
+            for entry in bundle.entries
+            if entry["id"] not in conflicts          # hidden until the own type is renamed
+        ]
+        cells += [
+            {"source": "own", "conflict": "bundled_id" if entry["id"] in conflicts else None, "entry": dict(entry)}
+            for entry in config.cell_types
+        ]
+        return {"revision": revision, "manifest": bundle.manifest, "cells": cells}
+
+    def _live_packs(self) -> dict[int, dict[str, Any]]:
+        """The packs of the status snapshot by address (empty before the first poll)."""
+        status = self._status_provider()
+        packs = status.get("packs") if isinstance(status, dict) else None
+        if not isinstance(packs, list):
+            return {}
+        return {p["address"]: p for p in packs if isinstance(p, dict) and type(p.get("address")) is int}
+
+    def _packs_view(self, config: MonitoringConfig, revision: int) -> dict[str, Any]:
+        live = self._live_packs()
+        packs = []
+        for address in sorted({*config.packs, *range(config.connection.pack_count)}):
+            stored = config.packs.get(address)
+            now = live.get(address, {})
+            cell = None
+            if stored is not None and stored.cell is not None:
+                item = stored.cell
+                found = find_cell(config.cell_types, item.id)
+                offer = (
+                    changed_fields(item.entry, found[1])
+                    if found is not None and item.valid and found[1]["entry_version"] > item.entry_version
+                    else None
+                )
+                cell = {
+                    "id": item.id, "entry_version": item.entry_version, "parallel": item.parallel,
+                    "entry": dict(item.entry), "valid": item.valid, "source": found[0] if found else None,
+                    "update_available": offer is not None, "changed": offer or [],
+                }
+            assigned = stored is not None and (stored.cell is not None or stored.balancer_profile is not None)
+            if not assigned:
+                identity = None
+            elif stored.serial_mismatch:
+                identity = "mismatch"
+            else:
+                identity = "verified" if stored.bms_serial is not None else "not_verifiable"
+            packs.append(
+                {
+                    "address": address,
+                    "configured": address < config.connection.pack_count,
+                    "series_count": now.get("cell_count"),
+                    "live_bms_serial": now.get("bms_serial"),
+                    "cell": cell,
+                    "balancer_profile": stored.balancer_profile if stored else None,
+                    "bms_serial": stored.bms_serial if stored else None,
+                    "serial_mismatch": stored.serial_mismatch if stored else False,
+                    "identity": identity,
+                }
+            )
+        return {"revision": revision, "pack_count": config.connection.pack_count, "packs": packs}
+
+    @staticmethod
+    def _profiles_view(config: MonitoringConfig, revision: int) -> dict[str, Any]:
+        return {"revision": revision, "profiles": [p.to_dict() for p in config.balancer_profiles]}
+
+    async def _get_cells(self, request: web.Request) -> web.Response:
+        config, revision = await self._load()
+        return json_response(self._cells_view(config, revision))
+
+    async def _get_packs(self, request: web.Request) -> web.Response:
+        config, revision = await self._load()
+        return json_response(self._packs_view(config, revision))
+
+    async def _get_profiles(self, request: web.Request) -> web.Response:
+        config, revision = await self._load()
+        return json_response(self._profiles_view(config, revision))
+
+    async def _put_cells(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_cells, self._cells_view, self._on_cells_saved, "cells")
+
+    async def _post_rename_cell(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_rename, self._cells_view, self._on_cells_saved, "cells")
+
+    async def _put_packs(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_packs, self._packs_view, self._on_cells_saved, "cells")
+
+    async def _post_accept_update(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_accept, self._packs_view, self._on_cells_saved, "cells")
+
+    async def _post_confirm_identity(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_confirm, self._packs_view, self._on_cells_saved, "cells")
+
+    async def _put_profiles(self, request: web.Request) -> web.Response:
+        return await self._put(request, self._apply_profiles, self._profiles_view, self._on_cells_saved, "cells")
+
+    @staticmethod
+    def _apply_cells(body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """The whole list of own types. Editing an existing type raises its ``entry_version`` and sets
+        ``updated`` (server side); a new id must not be a bundled one."""
+        items = _body_value(body, "cells", list, status)
+        stored = data.get("cell_types")
+        old = {e["id"]: e for e in stored if isinstance(e, dict) and isinstance(e.get("id"), str)} if isinstance(stored, list) else {}
+        bundle = catalog.current()
+        problems: list[Problem] = []
+        entries: list[Any] = []
+        for i, raw in enumerate(items):
+            if isinstance(raw, dict) and isinstance(raw.get("id"), str):
+                before = old.get(raw["id"])
+                if before is None:
+                    if bundle.get(raw["id"]) is not None:
+                        problems.append((f"cell_types[{i}].id", "duplicate"))
+                else:
+                    ignored = ("entry_version", "updated")
+                    if {k: v for k, v in raw.items() if k not in ignored} == {k: v for k, v in before.items() if k not in ignored}:
+                        raw = {**raw, "entry_version": before.get("entry_version"), "updated": before.get("updated")}
+                    else:
+                        version = before.get("entry_version")
+                        numeric = isinstance(version, (int, float)) and not isinstance(version, bool)
+                        raw = {**raw, "entry_version": int(version) + 1 if numeric else 1,
+                               "updated": timeutil.local_now().date().isoformat()}
+            entries.append(raw)
+        kept = {e["id"] for e in entries if isinstance(e, dict) and isinstance(e.get("id"), str)}      # hashable only
+        in_use = [
+            {"id": cell_id, "addresses": users}
+            for cell_id in old
+            if cell_id not in kept and (users := _users(data, lambda p, c=cell_id: _cell_id_of(p) == c))
+        ]
+        if in_use:
+            raise ApiError("in_use", 409, kind="cell_type", items=in_use)
+        data["cell_types"] = entries
+        return problems
+
+    @staticmethod
+    def _apply_rename(body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """Rename an own type: its id, every pack reference and the id inside those snapshots."""
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", field="body")
+        unknown = sorted(str(k)[:64] for k in body if k not in ("from", "to"))
+        if unknown:
+            raise ApiError("unknown_field", fields=unknown[:10])
+        missing = [k for k in ("from", "to") if k not in body]
+        if missing:
+            raise ApiError("missing_field", fields=missing)
+        if status is LoadStatus.MISSING:
+            raise ApiError("store_missing", 409)
+        old_id, new_id = body["from"], body["to"]
+        problems: list[Problem] = []
+        stored = data.get("cell_types")
+        target = next(
+            (e for e in stored if isinstance(e, dict) and e.get("id") == old_id), None
+        ) if isinstance(stored, list) and isinstance(old_id, str) else None
+        if target is None:
+            problems.append(("from", "value"))
+        pattern = catalog.current().schema["$defs"]["cell"]["properties"]["id"]["pattern"]
+        if not isinstance(new_id, str):
+            problems.append(("to", "type"))
+        elif not re.fullmatch(pattern, new_id):
+            problems.append(("to", "format"))
+        elif new_id == old_id or catalog.current().get(new_id) is not None or any(
+            isinstance(e, dict) and e.get("id") == new_id for e in stored or []
+        ):
+            problems.append(("to", "duplicate"))
+        if problems:
+            return problems
+        target["id"] = new_id
+        packs = data.get("packs")
+        for pack in packs.values() if isinstance(packs, dict) else []:
+            cell = pack.get("cell") if isinstance(pack, dict) else None
+            if isinstance(cell, dict) and cell.get("id") == old_id:
+                cell["id"] = new_id
+                if isinstance(cell.get("entry"), dict):
+                    cell["entry"]["id"] = new_id
+        return []
+
+    def _apply_packs(self, body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """Reference-only patch: a listed address is replaced, an unlisted one stays. The snapshot is
+        made only when the cell id changes; the same id keeps the stored one."""
+        items = _body_value(body, "packs", dict, status)
+        stored = data.get("packs")
+        packs: dict[str, Any] = stored if isinstance(stored, dict) else {}
+        own = data.get("cell_types") if isinstance(data.get("cell_types"), list) else []
+        live = self._live_packs()
+        problems: list[Problem] = []
+        for key, item in items.items():
+            path = f"packs.{key}"
+            if not _is_address(key):
+                problems.append((path, "value"))
+                continue
+            if not isinstance(item, dict):
+                problems.append((path, "type"))
+                continue
+            problems.extend((f"{path}.{k}", "unknown_field") for k in item if k not in ("cell", "balancer_profile"))
+            absent = [k for k in ("cell", "balancer_profile") if k not in item]
+            problems.extend((f"{path}.{k}", "required") for k in absent)
+            if absent:
+                continue
+            before = packs.get(key) if isinstance(packs.get(key), dict) else {}
+            old_cell = before.get("cell") if isinstance(before.get("cell"), dict) else None
+            cell = None
+            reassigned = False
+            ref = item["cell"]
+            if ref is not None:
+                if not isinstance(ref, dict):
+                    problems.append((f"{path}.cell", "type"))
+                    continue
+                problems.extend((f"{path}.cell.{k}", "unknown_field") for k in ref if k not in ("id", "parallel"))
+                problems.extend((f"{path}.cell.{k}", "required") for k in ("id", "parallel") if k not in ref)
+                if "id" not in ref or "parallel" not in ref:
+                    continue
+                if not isinstance(ref["id"], str):
+                    problems.append((f"{path}.cell.id", "type"))
+                    continue
+                if old_cell is not None and old_cell.get("id") == ref["id"] and _snapshot_ok(old_cell):
+                    # the same type keeps its snapshot, even if the catalog no longer has the entry
+                    cell = {**old_cell, "parallel": ref["parallel"]}
+                else:
+                    found = find_cell(own, ref["id"])
+                    if found is None:
+                        problems.append((f"{path}.cell.id", "value"))
+                        continue
+                    entry = cell_validate.normalized(dict(found[1]))
+                    cell = {"id": ref["id"], "entry_version": entry["entry_version"], "parallel": ref["parallel"], "entry": entry}
+                    reassigned = True
+            new = {**before, "cell": cell, "balancer_profile": item["balancer_profile"]}
+            had = before.get("cell") is not None or before.get("balancer_profile") is not None
+            if cell is None and item["balancer_profile"] is None:
+                new["bms_serial"], new["serial_mismatch"] = None, False
+                if set(new) <= _PACK_KEYS:
+                    packs.pop(key, None)
+                    continue
+            elif reassigned or not had:
+                serial = live.get(int(key), {}).get("bms_serial")
+                new["bms_serial"], new["serial_mismatch"] = serial if isinstance(serial, str) else None, False
+            packs[key] = new
+        data["packs"] = packs
+        return problems
+
+    @staticmethod
+    def _apply_accept(body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """Replace the snapshots of the listed packs by the current (own or bundled) entry."""
+        addresses = _body_value(body, "addresses", list, status)
+        stored = data.get("packs")
+        own = data.get("cell_types") if isinstance(data.get("cell_types"), list) else []
+        problems: list[Problem] = []
+        for i, address in enumerate(addresses):
+            pack = stored.get(str(address)) if isinstance(stored, dict) and type(address) is int else None
+            cell = pack.get("cell") if isinstance(pack, dict) else None
+            found = find_cell(own, cell.get("id")) if isinstance(cell, dict) and isinstance(cell.get("id"), str) else None
+            resolved = cell_validate.normalized(dict(found[1])) if found else None      # the raw store may hold 2.0
+            version = resolved.get("entry_version") if resolved else None
+            if (
+                not isinstance(cell, dict) or found is None or not _snapshot_ok(cell)
+                or type(version) is not int or version <= cell["entry_version"]
+            ):
+                problems.append((f"addresses[{i}]", "type" if type(address) is not int else "value"))
+                continue
+            cell["entry"] = resolved
+            cell["entry_version"] = version
+        return problems
+
+    def _apply_confirm(self, body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """Take the serial the pack reports now as the expected one."""
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", field="body")
+        unknown = sorted(str(k)[:64] for k in body if k != "address")
+        if unknown:
+            raise ApiError("unknown_field", fields=unknown[:10])
+        if "address" not in body:
+            raise ApiError("missing_field", fields=["address"])
+        if status is LoadStatus.MISSING:
+            raise ApiError("store_missing", 409)
+        address = body["address"]
+        stored = data.get("packs")
+        pack = stored.get(str(address)) if isinstance(stored, dict) and type(address) is int else None
+        if not isinstance(pack, dict) or (pack.get("cell") is None and pack.get("balancer_profile") is None):
+            return [("address", "type" if type(address) is not int else "value")]
+        serial = self._live_packs().get(address, {}).get("bms_serial")
+        if not isinstance(serial, str):
+            raise ApiError("serial_unavailable", 409)
+        pack["bms_serial"], pack["serial_mismatch"] = serial, False
+        return []
+
+    @staticmethod
+    def _apply_profiles(body: Any, status: LoadStatus, data: dict[str, Any]) -> list[Problem]:
+        """The whole profile list; ids are assigned here and never reused."""
+        items = _body_value(body, "profiles", list, status)
+        stored = data.get("balancer_profiles")
+        stored_ids = {p.get("id") for p in stored if isinstance(p, dict)} if isinstance(stored, list) else set()
+        next_id = data.get("next_profile_id", 1)
+        entries: list[Any] = []
+        problems: list[Problem] = []
+        for i, entry in enumerate(items):
+            if isinstance(entry, dict):
+                if "id" not in entry:
+                    entry = {**entry, "id": next_id}
+                    next_id += 1
+                elif type(entry["id"]) is int and entry["id"] not in stored_ids:
+                    problems.append((f"balancer_profiles[{i}].id", "value"))
+            entries.append(entry)
+        kept = {e["id"] for e in entries if isinstance(e, dict) and type(e.get("id")) is int}      # hashable only
+        in_use = [
+            {"id": profile_id, "addresses": users}
+            for profile_id in sorted(i for i in stored_ids if type(i) is int)
+            if profile_id not in kept and (users := _users(data, lambda p, x=profile_id: p.get("balancer_profile") == x))
+        ]
+        if in_use:
+            raise ApiError("in_use", 409, kind="balancer_profile", items=in_use)
+        data["balancer_profiles"] = entries
+        data["next_profile_id"] = next_id
+        return problems
+
     async def _save(
         self,
         body: Any,
@@ -527,6 +867,45 @@ def _finalize(request: web.Request, response: web.StreamResponse) -> web.StreamR
     elif request.path == "/" or request.path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+def _body_value(body: Any, key: str, kind: type, status: LoadStatus) -> Any:
+    """The one allowed key of a body, checked for its type."""
+    if not isinstance(body, dict):
+        raise ApiError("invalid_request", field="body")
+    unknown = sorted(str(k)[:64] for k in body if k != key)
+    if unknown:
+        raise ApiError("unknown_field", fields=unknown[:10])
+    if key not in body:
+        raise ApiError("missing_field", fields=[key])
+    if not isinstance(body[key], kind):
+        raise ApiError("invalid_request", field=key)
+    if status is LoadStatus.MISSING:
+        raise ApiError("store_missing", 409)
+    return body[key]
+
+
+def _is_address(key: Any) -> bool:
+    return isinstance(key, str) and key.isascii() and key.isdigit() and str(int(key)) == key and int(key) <= 15
+
+
+def _cell_id_of(pack: Any) -> Any:
+    cell = pack.get("cell") if isinstance(pack, dict) else None
+    return cell.get("id") if isinstance(cell, dict) else None
+
+
+def _users(data: dict[str, Any], matches: Callable[[dict[str, Any]], bool]) -> list[int]:
+    """Addresses (any, also above ``pack_count``) of the stored packs for which ``matches`` holds."""
+    packs = data.get("packs")
+    if not isinstance(packs, dict):
+        return []
+    return sorted(int(k) for k, p in packs.items() if isinstance(p, dict) and _is_address(k) and matches(p))
+
+
+def _snapshot_ok(cell: dict[str, Any]) -> bool:
+    """The stored snapshot belongs to the reference (id and version)."""
+    entry = cell.get("entry")
+    return isinstance(entry, dict) and entry.get("id") == cell.get("id") and entry.get("entry_version") == cell.get("entry_version")
 
 
 def _all_finite(value: Any) -> bool:

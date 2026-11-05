@@ -1,0 +1,7715 @@
+[
+  {
+    "schema_version": 1,
+    "id": "eve-lf280k-rev-b-2021",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF280K",
+    "variant": "Rev B (2021)",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "LF280K (3.2V 280Ah) Product Specification, File No. LF280K-72174, Version B",
+      "source_type": "manufacturer_pdf",
+      "url": "https://akkudoktor.net/uploads/short-url/gI1mZDoARVdkajomXZ3HTcipYqs.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 280
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 280,
+      "max_continuous_discharge_a": 280
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 55,
+      "discharge_min_c": -20,
+      "discharge_max_c": 55
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "EVE manufacturer specification, File No. LF280K-72174, Version B, effective 2021-03-23; third-party forum host (source_type enum has no generic third-party-host option)"
+      },
+      "form_factor": {
+        "verified": true,
+        "note": "aluminium-shell prismatic cell"
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "280.0 Ah at 25+/-2 C, standard charge/discharge"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: source states maximum continuous charge 1C; 1C x 280 Ah"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: source states maximum continuous discharge 1C; 1C x 280 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "LF280K-72174 Rev B, all 11 PDF pages checked; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf280k-pbri-rev-c-v3",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF280K",
+    "variant": "PBRI Rev C (retailer designation V3)",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "LF280K Product Specification, PBRI-LF280K-D06-01, Version C",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.docanpower.com/index.php?download_id=6&product_id=509&route=product%2Fproduct%2Fdownload"
+    },
+    "capacity": {
+      "nominal_ah": 280,
+      "nominal_energy_wh": 896
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 280,
+      "max_continuous_discharge_a": 280
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Document is PBRI-LF280K-D06-01 Rev C dated 2023-06-06; V3 is a retailer designation, not an EVE revision label"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "280 Ah at 0.5P/0.5P, 25+/-2 C, 2.5-3.65 V, fresh cell"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true,
+        "note": "same test conditions as nominal capacity"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: source states maximum continuous charge power 1P; 1P x 896 Wh / 3.2 V nominal = 280 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: source states maximum continuous discharge power 1P; 1P x 896 Wh / 3.2 V nominal = 280 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "operation-temperature table; a separate absolute-limit passage mentions -35 C"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "PBRI-LF280K-D06-01 Rev C, section 4.2.2.1, Table 9, PDF page 25 (printed page 19); continuous charging modes, 0-100% SOC."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.03
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 1.0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.25
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-mb31-rev-a-314ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "MB31",
+    "variant": "Rev A (314Ah)",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "MB31 Product Specification, PBRI-MB31-D06-01, Version A",
+      "source_type": "manufacturer_pdf",
+      "url": "https://batteryfinds.com/wp-content/uploads/2024/06/EVE-MB31-3.2V-314Ah-LiFePO4-Prismatic-Battery-Cells-Specification.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 157,
+      "max_continuous_discharge_a": 157
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "PBRI-MB31-D06-01 Rev A, first issue 2023-11-20"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "0.5P/0.5P, 25+/-2 C, 2.5-3.65 V, fresh cell"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 0.5P x 1004.8 Wh / 3.2 V nominal = 157 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 1004.8 Wh / 3.2 V nominal = 157 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "operation range; absolute lower discharge limit elsewhere in document is -35 C"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "PBRI-MB31-D06-01 Rev A, section 2.3.2, Table 5, PDF page 11 (printed page 4); continuous charging modes, 0-100% SOC."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.05
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf304-rev-b-2020",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF304",
+    "variant": "Rev B (2020)",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "LF304 (3.2V 304Ah) Product Specification, File No. LF304-72174, Version B",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.gobelpower.com/download/EVE-LF304-LiFePO4-Battery-Cell-Product-Specification-20200507.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 304
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 250,
+      "max_continuous_discharge_a": 250
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "File No. LF304-72174, Version B, effective 2020-05-07"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "typical capacity, 25+/-2 C, standard procedure"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "source directly states continuous charge current 250 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "source directly states continuous discharge current 250 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "LF304-72174 Rev B, all 10 printed specification pages checked; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf304-pbri-rev-e-2023",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF304",
+    "variant": "PBRI Rev E (2023)",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "LF304 Product Specification, PBRI-LF304-D06-01, Version E",
+      "source_type": "manufacturer_pdf",
+      "url": "https://diy.manko.pro/wp-content/uploads/2024/10/lifepo4_eve_3.2v_302ah_datasheet.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 304,
+      "nominal_energy_wh": 972.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 304,
+      "max_continuous_discharge_a": 304
+    },
+    "temperature": {
+      "charge_min_c": -10,
+      "charge_max_c": 65,
+      "discharge_min_c": -35,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "PBRI-LF304-D06-01 Rev E dated 2023-05-31; filename incorrectly says 302Ah but document content is LF304"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "0.5C/0.5C, 25+/-2 C, 2.5-3.65 V, fresh cell"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charging current 1C x 304 Ah"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge current 1C x 304 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "absolute range; table specifies 0C at -10 C and positive charge only from -5 C"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "absolute range; table specifies 0C at 65 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "PBRI-LF304-D06-01 Rev E, section 4.2.2.1, Table 9, PDF page 28 (printed page 19); continuous C-rate by cell temperature and exact SOC columns."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": -10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.15
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.15
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.15
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.15
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.12
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.12
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.08
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.08
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.07
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.05
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.05
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.05
+        },
+        {
+          "temp_c": -5,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.3
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.3
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.3
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.25
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.12
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.12
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.1
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.1
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.08
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.08
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.05
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.05
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.45
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.45
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.35
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.35
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.25
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.25
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.19
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.16
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.13
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.12
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.12
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.12
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.7
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.68
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.65
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.56
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.5
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.5
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.4
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.4
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.28
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf230-rd-rev-a",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF230",
+    "variant": "RD Rev A",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "LF230 Product Specification, RD-LF230-S01-LF, Version A",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.nkon.nl/amfile/file/download/file/330/product/5673/"
+    },
+    "capacity": {
+      "nominal_ah": 230,
+      "nominal_energy_wh": 736
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 1,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 230,
+      "max_continuous_discharge_a": 230
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -35,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "RD-LF230-S01-LF Version A"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "minimum capacity 230 Ah at 1C, 25+/-2 C; document uses 230 Ah as nominal/rated basis"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charging current 1C x 230 Ah"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge current 1C x 230 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "absolute charge temperature"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "absolute charge temperature"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "absolute discharge temperature"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true,
+        "note": "absolute discharge temperature"
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "RD-LF230-S01-LF Rev A, section 4.2, Table 9; continuous C-rate by cell temperature and exact SOC columns (manufacturer PDF text independently re-read via Manuals+ mirror)."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.2
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 0.2
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.1
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.06
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.06
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.4
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 0.4
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.2
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.12
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.12
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.4
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 0.4
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.2
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.12
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.12
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.8
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 0.8
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.6
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.6
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.6
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.6
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.4
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.4
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.4
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.4
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.4
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.4
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.4
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 5,
+          "soc_max_pct": 5,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf105-pbri-rev-d",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF105",
+    "variant": "PBRI Rev D",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "LF105 Product Specification, PBRI-LF105-D06-01, Version D",
+      "source_type": "manufacturer_pdf",
+      "url": "https://mullerenergy.com.au/wp-content/uploads/2023/09/EVE-LF105-Specifications.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 105
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 105,
+      "max_continuous_discharge_a": 105
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -35,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "PBRI-LF105-D06-01 Rev D dated 2022-11-08"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "minimum 105 Ah at 0.5C/0.5C, 25+/-2 C, 2.5-3.65 V, fresh cell"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charging current 1C x 105 Ah"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge current 1C x 105 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "absolute charge range; charging table specifies 0C at 0 C"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "absolute charge range; charging table specifies 0C at 65 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "PBRI-LF105-D06-01 Rev D, section 5.2, Table 10, PDF page 29 (printed page 20); continuous C-rate by cell temperature and exact SOC columns."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.37
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.4
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0.4
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 98,
+          "soc_max_pct": 98,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "catl-lep71h3l7-01-302ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CATL",
+    "model": "LEP71H3L7-01",
+    "variant": "302Ah, CTPS Rev 1.0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 302Ah Cell, CTPS-71H3L7-01, Rev 1.0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.basenpower.com/wp-content/uploads/2025/06/CATL-302Ah-%E7%94%B5%E8%8A%AF%E6%8A%80%E6%9C%AF%E8%A7%84%E6%A0%BC%E4%B9%A6%E9%80%9A%E7%94%A8%E7%89%88.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 302
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_discharge_a": 302
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -30,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "CTPS-71H3L7-01 Rev 1.0; the revision table is inconsistent and also prints 1.1 without a visible effective date"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "302 Ah at 1C discharge, 25+/-2 C, fresh cell"
+      },
+      "voltage.nominal_v": {
+        "verified": true,
+        "note": "stated in scope/product definition"
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification of 302Ah Cell CTPS-71H3L7-01; an SOC/temperature charging table reaches 1C but is not labelled as a single maximum continuous current"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge current 1.0C x 302 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "conflict inside datasheet: overview table states -35 C, detailed absolute-discharge limit states -30 C; conservative detailed -30 C selected"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CTPS-71H3L7-01 Rev 1.0, section 2.2.7, PDF page 7; C-rate table. Printed SOC bands are 0%~<80% and >80%; schema boundaries store 80 while this note preserves the printed inequalities. The split line at 60 C reads 0.279, not 0.2."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.116
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.116
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.116
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.116
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.372
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.372
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.372
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.372
+        },
+        {
+          "temp_c": 12,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 12,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.75
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 48,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.8
+        },
+        {
+          "temp_c": 48,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.279
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.279
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "catl-cbc00-314ah-rev-1-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CATL",
+    "model": "CBC00",
+    "variant": "314Ah Rev 1.0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 314Ah Cell, Rev 1.0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.lifepo4-battery.com/ueditor/php/upload/file/20230628/1687919938645753.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 157,
+      "max_continuous_discharge_a": 157
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "CATL manufacturer specification Rev 1.0, effective 2023-05-10"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "typical capacity, fresh cell, standard 0.5P procedures"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charging power 0.5P x 1004.8 Wh / 3.2 V nominal = 157 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 1004.8 Wh / 3.2 V nominal = 157 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CBC00 Product Specification Rev 1.0, section 2.2.7, PDF page 7; max charge power for 0%~<100% SOC. The datasheet explicitly marks the values as estimated, pending actual testing."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.04
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.16
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.28
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.35
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "catl-cb310-280ah-rev-1-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CATL",
+    "model": "CB310",
+    "variant": "280Ah C-sample Rev 1.0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 280Ah Cell, CB310, Rev 1.0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.champbattery.com/wp-content/uploads/2024/08/CATL-280Ah-Cell-LiFePO4-Datasheet.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 280,
+      "nominal_energy_wh": 896
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.25,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.25,
+        "basis": "P"
+      },
+      "max_continuous_discharge_a": 140
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "CATL-branded Rev 1.0 C-sample specification; process not frozen and document warns against end-customer sales"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "standard 0.25P charge/discharge procedures"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification of 280Ah Cell CB310 Rev 1.0; temperature table says max charge power but no scalar maximum continuous charge field"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: source states maximum discharge power (continuous) 0.5P x 896 Wh / 3.2 V nominal = 140 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CB310 Product Specification Rev 1.0, section 2.2.7, PDF page 7; max charge power, 0%~<100% SOC."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.05
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.2
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.35
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "hithium-lfp71173207-314ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "HiTHIUM",
+    "model": "LFP71173207",
+    "variant": "314Ah",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "ESS Cell 314 Ah",
+      "source_type": "manufacturer_pdf",
+      "url": "https://en.hithium.com/bocupload/2025/08/26/175618416688977r4ul.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      }
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "official HiTHIUM one-page datasheet; no printed document number/revision/date"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "0.5P/0.5P, 25+/-2 C"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true,
+        "note": "0.5P/0.5P, 25+/-2 C"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true,
+        "note": "upper end of operating-voltage range"
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "datasheet labels this nominal continuous charge rate"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "datasheet labels this nominal continuous discharge rate"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet ESS Cell 314 Ah; nominal continuous rate is not relabelled as maximum"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "not specified in datasheet ESS Cell 314 Ah; nominal continuous rate is not relabelled as maximum"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "ESS Cell 314 Ah manufacturer datasheet (2025-08), both pages checked by OCR; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "envision-aesc-hc-l315a-rev-1-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Envision AESC",
+    "model": "HC-L315A",
+    "variant": "315Ah Rev 1.0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 315Ah Cell, HC-L315A, Rev 1.0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.scribd.com/document/1046849374/AESC-Envision315ah"
+    },
+    "capacity": {
+      "nominal_ah": 315,
+      "nominal_energy_wh": 1008
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 158,
+      "max_continuous_discharge_a": 315
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "AESC manufacturer specification Rev 1.0, effective 2024-01-27, hosted by Scribd"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "fresh cell, standard procedure"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived and rounded: maximum continuous charge power 0.5P x 1008 Wh / 3.2 V nominal = 157.5 A, stored as 158 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 1P x 1008 Wh / 3.2 V nominal = 315 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "HC-L315A Product Specification Rev 1.0, section 2.3.8, printed page 9; max charge power, 0-100% SOC. Open-ended points encode the printed <0 C and >60 C no-charge columns; intermediate bounds are printed as ranges."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_max_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 15,
+          "temp_max_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.25
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "lishen-lp71173207-272ah-rev-1",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Lishen",
+    "model": "LP71173207-272Ah",
+    "variant": "Rev 1",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — Lithium-ion Power Cell of LP71173207-272Ah, Rev 1",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.bateriaslifepo4.com/wp-content/uploads/2021/02/Lishen-272ah-LiFePo4-battery-datasheet.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 272
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "max_continuous_charge_a": 272,
+      "max_continuous_discharge_a": 272,
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      }
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -35,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Lishen manufacturer specification Rev 1 dated 2019-06-15"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "new battery; nominal-capacity test uses 1.0 I1 discharge at 25+/-2 C"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "datasheet: slow charge 0.5 I1; I1 = 272 A = 1C; 'fast' 1.0 I1 not used as standard"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "source directly defines I1 = 272 A and maximum continuous charge = 1.0 I1"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "source directly defines I1 = 272 A and maximum continuous discharge = 1.0 I1"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "LP71173207-272Ah Rev 1 (2019-06-15), all 15 pages checked; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "rept-battero-cb75-314ah-v01",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "REPT BATTERO",
+    "model": "CB75",
+    "variant": "314Ah Version 01",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — CB75-314Ah, Version 01",
+      "source_type": "manufacturer_pdf",
+      "url": "https://lynxpower.co.uk/wp-content/uploads/2024/08/REPT-Cell-314Ah-Product-Specification.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 157,
+      "max_continuous_discharge_a": 157
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "REPT BATTERO manufacturer specification Version 01 dated 2023-02-01"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P/0.5P"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P/0.5P"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 0.5P x 1004.8 Wh / 3.2 V nominal = 157 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 1004.8 Wh / 3.2 V nominal = 157 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CB75-314Ah Version 01, all 16 printed pages checked; no temperature-dependent continuous-charge table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "trina-storage-314ah-cell",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Trina Storage",
+    "model": "TS71173204-314A",
+    "variant": "314Ah, Rev A",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Specification of TS71173204-314A, Version A",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.scribd.com/document/821851058/Trina-LiFePO4-LFP-cell-314Ah-datasheet"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 314,
+      "max_continuous_discharge_a": 314
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Version A, new release dated 2024-01-26; original Trina Energy Storage Solutions manufacturer specification hosted by Scribd"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "fresh cell; standard charge and discharge; section 4.1.2"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true,
+        "note": "section 4.1.1"
+      },
+      "voltage.nominal_v": {
+        "verified": true,
+        "note": "manufacturer scope defines 314 Ah 3.2 V LFP cell"
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true,
+        "note": "section 4.2.5"
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "section 4.4.5; T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "section 4.4.5; T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "section 4.2.1; 0.5P at 25+/-2 C"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "section 4.4.1; 0.5P at 25+/-2 C"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "section 4.2.3: maximum continuous charge 1P; derived: 1P x 1004.8 Wh / 3.2 V nominal = 314 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "section 4.4.3: maximum continuous discharge 1P; derived: 1P x 1004.8 Wh / 3.2 V nominal = 314 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "sections 4.1.7 and 4.2.6"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "sections 4.1.7 and 4.2.6"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "sections 4.1.8 and 4.4.6"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true,
+        "note": "sections 4.1.8 and 4.4.6"
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "TS71173204-314A Product Specification Rev A (2024-01-26), section 4.3, printed page 9; max charge power, 0-100% SOC; original manufacturer specification hosted by Scribd."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.4
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-mb30-rev-a-306ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "MB30",
+    "variant": "306Ah Rev A",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — Prismatic LFP Cell MB30, PBRI-MB30-D06-01, Version A",
+      "source_type": "manufacturer_pdf",
+      "url": "https://batteryfinds.com/wp-content/uploads/2024/06/EVE-MB30-3.2V-306Ah-LiFePO4-Prismatic-Battery-Cells-Specification.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 306,
+      "nominal_energy_wh": 979.2
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 153,
+      "max_continuous_discharge_a": 153
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "PBRI-MB30-D06-01 Version A, first issue 2023-11-20"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P charge/0.5P discharge, 2.5-3.65 V, fresh cell"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true,
+        "note": "same test condition as nominal capacity"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 0.5P x 979.2 Wh / 3.2 V nominal = 153 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 979.2 Wh / 3.2 V nominal = 153 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "operation range; recommended table gives 0P at exactly 60 C"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "operation range; recommended table gives 0P at exactly 60 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "operation table; separate absolute limit is -35 C"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true,
+        "note": "operation table; separate absolute limit is 65 C"
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "PBRI-MB30-D06-01 Rev A, section 2.3.2, Table 5, PDF page 11 (printed page 4); continuous charging modes, 0-100% SOC."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.05
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.12
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-mb56-v1-1-rev-d-628ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "MB56-0.5P-V1.1",
+    "variant": "628Ah Version D",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — MB56-0.5P-V1.1, PBRI-MB56-0.5P-V1.1-D06-04, Version D",
+      "source_type": "manufacturer_pdf",
+      "url": "https://manuals.plus/m/fcb6bb423a51bb47d3f5c0316a08278d6d28e52d1e741cfb710d614fd34d93a3"
+    },
+    "capacity": {
+      "nominal_ah": 628,
+      "nominal_energy_wh": 2009.6
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 314,
+      "max_continuous_discharge_a": 314
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "PBRI-MB56-0.5P-V1.1-D06-04 Version D, 2025-06-18"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P charge/0.5P discharge, 2.5-3.65 V"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true,
+        "source": "https://www.evemall.eu/selection-guide/all-about-eve-mb56-and-s556h201-mr-giant-5mwh",
+        "note": "official EVE page; the controlled Version D specification does not print a separate nominal-voltage row"
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 0.5P x 2009.6 Wh / 3.2 V nominal = 314 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 2009.6 Wh / 3.2 V nominal = 314 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "charge table is 0P at exactly 60 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "PBRI-MB56-0.5P-V1.1-D06-04 Rev D, section 3.3 Charging Recommendation, source-PDF page/converted section; P-rate by cell temperature and exact SOC columns. Section 3 says BMS design reference data; actual use is subject to agreed conditions."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": -30,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": -30,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": -20,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": -10,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.1
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.05
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.05
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.05
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.2
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.1
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.1
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.1
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.3
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.2
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.2
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.2
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.3
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.3
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.3
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.25
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.25
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.25
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.375
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.125
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.125
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.125
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0.25
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0.1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0.1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0.1
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 0,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 10,
+          "soc_max_pct": 10,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 20,
+          "soc_max_pct": 20,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 30,
+          "soc_max_pct": 30,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 40,
+          "soc_max_pct": 40,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 50,
+          "soc_max_pct": 50,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 60,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 70,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 90,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 95,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 100,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf100la-rev-a-100ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF100LA",
+    "variant": "LF100LA-56160 Version A",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — LF100LA-56160, Version A",
+      "source_type": "manufacturer_pdf",
+      "url": "https://support.clientwebwork.com/wp-content/uploads/2024/11/EVE-LF100LA-3.2V100Ah-LiFePO4-Prismatic-Battery-Cell-Specification-Datasheet.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 100
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 100,
+      "max_continuous_discharge_a": 100
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 55,
+      "discharge_min_c": -20,
+      "discharge_max_c": 55
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "LF100LA-56160 Version A, effective 2022-01-01"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, standard charge/discharge"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: 1C x 100 Ah"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: 1C x 100 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "LF100LA-56160 Version A (2022-01-01), all 11 PDF pages checked; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "eve-lf100la-rd-rev-b-102ah",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "EVE",
+    "model": "LF100LA",
+    "variant": "RD-LF100LA-S01-LF Version B",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — LF100LA, RD-LF100LA-S01-LF, Version B",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.mivvyenergy.cz/img/cms/RD-LF100LA-S01-LF100LA%20latest%20specification-pdf.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 102,
+      "nominal_energy_wh": 326.4
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.2,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.2,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 102
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -20,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Version B, 2022-09-20; bilingual EVE specification"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.2C, 2.5-3.65 V; changed from 100 Ah in Version A"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "0 C < T <= 65 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "-20 C < T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum charging current 1C x 102 Ah"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification LF100LA RD-LF100LA-S01-LF Version B; rate-discharge tests are not relabelled as maximum continuous"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "RD-LF100LA-S01-LF Rev B, section 4.1.2, PDF page 12; C-rate by printed temperature bands and SOC bands. Boundaries are stored numerically; the source prints parentheses around intermediate temperature ranges."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 10,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 10,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 10,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 10,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 20,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 20,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 20,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 20,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 20,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 25,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 25,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 25,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0.3
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 25,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0.8
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 55,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 55,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 55,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0.3
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 55,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 0,
+          "soc_max_pct": 60,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 60,
+          "soc_max_pct": 70,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 70,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 80,
+          "soc_max_pct": 90,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 90,
+          "soc_max_pct": 95,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 95,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "catl-cbdd0-306ah-rev-2-1",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CATL",
+    "model": "CBDD0",
+    "variant": "306Ah Rev 2.1",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 306Ah Cell, Model CBDD0, Rev 2.1",
+      "source_type": "manufacturer_pdf",
+      "url": "https://qaes.eu/wp-content/uploads/2024/09/CATL-306Ah-Spec.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 306,
+      "nominal_energy_wh": 979.2
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 153,
+      "max_continuous_discharge_a": 153
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Rev 2.1 dated 2023-09-28"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P charge/0.5P discharge"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 0.5P x 979.2 Wh / 3.2 V nominal = 153 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 979.2 Wh / 3.2 V nominal = 153 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "temperature-current table is 0P at exactly 60 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CBDD0 Product Specification Rev 2.1, section 2.2.8, PDF page 7; max charge power, 0%~<100% SOC; note in source says cell temperature rise is not considered."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.05
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.2
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "catl-lep71h3l7-01-320ah-rev-1-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CATL",
+    "model": "LEP71H3L7-01",
+    "variant": "320Ah CTPS-71H3L7-01 Rev 1.0/1.1",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 320Ah Cell, CTPS-71H3L7-01",
+      "source_type": "manufacturer_pdf",
+      "url": "https://ecoteardown.top/wp-content/uploads/2023/12/CATL-320Ah-3.2V-LiFePO4-Prismatic-Battery-Cell-Specification-Datasheet.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 320
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_discharge_a": 320
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -30,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "cover says Rev 1.0; amendment page also shows 1.1 without date"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 1C discharge"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification of 320Ah Cell CTPS-71H3L7-01; SOC/temperature table is not a single maximum-continuous rating"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge current 1C x 320 Ah"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "charge-current matrix gives 0C at exactly 65 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "conflict inside datasheet: overview table states -35 C, detailed absolute-discharge limit states -30 C; conservative detailed -30 C selected"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CTPS-71H3L7-01 Rev 1.0, section 2.2.7, PDF page 7; C-rate table. Printed SOC bands are 0%~<80% and >80%; schema boundaries store 80 while this note preserves the printed inequalities. The split line at 60 C reads 0.279, not 0.2."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.116
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.116
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.116
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.116
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.372
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.372
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.372
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.372
+        },
+        {
+          "temp_c": 12,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 12,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.75
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1.0
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 48,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.8
+        },
+        {
+          "temp_c": 48,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.279
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.279
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "catl-6lh3l8-01-320ah-c-sample-rev-1-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CATL",
+    "model": "6LH3L8-01",
+    "variant": "320Ah C-sample Rev 1.0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "3.22V 320Ah Rechargeable Lithium-ion LFP Power Battery — CTPS 6LH3L8-01 Rev 1.0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://akkudoktor.net/uploads/short-url/eJ6uoFmjrta5gbbjHF9PW6JChgU.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 320
+    },
+    "voltage": {
+      "nominal_v": 3.22,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 320,
+      "max_continuous_discharge_a": 320
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 65,
+      "discharge_min_c": -35,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "CTPS 6LH3L8-01 Rev 1.0; document explicitly says C-sample stage"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 1C discharge; C-sample-stage document"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum sustained charge current 1C x 320 Ah; C-sample-stage value"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum sustained discharge current 1C x 320 Ah; C-sample-stage value"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "charge-current matrix gives 0C at exactly 65 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CTPS 6LH3L8-01 Rev 1.0, section 2.2.8, PDF page 9 (printed page 7); C-rate table. Printed SOC bands are 0%~<80% and >80%; schema boundaries store 80 while this note preserves the printed inequalities."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 0,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.116
+        },
+        {
+          "temp_c": 2,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.116
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.116
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.116
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.372
+        },
+        {
+          "temp_c": 7,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.372
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.372
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.372
+        },
+        {
+          "temp_c": 12,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 12,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.75
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 1
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 48,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.8
+        },
+        {
+          "temp_c": 48,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.8
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0.279
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0.279
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 0,
+          "soc_max_pct": 80,
+          "value": 0
+        },
+        {
+          "temp_c": 65,
+          "soc_min_pct": 80,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "rept-battero-cb71173204eb-280ah-rev-06",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "REPT BATTERO",
+    "model": "CB71173204EB",
+    "variant": "280Ah Rev 06",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Production Specification CB71173204EB-280Ah, REV 06",
+      "source_type": "manufacturer_pdf",
+      "url": "https://pdf.elecfans.com/p/10971432.html"
+    },
+    "capacity": {
+      "nominal_ah": 280,
+      "nominal_energy_wh": 896
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 140,
+      "max_continuous_discharge_a": 140
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 55,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "body/footer says REV 06 dated 2024-06-06; change log also lists REV 07 dated 2024-08-23, an internal revision conflict"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P charge/0.5P discharge"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "-20 C <= T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "448 W, stated as 0.5P"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "448 W, stated as 0.5P"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 0.5P x 896 Wh / 3.2 V nominal = 140 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 0.5P x 896 Wh / 3.2 V nominal = 140 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "document prints 0 < T <= 55 C; lower boundary is represented as 0 C"
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CB71173204EB-280Ah REV 06 (2024-06-06), all 15 pages checked; no temperature-dependent continuous-charge table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "rept-battero-cb71-320ah-rev-01",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "REPT BATTERO",
+    "model": "CB71",
+    "variant": "320Ah Rev 01",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — CB71-320Ah, REV 01",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.gobelpower.com/download/REPT-320Ah-CB71-320Ah-Datasheet-V01.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 320,
+      "nominal_energy_wh": 1024
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 320,
+      "max_continuous_discharge_a": 320
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 55,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "REV 01 dated 2023-02-01"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.5P charge/0.5P discharge"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 1P x 1024 Wh / 3.2 V nominal = 320 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 1P x 1024 Wh / 3.2 V nominal = 320 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "CB71-320Ah REV 01, all 16 printed pages checked; only a 30 s pulse-recharge matrix is present and was excluded by the format rule; no continuous charge-derating table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "gotion-ifp72175207-314ah-qgx034-2024",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Gotion",
+    "model": "IFP72175207-314Ah",
+    "variant": "QGX034-2024 first edition",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of IFP72175207-314Ah Lithium Ion Rechargeable Cell, QGX034-2024",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.scribd.com/document/935140662/Gotion-314"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      }
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 55,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "original Gotion specification QGX034-2024, first edition; revision date field is blank"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, standard 0.5P procedure"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C; continuous charging forbidden"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "standard power charge 0.5P (502.4 W)"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "standard test method uses 0.5P"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification QGX034-2024; step-charge matrix is not a single maximum-continuous rating"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification QGX034-2024"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "QGX034-2024, Appendix A.1 Step Charge Table, printed page 17; each stored value is the maximum (procedure 1) C-rate for the printed temperature band. Later voltage-controlled steps use lower rates. The <0 C column says charging forbidden."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_max_c": 0,
+          "value": 0
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 5,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 5,
+          "temp_max_c": 15,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 15,
+          "temp_max_c": 25,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 50,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 50,
+          "temp_max_c": 55,
+          "value": 0.2
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "gotion-ifp81175200-340ah-qgx033-2023",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Gotion",
+    "model": "IFP81175200-340Ah",
+    "variant": "QGX033-2023",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of IFP81175200-340Ah Lithium Ion Rechargeable Cell, QGX033-2023",
+      "source_type": "manufacturer_pdf",
+      "url": "https://storage.googleapis.com/allegro-offer-attachments/193637fe27e56647f2ebea48f84114cf90c7a8ef2c749d3de2c34aa4146a409c"
+    },
+    "capacity": {
+      "nominal_ah": 340,
+      "nominal_energy_wh": 1060
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "C"
+      },
+      "standard_discharge": {
+        "value": 1.0,
+        "basis": "C"
+      }
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 65
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "QGX033-2023 revised 2023-05-25"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "standard procedure at 25+/-2 C"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true,
+        "note": "1060 Wh at 1C, 2.0-3.65 V"
+      },
+      "voltage.nominal_v": {
+        "verified": true,
+        "note": "3.2 V at 0.33C; document also states 3.14 V at 1C"
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "minimum normal working voltage at 0 C and above; general voltage-range table goes down to 2.0 V"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "minimum normal working voltage below 0 C; main voltage-range table goes down to 1.8 V and is a wider operating range"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "regular slow charge printed as 170 A at 15 <= T < 45 C; converted: 170 A / 340 Ah = 0.5C"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "standard cell-discharge method printed as 340 A at 25+/-2 C; converted: 340 A / 340 Ah = 1C"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet QGX033-2023; the step-charge matrix is not labelled as a single maximum-continuous rating"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "not specified in datasheet QGX033-2023; standard/cycle and pulse-test currents are not relabelled as maximum continuous"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "charge matrix has no charging at or above 60 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "QGX033-2023, Appendix A.1 Step Charge Table, PDF/printed page 18; each stored value is the maximum (procedure 1) C-rate for the printed temperature band. Later voltage-controlled steps use lower rates. The <0 C column says charging is not allowed."
+      }
+    },
+    "charge_derating": {
+      "basis": "C",
+      "points": [
+        {
+          "temp_max_c": 0,
+          "value": 0
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 5,
+          "value": 0.2
+        },
+        {
+          "temp_min_c": 5,
+          "temp_max_c": 10,
+          "value": 0.33
+        },
+        {
+          "temp_min_c": 10,
+          "temp_max_c": 15,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 15,
+          "temp_max_c": 25,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 25,
+          "temp_max_c": 45,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 48,
+          "value": 0.8
+        },
+        {
+          "temp_min_c": 48,
+          "temp_max_c": 52,
+          "value": 0.6
+        },
+        {
+          "temp_min_c": 52,
+          "temp_max_c": 55,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 55,
+          "temp_max_c": 60,
+          "value": 0.2
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "calb-l173f314a-rev-a1",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "CALB",
+    "model": "L173F314A",
+    "variant": "Revision A1",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of L173F314A, Revision A1",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.evlithium.com/Upfile/file/L173F314A.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 157,
+      "max_continuous_discharge_a": 314
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 55,
+      "discharge_min_c": -30,
+      "discharge_max_c": 55
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Revision A1 dated 2023-06-20"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "standard discharge at 25+/-2 C"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "document gives equivalent standard procedures at 0.5P and 0.5C; P basis retained"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "document gives equivalent standard procedures at 0.5P and 0.5C; P basis retained"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "direct value 157 A at 25 C; document defines continuous charge/discharge duration as only 180 s"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "direct value 314 A at 25 C; document defines continuous charge/discharge duration as only 180 s"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "operation range; separate safety limit is 0-60 C"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "operation range; separate safety limit is 0-60 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true,
+        "note": "operation range; separate safety limit is -40 to 60 C"
+      },
+      "temperature.discharge_max_c": {
+        "verified": true,
+        "note": "operation range; separate safety limit is -40 to 60 C"
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "L173F314A Revision A1, all 20 pages checked; section 3.2.2 gives only a 25 C/180 s current-limit table, not a temperature-dependent derating table."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "lishen-lp71173207-280ah-rev-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Lishen",
+    "model": "LP71173207",
+    "variant": "280Ah Version 0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification — LFP Battery LP71173207-280Ah, Version 0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.scribd.com/document/1025563288/Lishen-280Ah-LFP-Prismatic-Battery-Cell-Specification"
+    },
+    "capacity": {
+      "nominal_ah": 280
+    },
+    "voltage": {
+      "nominal_v": 3.22,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.2,
+        "basis": "C"
+      },
+      "max_continuous_charge_a": 280,
+      "max_continuous_discharge_a": 280
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Version 0 dated 2021-01-25"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, 0.2 I1 discharge"
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "datasheet prints 0.2 I1 = 56 A; converted: 56 A / 280 Ah = 0.2C"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "direct document value I1 = 280 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "direct document value I1 = 280 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true,
+        "note": "maximum working range; caution text narrows charger start to 0-45 C"
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "maximum working range; caution text narrows charger start to 0-45 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "LP71173207-280Ah Version 0 (2021-01-25), all 8 pages checked; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "lishen-lp71173207-314ah-lsc431-006ss",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Lishen",
+    "model": "LP71173207",
+    "variant": "314Ah LSC431.006SS",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification LP71173207-314Ah, LSC431.006SS",
+      "source_type": "manufacturer_pdf",
+      "url": "https://device.report/m/b4b0e75739738fd3cdd123c6f8a7c8f36a15834373d2dd1868199fb7abde0835"
+    },
+    "capacity": {
+      "nominal_ah": 314,
+      "nominal_energy_wh": 1004.8
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_discharge_a": 314
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -20,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "manufacturer document LSC431.006SS published 2024-04-12"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, standard 0.5P charge/discharge"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "not specified in datasheet Product Specification LP71173207-314Ah LSC431.006SS"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 1P x 1004.8 Wh / 3.2 V nominal = 314 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true,
+        "note": "reference charge-current table gives 0P at exactly 60 C"
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "LSC431.006SS (2024-04-12), section 2.2.7, printed page 6; max charge power, 0-100% SOC. Source labels the table reference-only and adjustable according to need."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_c": 5,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.05
+        },
+        {
+          "temp_c": 10,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.2
+        },
+        {
+          "temp_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.4
+        },
+        {
+          "temp_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 25,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 50,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 55,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "hithium-lfp71173207-280ah-v1-1",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "HiTHIUM",
+    "model": "LFP71173207",
+    "variant": "ESS Cell 280Ah Version 1.1",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "HiTHIUM Data Sheet — ESS Cell 280Ah, V1.1 EU EN",
+      "source_type": "manufacturer_pdf",
+      "url": "https://hithium.com/fileadmin/ns_theme_hithium/pdf/HiTHIUM_Data-Sheet_ESS-Cell280Ah_V1-1_EU_EN_230612.pdf"
+    },
+    "capacity": {
+      "nominal_ah": 280,
+      "nominal_energy_wh": 896
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 280,
+      "max_continuous_discharge_a": 280
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "document identifier HiTHIUM_Data-Sheet_ESS-Cell280Ah_V1-1_EU_EN_230611"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "0.5P charge/0.5P discharge, 25+/-2 C"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "T > 0 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true,
+        "note": "condition used for nominal-capacity and cycle-life ratings"
+      },
+      "current.standard_discharge": {
+        "verified": true,
+        "note": "condition used for nominal-capacity and cycle-life ratings"
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 1P x 896 Wh / 3.2 V nominal = 280 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 1P x 896 Wh / 3.2 V nominal = 280 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "HiTHIUM ESS Cell 280Ah V1.1 EU EN, both datasheet pages checked; no temperature-dependent charge-rate table is specified."
+      }
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "envision-aesc-ess-4lh3l7-280a-rev-3-0",
+    "entry_version": 2,
+    "updated": "2026-10-09",
+    "manufacturer": "Envision AESC",
+    "model": "ESS 4LH3L7 280A",
+    "variant": "280Ah Rev 3.0",
+    "chemistry": "LFP",
+    "form_factor": "prismatic",
+    "datasheet": {
+      "title": "Product Specification of 280Ah Cell — ESS 4LH3L7 280A, Rev 3.0",
+      "source_type": "manufacturer_pdf",
+      "url": "https://www.nkon.nl/en/amfile/file/download/file/507/product/5420/"
+    },
+    "capacity": {
+      "nominal_ah": 280,
+      "nominal_energy_wh": 896
+    },
+    "voltage": {
+      "nominal_v": 3.2,
+      "charge_cutoff_v": 3.65,
+      "discharge_cutoff_v": 2.5,
+      "discharge_cutoff_low_temp_v": 2.0
+    },
+    "current": {
+      "standard_charge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "standard_discharge": {
+        "value": 0.5,
+        "basis": "P"
+      },
+      "max_continuous_charge_a": 280,
+      "max_continuous_discharge_a": 280
+    },
+    "temperature": {
+      "charge_min_c": 0,
+      "charge_max_c": 60,
+      "discharge_min_c": -30,
+      "discharge_max_c": 60
+    },
+    "provenance": {
+      "variant": {
+        "verified": true,
+        "note": "Rev 3.0; controlled DCC002 20 Feb 2024"
+      },
+      "form_factor": {
+        "verified": true
+      },
+      "capacity.nominal_ah": {
+        "verified": true,
+        "note": "25+/-2 C, standard 0.5P charge/discharge"
+      },
+      "capacity.nominal_energy_wh": {
+        "verified": true
+      },
+      "voltage.nominal_v": {
+        "verified": true
+      },
+      "voltage.charge_cutoff_v": {
+        "verified": true
+      },
+      "voltage.discharge_cutoff_v": {
+        "verified": true,
+        "note": "0 C < T <= 60 C"
+      },
+      "voltage.discharge_cutoff_low_temp_v": {
+        "verified": true,
+        "note": "-30 C <= T <= 0 C"
+      },
+      "current.standard_charge": {
+        "verified": true
+      },
+      "current.standard_discharge": {
+        "verified": true
+      },
+      "current.max_continuous_charge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous charge power 1P x 896 Wh / 3.2 V nominal = 280 A"
+      },
+      "current.max_continuous_discharge_a": {
+        "verified": true,
+        "note": "derived: maximum continuous discharge power 1P x 896 Wh / 3.2 V nominal = 280 A"
+      },
+      "temperature.charge_min_c": {
+        "verified": true
+      },
+      "temperature.charge_max_c": {
+        "verified": true
+      },
+      "temperature.discharge_min_c": {
+        "verified": true
+      },
+      "temperature.discharge_max_c": {
+        "verified": true
+      },
+      "charge_derating": {
+        "verified": true,
+        "note": "ESS 4LH3L7 280A Product Specification Rev 3.0, section 2.3.8, PDF page 9 (printed page 8); max charge power, 0-100% SOC. Open-ended points encode the printed <0 C and >60 C no-charge columns."
+      }
+    },
+    "charge_derating": {
+      "basis": "P",
+      "points": [
+        {
+          "temp_max_c": 0,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        },
+        {
+          "temp_min_c": 0,
+          "temp_max_c": 15,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.1
+        },
+        {
+          "temp_min_c": 15,
+          "temp_max_c": 20,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 20,
+          "temp_max_c": 45,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 1.0
+        },
+        {
+          "temp_min_c": 45,
+          "temp_max_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0.5
+        },
+        {
+          "temp_min_c": 60,
+          "soc_min_pct": 0,
+          "soc_max_pct": 100,
+          "value": 0
+        }
+      ]
+    }
+  }
+]

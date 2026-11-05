@@ -1,0 +1,8 @@
+{
+  "source": "openbms-monitor",
+  "commit": "dbcae8b85795b6ce5b760cbeeeebcc2f944924ad",
+  "files": {
+    "cells.json": "1807f317453c36807537f0d31de6338ef6fb1ae8e1fd3ad14d18851de190e939",
+    "cells.schema.json": "618df91e101a1b1b9fb1ffaf053c0163adfa9ad1058c62b2af22b4f45496609f"
+  }
+}

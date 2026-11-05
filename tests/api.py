@@ -248,6 +248,7 @@ def run_main(
     job_after_polls: int | None = None,
     sets_after_polls: list[tuple[int, tuple]] | None = None,
     serial_error: str | None = None,
+    cells_after_polls: list[tuple[int, tuple]] | None = None,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -256,7 +257,8 @@ def run_main(
     execv calls and the AppState instances of the run are left in LAST_RUN. `startup=True` runs
     main() without a config (startup_config(os.environ), bridge): the caller sets the environment.
     `job_after_polls` submits a "detect" job (like the web thread would); it is left in LAST_RUN["job"].
-    `sets_after_polls=[(n, sets), ...]` hands over saved parallel sets like the web thread would (AppState.request_sets).
+    `sets_after_polls=[(n, sets), ...]` hands over saved parallel sets like the web thread would (AppState.request_sets);
+    `cells_after_polls=[(n, (packs, profiles)), ...]` does the same for cell assignments (AppState.request_cells).
     """
     from frames import ascii_frame
 
@@ -281,6 +283,9 @@ def run_main(
             for after, handed_over in sets_after_polls or []:
                 if counter["n"] == after + 1:
                     LAST_RUN["states"][0].request_sets(types.SimpleNamespace(parallel_sets=handed_over))
+            for after, (packs, profiles) in cells_after_polls or []:
+                if counter["n"] == after + 1:
+                    LAST_RUN["states"][0].request_cells(types.SimpleNamespace(packs=packs, balancer_profiles=profiles))
             if entry is None:
                 return b""
             return entry(req) if callable(entry) else ascii_frame(adr, 0x00, entry)
@@ -333,6 +338,46 @@ def run_main(
             LAST_RUN["exit"] = e.code
     assert not bms.protocol_errors, bms.protocol_errors
     return client, port
+
+
+# --- cell catalog ---------------------------------------------------------------------------------
+
+def bundled_cells() -> list[dict]:
+    """Deep copies of the bundled cell entries."""
+    import copy
+
+    from seplos_mqtt.cells import catalog
+    return copy.deepcopy(list(catalog.current().entries))
+
+
+def use_bundle(monkeypatch, entries: list[dict]) -> None:
+    """Simulate another bundle (a catalog update): same schema, these entries."""
+    from seplos_mqtt.cells import catalog
+    monkeypatch.setattr(catalog, "_CATALOG", dataclasses.replace(catalog.current(), entries=tuple(entries)))
+
+
+def cell_structural_problems(entry) -> list:
+    from seplos_mqtt.cells import validate
+    return validate.structural_problems(entry)
+
+
+def cell_semantic_problems(entry) -> list:
+    from seplos_mqtt.cells import validate
+    return validate.semantic_problems(entry)
+
+
+def cell_problems(entry, path: str = "") -> list:
+    from seplos_mqtt.cells import validate
+    return validate.entry_problems(entry, path)
+
+
+def cell_schema() -> dict:
+    from seplos_mqtt.cells import catalog
+    return catalog.current().schema
+
+
+def check_identity(state, pack_state) -> None:
+    app.check_identity(state, pack_state)
 
 
 def length_field(n: int) -> int:

@@ -109,6 +109,7 @@
   "invalid.value": "This value is not allowed.",
   "invalid.order": "The minimum must be lower than the maximum.",
   "invalid.duplicate": "This value is already used.",
+  "invalid.unknown_field": "This field is not part of the cell database format.",
 
   "sets.intro": "A parallel set is a group of packs that share one common feeder. For every active set the add-on combines the values of its packs (current, power, state of charge, voltage and cell extremes) and offers them as a device in Home Assistant. Sets are only evaluated with several packs. Nothing is written to the BMS.",
   "sets.single_pack_hint": "Only one pack is configured, so every set is inactive. Set the number of packs in the settings first.",
@@ -219,6 +220,8 @@
   "err.json_required": "The request must be JSON.",
   "err.store_corrupt": "The saved settings cannot be read, so they cannot be changed here.",
   "err.store_missing": "There are no saved settings yet.",
+  "err.in_use": "This is still assigned to packs. Unassign it first.",
+  "err.serial_unavailable": "The pack does not report a BMS serial number right now.",
   "err.save_failed": "The settings could not be saved (storage error).",
   "err.job_busy": "Another detection is already queued or running.",
   "err.unknown_job": "This job does not exist (any more).",

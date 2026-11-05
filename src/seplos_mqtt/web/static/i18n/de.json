@@ -109,6 +109,7 @@
   "invalid.value": "Dieser Wert ist nicht erlaubt.",
   "invalid.order": "Das Minimum muss kleiner als das Maximum sein.",
   "invalid.duplicate": "Dieser Wert wird bereits verwendet.",
+  "invalid.unknown_field": "Dieses Feld gehört nicht zum Format der Zelldatenbank.",
 
   "sets.intro": "Ein Parallel-Set ist eine Gruppe von Packs, die an einer gemeinsamen Sammelleitung hängen. Für jedes aktive Set fasst das Add-on die Werte seiner Packs zusammen (Strom, Leistung, Ladezustand, Spannung und Zell-Extremwerte) und stellt sie als Gerät in Home Assistant bereit. Sets werden nur mit mehreren Packs ausgewertet. Es wird nichts in das BMS geschrieben.",
   "sets.single_pack_hint": "Es ist nur ein Pack eingestellt, daher ist jedes Set inaktiv. Stelle zuerst in den Einstellungen die Anzahl der Packs ein.",
@@ -219,6 +220,8 @@
   "err.json_required": "Die Anfrage muss JSON sein.",
   "err.store_corrupt": "Die gespeicherten Einstellungen sind nicht lesbar und können hier nicht geändert werden.",
   "err.store_missing": "Es gibt noch keine gespeicherten Einstellungen.",
+  "err.in_use": "Das ist noch Packs zugeordnet. Zuerst die Zuordnung aufheben.",
+  "err.serial_unavailable": "Das Pack meldet gerade keine BMS-Seriennummer.",
   "err.save_failed": "Die Einstellungen konnten nicht gespeichert werden (Speicherfehler).",
   "err.job_busy": "Eine andere Erkennung ist bereits eingereiht oder läuft.",
   "err.unknown_job": "Diese Aufgabe gibt es nicht (mehr).",

@@ -38,6 +38,16 @@ def _maint_version(pack: Any) -> str | None:
     return maint.identity.patch_version
 
 
+def bms_serial(pack_state: Any) -> str | None:
+    """The BMS serial (0xA4 string 2, trimmed) once it was read: RS485-1/2 or MAINT UART1; else None.
+    The battery serial (0xA2) is never used for identity."""
+    pack = pack_state.pack
+    info = _normal(pack.info) if pack.info else {}
+    value = _normal(pack_state.last_data, "info").get("bms_serial_number") or info.get("bms_serial_number")
+    value = value.strip() if isinstance(value, str) else ""
+    return value or None
+
+
 def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
     pack = pack_state.pack
     info = _normal(pack.info) if pack.info else {}
@@ -51,6 +61,7 @@ def _pack_status(pack_state: Any, now_mono: float) -> dict[str, Any]:
         "firmware_version": info.get("firmware_version"),
         "firmware_patch": info.get("firmware_patch"),
         "cell_count": pack.cell_count,
+        "bms_serial": bms_serial(pack_state),
         "maint": _maint(pack),
         "maint_version": _maint_version(pack),
         **{key: values.get(key) for key in _PACK_VALUES},

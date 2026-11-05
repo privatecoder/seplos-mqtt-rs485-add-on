@@ -6,9 +6,12 @@ import copy
 import ipaddress
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
+
+from ..cells import catalog
+from ..cells import validate as cell_validate
 
 # the pty that run.sh creates with socat for a TCP RS485 gateway
 TCP_PTY_PATH = "/tmp/vcom0"
@@ -355,14 +358,266 @@ class ParallelSet:
         return out
 
 
+_CELL_KEYS = frozenset({"id", "entry_version", "parallel", "entry"})
+_PACK_KEYS = frozenset({"cell", "balancer_profile", "bms_serial", "serial_mismatch"})
+_PROFILE_KEYS = frozenset({"id", "name", "values"})
+MAX_PARALLEL = 10_000          # only a guard against absurd input; the contract says "an integer >= 1"
+MAX_SERIAL = 64
+MAX_PROFILE_NAME = 40
+PROFILE_WHEN = ("always", "charging", "not-discharging")
+_MV_KEYS = ("start_mv", "stop_cell_mv", "trigger_mv", "stop_mv")
+
+
+def join_path(path: str, key: str) -> str:
+    return f"{path}.{key}" if path else key
+
+
+@dataclass(frozen=True)
+class CellAssignment:
+    """A pack's cell type: the reference (id, version, parallel) and the server-made snapshot of the
+    entry. ``valid`` is False when the snapshot does not match the reference (checks are then not
+    evaluated and the assignment is shown for re-assignment)."""
+
+    id: str
+    entry_version: int
+    parallel: int
+    entry: Mapping[str, Any]
+    valid: bool = True
+
+    @classmethod
+    def from_dict(cls, data: Any, path: str) -> CellAssignment:
+        if not isinstance(data, Mapping):
+            raise ConfigValidationError([(path, "type")])
+        problems: list[Problem] = []
+
+        def bad(key: str, kind: str) -> None:
+            problems.append((join_path(path, key), kind))
+
+        for key in data:
+            if key not in _CELL_KEYS:
+                bad(str(key), "unknown_field")
+        for key in ("id", "entry_version", "parallel", "entry"):
+            if key not in data:
+                bad(key, "required")
+        cell_id, version, parallel = data.get("id"), data.get("entry_version"), data.get("parallel")
+        if "id" in data and (not isinstance(cell_id, str) or not cell_id):
+            bad("id", "type")
+        if "entry_version" in data:
+            if not _is_int(version):
+                bad("entry_version", "type")
+            elif version < 1:
+                bad("entry_version", "range")
+        if "parallel" in data:
+            if not _is_int(parallel):
+                bad("parallel", "type")
+            elif not 1 <= parallel <= MAX_PARALLEL:
+                bad("parallel", "range")
+        entry = data.get("entry")
+        if "entry" in data:
+            problems.extend(cell_validate.entry_problems(entry, join_path(path, "entry")))
+        if problems:
+            raise ConfigValidationError(problems)
+        entry = cell_validate.normalized(entry)
+        valid = entry["id"] == cell_id and entry["entry_version"] == version
+        return cls(cell_id, version, parallel, entry, valid)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "entry_version": self.entry_version,
+            "parallel": self.parallel,
+            "entry": copy.deepcopy(dict(self.entry)),
+        }
+
+
+@dataclass(frozen=True)
+class PackAssignment:
+    """What is stored for one DIP address (also for addresses at or above ``pack_count``)."""
+
+    address: int
+    cell: CellAssignment | None = None
+    balancer_profile: int | None = None
+    bms_serial: str | None = None
+    serial_mismatch: bool = False
+    _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    @classmethod
+    def from_dict(cls, address: int, data: Any, path: str) -> PackAssignment:
+        if not isinstance(data, Mapping):
+            raise ConfigValidationError([(path, "type")])
+        problems: list[Problem] = []
+
+        def bad(key: str, kind: str) -> None:
+            problems.append((join_path(path, key), kind))
+
+        cell = None
+        if data.get("cell") is not None:
+            try:
+                cell = CellAssignment.from_dict(data["cell"], join_path(path, "cell"))
+            except ConfigValidationError as e:
+                problems.extend(e.problems)
+        profile = data.get("balancer_profile")
+        if profile is not None:
+            if not _is_int(profile):
+                bad("balancer_profile", "type")
+            elif profile < 1:
+                bad("balancer_profile", "range")
+        serial = data.get("bms_serial")
+        if serial is not None:
+            if not isinstance(serial, str):
+                bad("bms_serial", "type")
+            elif not 1 <= len(serial) <= MAX_SERIAL:
+                bad("bms_serial", "range")
+        mismatch = data.get("serial_mismatch", False)
+        if not isinstance(mismatch, bool):
+            bad("serial_mismatch", "type")
+        if problems:
+            raise ConfigValidationError(problems)
+        return cls(
+            address, cell, profile, serial, mismatch,
+            {k: copy.deepcopy(v) for k, v in data.items() if k not in _PACK_KEYS},
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = copy.deepcopy(dict(self._extra))
+        out.update(
+            cell=self.cell.to_dict() if self.cell is not None else None,
+            balancer_profile=self.balancer_profile,
+            bms_serial=self.bms_serial,
+            serial_mismatch=self.serial_mismatch,
+        )
+        return out
+
+
+def _mv_problem(value: Any) -> str | None:
+    if not _is_int(value):
+        return "type"
+    return None if 1 <= value <= 5000 else "range"
+
+
+@dataclass(frozen=True)
+class BalancerProfile:
+    """Values of one kind of external active balancer (rules of ``docs/exchange``). Twelve equal units
+    share one profile."""
+
+    id: int
+    name: str
+    values: Mapping[str, Any]
+    _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    @classmethod
+    def from_dict(cls, data: Any, path: str) -> BalancerProfile:
+        if not isinstance(data, Mapping):
+            raise ConfigValidationError([(path, "type")])
+        problems: list[Problem] = []
+
+        def bad(key: str, kind: str) -> None:
+            problems.append((join_path(path, key), kind))
+
+        profile_id = data.get("id")
+        if "id" not in data:
+            bad("id", "required")
+        elif not _is_int(profile_id):
+            bad("id", "type")
+        elif profile_id < 1:
+            bad("id", "range")
+
+        name = ""
+        if "name" not in data:
+            bad("name", "required")
+        elif not isinstance(data["name"], str):
+            bad("name", "type")
+        else:
+            name = data["name"].strip()
+            if not 1 <= len(name) <= MAX_PROFILE_NAME:
+                bad("name", "range")
+
+        values: dict[str, Any] = {}
+        raw = data.get("values")
+        if "values" not in data:
+            bad("values", "required")
+        elif not isinstance(raw, Mapping):
+            bad("values", "type")
+        else:
+            def vbad(key: str, kind: str) -> None:
+                bad(f"values.{key}", kind)
+
+            for key in _MV_KEYS:
+                value = raw.get(key)
+                if value is None:
+                    if key == "trigger_mv":
+                        vbad(key, "required")
+                    values[key] = None
+                    continue
+                kind = _mv_problem(value)
+                if kind is not None:
+                    vbad(key, kind)
+                values[key] = value
+            when = raw.get("when")
+            if "when" not in raw:
+                vbad("when", "required")
+            elif not isinstance(when, str) or when not in PROFILE_WHEN:
+                vbad("when", "value")
+            values["when"] = when
+            max_a = raw.get("max_a")
+            if max_a is not None:
+                if not _is_number(max_a):
+                    vbad("max_a", "type")
+                elif isinstance(max_a, float) and not math.isfinite(max_a) or not 0 <= max_a <= 1_000_000:
+                    vbad("max_a", "range")
+            values["max_a"] = max_a
+            values.update({k: copy.deepcopy(v) for k, v in raw.items() if k not in values})
+
+        if problems:
+            raise ConfigValidationError(problems)
+        return cls(
+            id=profile_id, name=name, values=values,
+            _extra={k: copy.deepcopy(v) for k, v in data.items() if k not in _PROFILE_KEYS},
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = copy.deepcopy(dict(self._extra))
+        out.update(id=self.id, name=self.name, values=copy.deepcopy(dict(self.values)))
+        return out
+
+
+def find_cell(own: Iterable[Mapping[str, Any]], cell_id: str) -> tuple[str, Mapping[str, Any]] | None:
+    """``(source, entry)`` of a cell type id: an own type wins over a bundled one with the same id
+    (an upgrade collision keeps the own type usable and hides the bundled entry)."""
+    for entry in own:
+        if isinstance(entry, Mapping) and entry.get("id") == cell_id:
+            return "own", entry
+    bundled = catalog.current().get(cell_id)
+    return ("bundled", bundled) if bundled is not None else None
+
+
+def changed_fields(old: Any, new: Any, path: str = "") -> list[str]:
+    """Paths of the values that differ between two entries (lists count as one value)."""
+    if isinstance(old, Mapping) and isinstance(new, Mapping):
+        out: list[str] = []
+        for key in [*old, *(k for k in new if k not in old)]:
+            out.extend(changed_fields(old.get(key), new.get(key), f"{path}.{key}" if path else key))
+        return out
+    return [] if old == new and type(old) is type(new) else [path]
+
+
 @dataclass(frozen=True)
 class MonitoringConfig:
     connection: ConnectionSettings
     parallel_sets: tuple[ParallelSet, ...] = ()
     # the id of the next new set; ids are never reused
     next_set_id: int = 1
+    # own cell types (full entries of the cell database schema)
+    cell_types: tuple[Mapping[str, Any], ...] = ()
+    packs: Mapping[int, PackAssignment] = field(default_factory=dict)
+    balancer_profiles: tuple[BalancerProfile, ...] = ()
+    next_profile_id: int = 1
     # unknown top-level keys (sections of later versions) survive load and save untouched
     _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    def cell_conflicts(self) -> frozenset[str]:
+        """Own types whose id a (newer) bundle also has: they stay usable, the user renames them."""
+        return frozenset(e["id"] for e in self.cell_types if catalog.current().get(e["id"]) is not None)
 
     @classmethod
     def from_dict(cls, data: Any) -> MonitoringConfig:
@@ -418,11 +673,90 @@ class MonitoringConfig:
                         problems.append((f"{path}.packs[{j}]", "duplicate"))
                 seen_packs.update(item.packs)
 
+        own: list[Mapping[str, Any]] = []
+        raw_types = data.get("cell_types", [])
+        if not isinstance(raw_types, list):
+            problems.append(("cell_types", "type"))
+        else:
+            seen_types: set[Any] = set()
+            for i, raw in enumerate(raw_types):
+                path = f"cell_types[{i}]"
+                found = cell_validate.entry_problems(raw, path)
+                problems.extend(found)
+                if found:
+                    continue
+                if raw["id"] in seen_types:
+                    problems.append((f"{path}.id", "duplicate"))
+                seen_types.add(raw["id"])
+                own.append(cell_validate.normalized(raw))
+
+        next_profile_id = 1
+        profile_next_ok = True
+        if "next_profile_id" in data:
+            next_profile_id = data["next_profile_id"]
+            if not _is_int(next_profile_id):
+                problems.append(("next_profile_id", "type"))
+                profile_next_ok = False
+            elif next_profile_id < 1:
+                problems.append(("next_profile_id", "range"))
+                profile_next_ok = False
+
+        profiles: list[BalancerProfile] = []
+        raw_profiles = data.get("balancer_profiles", [])
+        if not isinstance(raw_profiles, list):
+            problems.append(("balancer_profiles", "type"))
+        else:
+            profile_ids: set[int] = set()
+            profile_names: set[str] = set()
+            for i, raw in enumerate(raw_profiles):
+                path = f"balancer_profiles[{i}]"
+                try:
+                    profile = BalancerProfile.from_dict(raw, path)
+                except ConfigValidationError as e:
+                    problems.extend(e.problems)
+                    continue
+                profiles.append(profile)
+                if profile.id in profile_ids:
+                    problems.append((f"{path}.id", "duplicate"))
+                elif profile_next_ok and profile.id >= next_profile_id:
+                    problems.append((f"{path}.id", "value"))
+                profile_ids.add(profile.id)
+                if profile.name.casefold() in profile_names:
+                    problems.append((f"{path}.name", "duplicate"))
+                profile_names.add(profile.name.casefold())
+
+        packs: dict[int, PackAssignment] = {}
+        raw_packs = data.get("packs", {})
+        if not isinstance(raw_packs, Mapping):
+            problems.append(("packs", "type"))
+        else:
+            for key, raw in raw_packs.items():
+                path = f"packs.{key}"
+                if not (isinstance(key, str) and key.isascii() and key.isdigit() and str(int(key)) == key
+                        and int(key) <= 15):
+                    problems.append((path, "value"))
+                    continue
+                try:
+                    item = PackAssignment.from_dict(int(key), raw, path)
+                except ConfigValidationError as e:
+                    problems.extend(e.problems)
+                    continue
+                packs[item.address] = item
+                if item.balancer_profile is not None and item.balancer_profile not in {p.id for p in profiles}:
+                    problems.append((f"{path}.balancer_profile", "value"))
+
         if problems or connection is None:
             raise ConfigValidationError(problems)
-        known = {"connection", "parallel_sets", "next_set_id"}
+        known = {
+            "connection", "parallel_sets", "next_set_id", "cell_types", "packs", "balancer_profiles",
+            "next_profile_id",
+        }
         extra = {k: copy.deepcopy(v) for k, v in data.items() if k not in known}
-        return cls(connection=connection, parallel_sets=tuple(sets), next_set_id=next_set_id, _extra=extra)
+        return cls(
+            connection=connection, parallel_sets=tuple(sets), next_set_id=next_set_id,
+            cell_types=tuple(own), packs=packs, balancer_profiles=tuple(profiles),
+            next_profile_id=next_profile_id, _extra=extra,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         out = copy.deepcopy(dict(self._extra))
@@ -431,6 +765,14 @@ class MonitoringConfig:
         if self.parallel_sets or self.next_set_id != 1:
             out["parallel_sets"] = [s.to_dict() for s in self.parallel_sets]
             out["next_set_id"] = self.next_set_id
+        # the cell sections are optional in the same way
+        if self.cell_types:
+            out["cell_types"] = [copy.deepcopy(dict(e)) for e in self.cell_types]
+        if self.packs:
+            out["packs"] = {str(a): self.packs[a].to_dict() for a in sorted(self.packs)}
+        if self.balancer_profiles or self.next_profile_id != 1:
+            out["balancer_profiles"] = [p.to_dict() for p in self.balancer_profiles]
+            out["next_profile_id"] = self.next_profile_id
         return out
 
 

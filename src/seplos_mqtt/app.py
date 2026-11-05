@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -24,12 +24,12 @@ from .discovery import Discovery
 from .jobs import JobQueue, step_detect
 from .monitoring.migration import load_or_migrate
 from .monitoring.model import ConfigValidationError, MonitoringConfig, activity
-from .monitoring.store import JsonStore, LoadStatus
+from .monitoring.store import JsonStore, LoadStatus, StaleRevision, StoreCorrupt
 from .mqtt_client import MqttConnection, Publisher
 from .pack import BatteryPack
 from .sets import Member, set_values
 from .state import StateStore
-from .status import build_status
+from .status import bms_serial, build_status
 from .supervisor import clear_legacy_options
 from .system import SystemReader
 from .transport import SerialBus
@@ -90,6 +90,44 @@ class AppState:
     published_sets: dict[int, Any] = field(default_factory=dict)    # ParallelSet as published to HA, per id
     set_inventory: set[int] = field(default_factory=set)            # ids with state in HA (kept in the state file)
     connection_error: str | None = None   # setup mode: why the BMS connection could not be opened
+    # cell types / balancer profiles: the same hand-over as the sets. ``cell_packs`` (PackAssignment per
+    # address) is changed by the main loop only; ``pending_cells`` is the web thread's latest save.
+    cell_packs: dict[int, Any] = field(default_factory=dict)
+    balancer_profiles: tuple = ()
+    pending_cells: tuple | None = None
+    cells_adopted: tuple | None = None
+    adopted_packs: dict[int, Any] = field(default_factory=dict)    # the assignments of the last hand-over (or startup)
+    identity_unsaved: set[int] = field(default_factory=set)        # identity changes the store has not accepted yet
+    monitoring_store: Any = None      # JsonStore: the identity guard persists serial_mismatch there
+
+    def request_cells(self, config: Any) -> None:
+        """A saved change of assignments or balancer profiles (web thread): adopted at the next cycle
+        boundary, no restart."""
+        self.pending_cells = (config.packs, config.balancer_profiles)
+
+    def adopt_cells(self) -> bool:
+        """True if a newer save was adopted now."""
+        pending = self.pending_cells
+        if pending is None or pending is self.cells_adopted:
+            return False
+        # The identity (serial, mismatch) belongs to the running loop: a hand-over that did not change it
+        # compared with the last one (an unrelated edit) must not undo what the guard found since. A changed
+        # identity (confirmation, new or re-assigned pack) was made by the user and wins.
+        merged = {}
+        for address, item in pending[0].items():
+            before, running = self.adopted_packs.get(address), self.cell_packs.get(address)
+            if before is not None and running is not None and (
+                (item.bms_serial, item.serial_mismatch) == (before.bms_serial, before.serial_mismatch)
+            ):
+                item = replace(item, bms_serial=running.bms_serial, serial_mismatch=running.serial_mismatch)
+            merged[address] = item
+        self.cells_adopted = pending
+        self.adopted_packs = dict(pending[0])
+        self.cell_packs = merged
+        self.identity_unsaved &= set(merged)
+        self.balancer_profiles = pending[1]
+        logger.info("Cell assignments updated: %s pack(s), %s balancer profile(s)", len(pending[0]), len(pending[1]))
+        return True
 
     def request_sets(self, config: Any) -> None:
         """A saved set change (web thread): picked up at the next cycle boundary, no restart."""
@@ -366,6 +404,7 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
 
     if data is not None:
         pack_state.last_data = data
+        check_identity(state, pack_state)
         if state.publisher.state(topics.pack_sensors(base, address), data):
             logger.info("Pack%s:Publishing updated data to MQTT", address)
         else:
@@ -374,6 +413,70 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
     for other in state.packs:
         publish_pack_availability(state, other, now)
     state.publisher.publish(topics.availability(base), "online")
+
+
+def persist_identity(state: AppState, new: Any) -> str:
+    """Write ``bms_serial``/``serial_mismatch`` of one pack into the monitoring document. Returns "ok",
+    "retry" (the write failed) or "superseded" (a save changed the pack's assignment or confirmed another
+    serial: that save reaches the loop with its own hand-over, nothing is written over it)."""
+    store = state.monitoring_store
+    if store is None:
+        return "ok"
+    key = str(new.address)
+    for _ in range(3):
+        status, _problem, revision, data = store.snapshot()
+        packs = data.get("packs") if status is LoadStatus.VALID else None
+        pack = packs.get(key) if isinstance(packs, dict) else None
+        if not isinstance(pack, dict) or (pack.get("cell") is None and pack.get("balancer_profile") is None):
+            return "superseded"
+        if pack.get("bms_serial") not in (None, new.bms_serial):
+            return "superseded"
+        if (pack.get("bms_serial"), pack.get("serial_mismatch")) == (new.bms_serial, new.serial_mismatch):
+            return "ok"
+        pack["bms_serial"], pack["serial_mismatch"] = new.bms_serial, new.serial_mismatch
+        try:
+            store.commit(data, revision)
+            return "ok"
+        except StaleRevision:
+            continue
+        except (OSError, StoreCorrupt) as e:
+            logger.warning("Pack%s:Could not store the identity check (%s)", new.address, type(e).__name__)
+            return "retry"
+    return "retry"
+
+
+def check_identity(state: AppState, pack_state: PackState) -> None:
+    """Identity guard: compare the BMS serial the pack reports with the stored one. A different readable
+    serial sets ``serial_mismatch``, the stored serial again clears it; an unreadable serial changes
+    nothing. A pack stored without a serial (it was not readable then) learns the first one.
+
+    The running identity changes at once, whether or not the store accepted the write (a failed write is
+    retried at the next check): a known different serial is never treated as the right pack."""
+    address = pack_state.address
+    stored = state.cell_packs.get(address)
+    if stored is None or (stored.cell is None and stored.balancer_profile is None):
+        state.identity_unsaved.discard(address)
+        return
+    serial = bms_serial(pack_state)
+    new = stored
+    if serial is not None:
+        if stored.bms_serial is None:
+            new = replace(stored, bms_serial=serial, serial_mismatch=False)
+        elif (serial != stored.bms_serial) != stored.serial_mismatch:
+            new = replace(stored, serial_mismatch=serial != stored.bms_serial)
+    if new is not stored:
+        state.cell_packs[address] = new
+        if new.serial_mismatch != stored.serial_mismatch:
+            logger.warning(
+                "Pack%s:BMS serial %s the stored one", address,
+                "differs from" if new.serial_mismatch else "matches again",
+            )
+    elif address not in state.identity_unsaved:
+        return
+    if persist_identity(state, new) == "retry":
+        state.identity_unsaved.add(address)
+    else:
+        state.identity_unsaved.discard(address)
 
 
 def update_status(state: AppState) -> None:
@@ -525,6 +628,15 @@ def load_sets(store: JsonStore) -> tuple:
         return ()
 
 
+def load_cells(store: JsonStore) -> tuple[dict, tuple]:
+    """The stored pack assignments and balancer profiles; none when the document is missing or corrupt."""
+    try:
+        config = MonitoringConfig.from_dict(store.snapshot()[3])
+    except ConfigValidationError:
+        return {}, ()
+    return dict(config.packs), config.balancer_profiles
+
+
 def start_web(state: AppState, store: JsonStore, port: str) -> None:
     """The Ingress app in its own thread; a failure only costs the UI, never the polling."""
     try:
@@ -532,7 +644,7 @@ def start_web(state: AppState, store: JsonStore, port: str) -> None:
 
         web_app = WebApp(
             WebSettings(port=int(port)), store, on_connection_saved=state.request_restart,
-            on_sets_saved=state.request_sets, status_provider=lambda: state.status,
+            on_sets_saved=state.request_sets, on_cells_saved=state.request_cells, status_provider=lambda: state.status,
             jobs=state.jobs if state.connection_error is None else None,     # setup mode: nothing runs jobs
         )
         web = WebThread(web_app)
@@ -596,6 +708,9 @@ def main(config: Config | None = None) -> None:
 
         if standalone and store is not None:
             state.parallel_sets = load_sets(store)
+            state.cell_packs, state.balancer_profiles = load_cells(store)
+            state.adopted_packs = dict(state.cell_packs)
+            state.monitoring_store = store
 
         ingress_port = os.environ.get("INGRESS_PORT")
         if standalone and ingress_port and store is not None:
@@ -641,6 +756,9 @@ def main(config: Config | None = None) -> None:
                     index = 0
                     publish_system_data(state, system_reader)
                     state.adopt_sets()
+                    if state.adopt_cells():
+                        for pack_state in state.packs:
+                            check_identity(state, pack_state)
                     publish_sets(state)
                     now = time.monotonic()
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
