@@ -73,6 +73,7 @@ def _pack_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]
         "maint_version": _maint_version(pack),
         **{key: values.get(key) for key in _PACK_VALUES},
         "cells": _cells_status(state, pack_state, now_mono),
+        "balancer": cell_report.balancer_report(state, pack_state, now_mono),
     }
 
 

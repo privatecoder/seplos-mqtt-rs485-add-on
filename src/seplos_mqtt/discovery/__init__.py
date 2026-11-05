@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from .. import topics
-from .catalog import CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SET_ENTITIES, SYSTEM, Entity
+from .catalog import BALANCER_ENTITY, CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SET_ENTITIES, SYSTEM, Entity
 
 logger = logging.getLogger("SeplosBMS.discovery")
 
@@ -69,6 +69,10 @@ class Discovery:
             return "{{ value_json.last_publish }}"
         if entity.kind == "parameters":
             return "{{ value_json.get('parameters', {}).get('read_at') }}"
+        if entity.kind == "balancer":
+            # "unknown" is no enum option: it becomes HA's unknown state (None renders as the MQTT "None" payload)
+            path = f"value_json.{entity.group}.normal.{entity.key}"
+            return f"{{{{ none if {path} == 'unknown' else {path} }}}}"
         state = "binary" if entity.domain == "binary_sensor" else "normal"
         flat = scope == SYSTEM_SCOPE or _is_set(scope)       # system and set payloads have no group level
         path = f"value_json.{state}.{entity.key}" if flat else f"value_json.{entity.group}.{state}.{entity.key}"
@@ -221,6 +225,18 @@ class Discovery:
         self._set_names.pop(set_id, None)
         results = [self._publish(entity.domain, scope, entity.key, None) for entity in SET_ENTITIES]
         return all(results)
+
+    def publish_balancer(self, pack_no: int) -> bool:
+        """The computed external balancer entity of a pack with a profile; True if the client accepted it."""
+        full = pack_no not in self._device_sent
+        ok = self._publish(BALANCER_ENTITY.domain, pack_no, BALANCER_ENTITY.key, self.render(BALANCER_ENTITY, pack_no, full))
+        if ok and full:
+            self._device_sent.add(pack_no)
+        return ok
+
+    def remove_balancer(self, pack_no: int) -> bool:
+        """Clear the config of a pack's balancer entity; True only if the client accepted it."""
+        return self._publish(BALANCER_ENTITY.domain, pack_no, BALANCER_ENTITY.key, None)
 
     def set_capabilities(self, pack_no: int, caps: set[str], pack_bus: bool) -> bool:
         """

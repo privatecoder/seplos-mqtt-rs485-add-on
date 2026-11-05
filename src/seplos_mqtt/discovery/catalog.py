@@ -262,6 +262,13 @@ CELLS: list[Entity] = [
            icon="mdi:battery-arrow-down", category=DIAG, disabled=True, **A),
 ]
 
+# Computed state of the external active balancer assigned to the pack. Not part of PACK_ENTITIES: it exists only for
+# packs with a balancer profile and is created/removed by Discovery.publish_balancer/remove_balancer.
+# The payload (and /api/status) say active | inactive | unknown; the value template turns unknown into HA's own
+# unknown state, so the enum options are only active | inactive (kind "balancer", see Discovery._template).
+BALANCER_ENTITY = Entity("external_balancer", "External Balancer", C_, kind="balancer", device_class="enum",
+                         options=("active", "inactive"), icon="mdi:scale-balance", category=DIAG)
+
 PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT, *CLOCK, *CELLS]
 
 Y = "system"

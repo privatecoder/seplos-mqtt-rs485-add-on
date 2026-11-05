@@ -251,6 +251,7 @@ def run_main(
     cells_after_polls: list[tuple[int, tuple]] | None = None,
     cell_types_after_polls: tuple = (),
     cell_packs: dict | None = None,
+    balancer_profiles: tuple = (),
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -330,6 +331,7 @@ def run_main(
         def __post_init__(self):
             if cell_packs:
                 self.cell_packs = dict(cell_packs)       # assignments as if loaded from the monitoring document
+            self.balancer_profiles = tuple(balancer_profiles)
             LAST_RUN["states"].append(self)
 
     monkeypatch.setattr(app, "AppState", SpyState)
@@ -713,6 +715,21 @@ def checks_sample(values: dict, at: float = 0.0, max_age: float | None = None):
     return Sample(values, at, max_age)
 
 
+def balancer_step(state: str, values: dict, sample, now: float = 0.0) -> str:
+    from seplos_mqtt.cells import balancer
+    return balancer.step(state, values, sample, now)
+
+
+def balancer_rule(values: dict):
+    from seplos_mqtt.cells import balancer
+    return balancer.Rule.from_values(values)
+
+
+def balancer_tracker():
+    from seplos_mqtt.cells import balancer
+    return balancer.Tracker()
+
+
 def live_checks(entry, parallel, sample, now: float = 0.0, blocked: str | None = None) -> dict:
     from seplos_mqtt.cells import checks
     return checks.live_checks(entry, parallel, sample, now, blocked=blocked)
@@ -755,6 +772,28 @@ def stored_assignments(packs: dict, cell_types: list | None = None, pack_count: 
     if cell_types:
         doc["cell_types"] = cell_types
     return dict(MonitoringConfig.from_dict(doc).packs)
+
+
+def stored_cells(packs: dict, profiles: list, pack_count: int = 2):
+    """The loaded monitoring document with pack assignments and balancer profiles."""
+    from seplos_mqtt.monitoring.model import MonitoringConfig
+    doc = {"connection": {"transport": "tcp", "host": "h", "pack_count": pack_count}, "packs": packs,
+           "balancer_profiles": profiles, "next_profile_id": 100}
+    return MonitoringConfig.from_dict(doc)
+
+
+def reconcile_balancers(state, force: bool = False) -> None:
+    app.reconcile_balancers(state, force=force)
+
+
+def balancer_update(state, pack_state, now: float) -> None:
+    from seplos_mqtt.cells import evaluate
+    evaluate.balancer_update(state, pack_state, now)
+
+
+def balancer_report(state, pack_state, now: float = 1000.0):
+    from seplos_mqtt.cells import evaluate
+    return evaluate.balancer_report(state, pack_state, now)
 
 
 def pack_report(state, pack_state, now: float) -> dict:

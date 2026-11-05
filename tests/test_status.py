@@ -21,7 +21,7 @@ from seplos_mqtt.web.server import WebApp, WebSettings
 PACK_KEYS = {
     "address", "availability", "last_success_age_s", "device_name", "firmware_version", "firmware_patch", "cell_count",
     "bms_serial", "maint", "maint_version", "state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage",
-    "cells",
+    "cells", "balancer",
 }
 SYSTEM_KEYS = {"system_soc", "system_voltage", "system_current", "system_power", "total_capacity", "total_full_energy", "system_state"}
 
@@ -70,6 +70,7 @@ def test_before_the_first_poll_everything_is_unknown():
     assert pack["address"] == 0 and pack["availability"] == "offline"
     assert pack["maint"] == "disabled"
     assert all(v is None for k, v in pack.items() if k not in ("address", "availability", "maint", "cells"))
+    assert pack["balancer"] is None
     assert pack["cells"]["assignment"] is None
     assert pack["cells"]["live"] == {"summary": "not_evaluated", "reason": "no_assignment", "checks": [],
                                      "charge_limit_a": None, "discharge_limit_a": None}

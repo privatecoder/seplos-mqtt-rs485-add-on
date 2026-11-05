@@ -100,6 +100,10 @@ class AppState:
     adopted_packs: dict[int, Any] = field(default_factory=dict)    # the assignments of the last hand-over (or startup)
     identity_unsaved: set[int] = field(default_factory=set)        # identity changes the store has not accepted yet
     monitoring_store: Any = None      # JsonStore: the identity guard persists serial_mismatch there
+    # computed balancer state per address (cells/balancer.py; memory only, a restart starts at unknown)
+    balancers: dict[int, Any] = field(default_factory=dict)
+    balancer_inventory: set[int] = field(default_factory=set)       # addresses that may have a retained HA config
+    balancer_published: set[int] = field(default_factory=set)       # addresses whose config the client accepted
 
     def request_cells(self, config: Any) -> None:
         """A saved change of assignments or balancer profiles (web thread): adopted at the next cycle
@@ -240,6 +244,7 @@ def resync(state: AppState) -> None:
     logger.info("Resending discovery configs and states")
     publish_discovery(state)
     reconcile_sets(state)                  # removals that were not accepted before
+    reconcile_balancers(state, force=True)
     now = time.monotonic()
     for pack_state in state.packs:
         pack_state.availability = "unknown"          # current (freshness-derived) value goes out again
@@ -374,6 +379,40 @@ def reconcile_sets(state: AppState) -> list:
     return active if recorded else [item for item in active if item.id in state.published_sets]
 
 
+def save_balancer_inventory(state: AppState) -> bool:
+    if state.store is None:
+        return True
+    return state.store.set_durable("published_balancers", sorted(state.balancer_inventory))
+
+
+def reconcile_balancers(state: AppState, force: bool = False) -> None:
+    """HA entity of the computed balancer, per pack with a profile. Every address that may have a retained config
+    is recorded durably before it is published, and cleared again until the client accepted the removal (a profile
+    unassigned, a pack removed, or either while the add-on was stopped). ``force`` publishes every config again
+    (reconnect, HA restart). Without discovery nothing is published and the record stays for a later start."""
+    discovery = state.discovery
+    if discovery is None:
+        return
+    wanted = {
+        p.address for p in state.packs
+        if cell_report.balancer_profile(state, state.cell_packs.get(p.address)) is not None
+    }
+    if force:
+        state.balancer_published.clear()
+    state.balancer_inventory |= wanted
+    recorded = save_balancer_inventory(state)         # before anything is published
+    for address in sorted(state.balancer_inventory - wanted):
+        state.balancer_published.discard(address)
+        if discovery.remove_balancer(address):
+            state.balancer_inventory.discard(address)
+    if recorded:
+        for address in sorted(wanted - state.balancer_published):
+            if discovery.publish_balancer(address):
+                state.balancer_published.add(address)
+                state.next_replay = time.monotonic() + REPLAY_DELAY_SECONDS
+    save_balancer_inventory(state)                    # no-op unless a removal succeeded or the last write failed
+
+
 def publish_sets(state: AppState) -> None:
     """Values and HA devices of the active parallel sets (after a full poll cycle)."""
     base, now = state.config.mqtt_topic, time.monotonic()
@@ -423,6 +462,8 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
     if data is not None:
         pack_state.last_data = data
         check_identity(state, pack_state)
+    cell_report.balancer_update(state, pack_state, now)     # also after a failed poll: the sample ages
+    if data is not None:
         # the energy follows the identity found in this very poll
         normal = data.get("telemetry", {}).get("normal")
         if isinstance(normal, dict):
@@ -765,6 +806,8 @@ def main(config: Config | None = None) -> None:
             logger.info("Auto-Discovery configurations sent")
         state.set_inventory = {i for i in state.store.get("published_sets", []) if isinstance(i, int)}
         reconcile_sets(state)          # sets deleted while the add-on was stopped, or single pack mode
+        state.balancer_inventory = {i for i in state.store.get("published_balancers", []) if isinstance(i, int)}
+        reconcile_balancers(state)     # balancers unassigned while the add-on was stopped
 
         index = 0
         system_reader = SystemReader()
@@ -796,6 +839,7 @@ def main(config: Config | None = None) -> None:
                         for pack_state in state.packs:
                             check_identity(state, pack_state)
                     publish_sets(state)
+                    reconcile_balancers(state)          # new/removed profile assignments, retried removals
                     now = time.monotonic()
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
                     update_status(state)
