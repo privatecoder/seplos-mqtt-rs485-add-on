@@ -54,7 +54,6 @@ class PackState:
     last_success: float | None = None
     publish_counter: int = 0
     availability: str = "offline"
-    firmware_reported: int = 0          # info_revision of the pack shown in the HA device info
     last_data: dict | None = None       # data of the last successful poll (for the status snapshot)
 
 
@@ -454,10 +453,13 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
             state.next_replay = now + REPLAY_DELAY_SECONDS
     if discovery and pack_state.pack.cell_count:
         discovery.update_cell_count(address, pack_state.pack.cell_count)
-    # show the real firmware version in the HA device info once it's known
-    if discovery and pack_state.pack.info and pack_state.firmware_reported != pack_state.pack.info_revision:
-        discovery.update_firmware(address, device_firmware(pack_state.pack.info))
-        pack_state.firmware_reported = pack_state.pack.info_revision
+    # show the real firmware version and the battery serial (0xA2 / MAINT UART1, as assembled into
+    # info.normal.serial_number) in the HA device info; Discovery republishes only on a change
+    if discovery and pack_state.pack.info:
+        info = pack_state.pack.info
+        assembled = ((data or {}).get("info") or {}).get("normal") or {}
+        serial = assembled.get("serial_number") or (info.get("normal") or {}).get("serial_number")
+        discovery.update_firmware(address, device_firmware(info), serial)
 
     if data is not None:
         pack_state.last_data = data

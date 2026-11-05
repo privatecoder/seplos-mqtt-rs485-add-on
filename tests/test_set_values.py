@@ -115,7 +115,7 @@ def test_set_discovery_configs():
     assert all(t.startswith("homeassistant/sensor/seplos-mqtt-set-2/") and t.endswith("/config") for t in records)
     first = client.as_records()[0]["payload"]["dev"]
     assert first == {
-        "hw": "10E", "sw": "2.x / 16.x", "mdl": "BMS V14 / V16", "mf": "Seplos",
+        "hw": "", "sw": "", "mdl": "Parallel set (virtual)", "mf": "Seplos",
         "name": "Seplos Parallel Set Left", "ids": "seplos_bms_set_2", "via_device": "seplos_bms_pack_0",
     }
     current = records["homeassistant/sensor/seplos-mqtt-set-2/current/config"]

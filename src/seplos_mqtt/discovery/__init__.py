@@ -6,16 +6,24 @@ import logging
 from typing import Any
 
 from .. import topics
-from .catalog import BALANCER_ENTITY, CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, PACK_ENTITIES, SET_ENTITIES, SYSTEM, Entity
+from .catalog import BALANCER_ENTITY, CELL_ENTITIES, OBSOLETE, PACK_ENTITIES, SET_ENTITIES, SYSTEM, Entity
 
 logger = logging.getLogger("SeplosBMS.discovery")
 
+# Physical pack device: product facts (generation BMS 2.0, OEM platform EMU1101, variant 1101-10E,
+# hardware V16). The firmware ("sw") and serial ("sn") are per pack and added when known.
 DEVICE_BASE = {
-    "hw": "10E",
-    "sw": "2.x / 16.x",
-    "mdl": "BMS V14 / V16",
     "mf": "Seplos",
+    "mdl": "BMS 2.0 / EMU1101",
+    "mdl_id": "1101-10E",
+    "hw": "V16",
 }
+
+# Virtual devices (bank aggregate, parallel set) are no protection boards: no hardware, firmware or
+# serial. Empty strings clear what HA registered from former versions (omitted fields are kept).
+VIRTUAL_BASE = {"mf": "Seplos", "hw": "", "sw": ""}
+SYSTEM_MODEL = "Bank aggregate (virtual)"
+SET_MODEL = "Parallel set (virtual)"
 
 # HA abbreviation -> Entity attribute
 _OPTIONAL = {
@@ -46,10 +54,10 @@ class Discovery:
         self.topic = mqtt_topic
         self.prefix = prefix
         self.invert = invert
-        # devices whose full device block has been sent with a config (pack number or "system")
-        self._device_sent: set = set()
-        # firmware version shown in the device info, per pack number and "system"
+        # firmware version shown in the device info, per pack number
         self._sw: dict = {}
+        # battery serial (0xA2 / MAINT UART1) shown in the device info, per pack number
+        self._sn: dict = {}
         # cell count per pack once known
         self._cells: dict[int, int] = {}
         # MAINT capabilities per pack (discovery conditions)
@@ -85,18 +93,21 @@ class Discovery:
         if _is_set(scope):
             device: dict[str, Any] = {"ids": topics.set_device_id(scope[1])}
             if full:
-                device = {**DEVICE_BASE, "name": f"Seplos Parallel Set {self._set_names.get(scope[1], scope[1])}", **device,
+                device = {**VIRTUAL_BASE, "mdl": SET_MODEL,
+                          "name": f"Seplos Parallel Set {self._set_names.get(scope[1], scope[1])}", **device,
                           "via_device": topics.pack_device_id(0)}
             return device
         if scope == SYSTEM_SCOPE:
             if not full:
                 return {"ids": topics.SYSTEM_DEVICE_ID}
-            return {**DEVICE_BASE, "sw": self._sw.get(scope, DEVICE_BASE["sw"]), "name": "Seplos BMS System",
+            return {**VIRTUAL_BASE, "mdl": SYSTEM_MODEL, "name": "Seplos BMS System",
                     "ids": topics.SYSTEM_DEVICE_ID, "via_device": topics.pack_device_id(0)}
         device: dict[str, Any] = {"ids": topics.pack_device_id(scope)}
         if full:
             master = "Master" if scope == 0 else "Slave"
-            device = {**DEVICE_BASE, "sw": self._sw.get(scope, DEVICE_BASE["sw"]), "name": f"Seplos BMS Pack-{scope} ({master})", **device}
+            device = {**DEVICE_BASE, "sw": self._sw.get(scope, ""), "name": f"Seplos BMS Pack-{scope} ({master})", **device}
+            if self._sn.get(scope):
+                device["sn"] = self._sn[scope]
         if scope > 0:
             device["via_device"] = topics.pack_device_id(0)
         return device
@@ -163,11 +174,18 @@ class Discovery:
             self.failed = True
         return ok
 
-    def _publish_entity(self, entity: Entity, scope) -> None:
-        """The full device block travels with the first successfully published config of a device."""
-        full = scope not in self._device_sent
-        if self._publish(entity.domain, scope, entity.key, self.render(entity, scope, full)) and full:
-            self._device_sent.add(scope)
+    @staticmethod
+    def _anchor(scope) -> Entity:
+        """The one entity whose retained config carries the full device block of a device."""
+        if _is_set(scope):
+            return SET_ENTITIES[0]
+        return SYSTEM[0] if scope == SYSTEM_SCOPE else PACK_ENTITIES[0].expand()[0]
+
+    def _publish_entity(self, entity: Entity, scope) -> bool:
+        """Only the anchor config of a device carries the full device block, all others the ids: the
+        retained configs can never disagree about firmware, serial or name, whatever order HA reads them."""
+        full = entity.key == self._anchor(scope).key
+        return self._publish(entity.domain, scope, entity.key, self.render(entity, scope, full))
 
     def _remove(self, domain: str, scope, key: str) -> None:
         self._publish(domain, scope, key, None)
@@ -177,7 +195,6 @@ class Discovery:
         All entities of a pack. pack_bus: connected to RS485-1/2 (single pack mode), where the
         extended status, parameters and serial number are available.
         """
-        self._device_sent.discard(pack_no)
         removed: list[Entity] = []
         cells = self._cells.get(pack_no, 16)
         cell_keys = {key for _domain, key in CELL_ENTITIES}
@@ -200,7 +217,6 @@ class Discovery:
 
     def publish_system(self) -> None:
         """The system device (Modbus 0x1000 of the master, multi pack mode)."""
-        self._device_sent.discard(SYSTEM_SCOPE)
         self._system_active = True
         for entity in SYSTEM:
             self._publish_entity(entity, SYSTEM_SCOPE)
@@ -214,25 +230,19 @@ class Discovery:
         rename shows up."""
         scope = ("set", item.id)
         self._set_names[item.id] = item.name
-        self._device_sent.discard(scope)
         for entity in SET_ENTITIES:
             self._publish_entity(entity, scope)
 
     def remove_set(self, set_id: int) -> bool:
         """Clear every config of a set; True only if the client accepted all of them."""
         scope = ("set", set_id)
-        self._device_sent.discard(scope)
         self._set_names.pop(set_id, None)
         results = [self._publish(entity.domain, scope, entity.key, None) for entity in SET_ENTITIES]
         return all(results)
 
     def publish_balancer(self, pack_no: int) -> bool:
         """The computed external balancer entity of a pack with a profile; True if the client accepted it."""
-        full = pack_no not in self._device_sent
-        ok = self._publish(BALANCER_ENTITY.domain, pack_no, BALANCER_ENTITY.key, self.render(BALANCER_ENTITY, pack_no, full))
-        if ok and full:
-            self._device_sent.add(pack_no)
-        return ok
+        return self._publish_entity(BALANCER_ENTITY, pack_no)
 
     def remove_balancer(self, pack_no: int) -> bool:
         """Clear the config of a pack's balancer entity; True only if the client accepted it."""
@@ -264,17 +274,18 @@ class Discovery:
                 elif index > previous:
                     self._publish_entity(item, pack_no)
 
-    def update_firmware(self, pack_no: int, firmware: str) -> None:
+    def update_firmware(self, pack_no: int, firmware: str, serial: str | None = None) -> None:
         """
-        Show the real firmware in the device info. The configs are sent before the device info is
-        read, so the device block is republished with one config. The system device shows the master's.
+        Show the real firmware and the battery serial (0xA2 or MAINT UART1, never the BMS serial 0xA4)
+        in the device info, trimmed but otherwise exactly as reported (placeholders included). The
+        configs are sent before the device info is read, so the device block is republished when either
+        becomes known or changes: in the same anchor config ``publish_pack`` uses, never in another one.
+        A missing or blank serial keeps the last one.
         """
-        if self._sw.get(pack_no) == firmware:
+        serial = (serial or "").strip() or self._sn.get(pack_no, "")
+        if self._sw.get(pack_no) == firmware and self._sn.get(pack_no, "") == serial:
             return
         self._sw[pack_no] = firmware
-        self._device_sent.discard(pack_no)
-        self._publish_entity(FIRMWARE_ENTITY, pack_no)
-        if pack_no == 0 and self._system_active:
-            self._sw[SYSTEM_SCOPE] = firmware
-            self._device_sent.discard(SYSTEM_SCOPE)
-            self._publish_entity(SYSTEM[0], SYSTEM_SCOPE)
+        if serial:
+            self._sn[pack_no] = serial
+        self._publish_entity(self._anchor(pack_no), pack_no)

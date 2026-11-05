@@ -10,58 +10,30 @@
         }
       ],
       "avty_mode": "all",
-      "default_entity_id": "sensor.seplos_bms_pack_0_firmware_version",
+      "default_entity_id": "sensor.seplos_bms_pack_0_voltage_cell_1",
       "dev": {
-        "hw": "10E",
+        "hw": "V16",
         "ids": "seplos_bms_pack_0",
-        "mdl": "BMS V14 / V16",
+        "mdl": "BMS 2.0 / EMU1101",
+        "mdl_id": "1101-10E",
         "mf": "Seplos",
         "name": "Seplos BMS Pack-0 (Master)",
         "sw": "16.06.13+"
       },
-      "ent_cat": "diagnostic",
-      "ic": "mdi:chip",
-      "name": "Firmware Version",
-      "obj_id": "seplos_bms_pack_0_firmware_version",
+      "dev_cla": "voltage",
+      "ic": "mdi:battery-outline",
+      "name": "Voltage Cell 1",
+      "obj_id": "seplos_bms_pack_0_voltage_cell_1",
+      "stat_cla": "measurement",
       "stat_t": "seplos/pack-0/sensors",
-      "uniq_id": "seplos_bms_pack_0_firmware_version",
-      "val_tpl": "{{ value_json.get('info', {}).get('normal', {}).get('firmware_version', 'unknown') }}"
+      "sug_dsp_prc": 3,
+      "uniq_id": "seplos_bms_pack_0_voltage_cell_1",
+      "unit_of_meas": "V",
+      "val_tpl": "{{ value_json.telemetry.normal.voltage_cell_1 }}"
     },
     "qos": 1,
     "retain": true,
-    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/firmware_version/config"
-  },
-  {
-    "payload": {
-      "avty": [
-        {
-          "t": "seplos/availability"
-        },
-        {
-          "t": "seplos/system/availability"
-        }
-      ],
-      "avty_mode": "all",
-      "default_entity_id": "sensor.seplos_bms_system_system_state",
-      "dev": {
-        "hw": "10E",
-        "ids": "seplos_bms_system",
-        "mdl": "BMS V14 / V16",
-        "mf": "Seplos",
-        "name": "Seplos BMS System",
-        "sw": "16.06.13+",
-        "via_device": "seplos_bms_pack_0"
-      },
-      "ic": "mdi:information-outline",
-      "name": "System State (Aggregate)",
-      "obj_id": "seplos_bms_system_system_state",
-      "stat_t": "seplos/system/sensors",
-      "uniq_id": "seplos_bms_system_system_state",
-      "val_tpl": "{{ value_json.normal.system_state }}"
-    },
-    "qos": 1,
-    "retain": true,
-    "topic": "homeassistant/sensor/seplos-mqtt-system/system_state/config"
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_1/config"
   },
   {
     "payload": {
@@ -74,26 +46,30 @@
         }
       ],
       "avty_mode": "all",
-      "default_entity_id": "sensor.seplos_bms_pack_1_firmware_version",
+      "default_entity_id": "sensor.seplos_bms_pack_1_voltage_cell_1",
       "dev": {
-        "hw": "10E",
+        "hw": "V16",
         "ids": "seplos_bms_pack_1",
-        "mdl": "BMS V14 / V16",
+        "mdl": "BMS 2.0 / EMU1101",
+        "mdl_id": "1101-10E",
         "mf": "Seplos",
         "name": "Seplos BMS Pack-1 (Slave)",
         "sw": "16.06",
         "via_device": "seplos_bms_pack_0"
       },
-      "ent_cat": "diagnostic",
-      "ic": "mdi:chip",
-      "name": "Firmware Version",
-      "obj_id": "seplos_bms_pack_1_firmware_version",
+      "dev_cla": "voltage",
+      "ic": "mdi:battery-outline",
+      "name": "Voltage Cell 1",
+      "obj_id": "seplos_bms_pack_1_voltage_cell_1",
+      "stat_cla": "measurement",
       "stat_t": "seplos/pack-1/sensors",
-      "uniq_id": "seplos_bms_pack_1_firmware_version",
-      "val_tpl": "{{ value_json.get('info', {}).get('normal', {}).get('firmware_version', 'unknown') }}"
+      "sug_dsp_prc": 3,
+      "uniq_id": "seplos_bms_pack_1_voltage_cell_1",
+      "unit_of_meas": "V",
+      "val_tpl": "{{ value_json.telemetry.normal.voltage_cell_1 }}"
     },
     "qos": 1,
     "retain": true,
-    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/firmware_version/config"
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/voltage_cell_1/config"
   }
 ]

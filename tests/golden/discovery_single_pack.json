@@ -4283,12 +4283,13 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_voltage_cell_1",
       "dev": {
-        "hw": "10E",
+        "hw": "V16",
         "ids": "seplos_bms_pack_0",
-        "mdl": "BMS V14 / V16",
+        "mdl": "BMS 2.0 / EMU1101",
+        "mdl_id": "1101-10E",
         "mf": "Seplos",
         "name": "Seplos BMS Pack-0 (Master)",
-        "sw": "2.x / 16.x"
+        "sw": ""
       },
       "dev_cla": "voltage",
       "ic": "mdi:battery-outline",

@@ -32,6 +32,17 @@ This Home Assistant add-on reads one or more Seplos BMS 2.0/10E/V16 (EMU1101) pa
 
 Tested gateway: [Waveshare 2-CH RS485 to ETH](https://www.waveshare.com/2-ch-rs485-to-eth-b.htm)
 
+### Supported hardware
+
+| | |
+|---|---|
+| Generation | BMS 2.0 |
+| OEM platform | EMU1101 |
+| Variant | 1101-10E |
+| Hardware | V16 |
+
+The firmware (e.g. 16.06.13, shown as "Firmware" in Home Assistant) is not the protocol version (V2.0). In Home Assistant the facts appear on the device page of each pack: model, model ID (`model_id` needs HA 2024.8 or newer), hardware and, where the battery serial number can be read (CID2 0xA2 on RS485-1/2, or MAINT on the CAN port), the serial number exactly as the pack reports it (a placeholder value is shown as is). The BMS serial number (0xA4) is only the diagnostic sensor and the identity check. The System and Parallel Set devices are virtual and show no hardware, firmware or serial.
+
 ## Wiring overview
 
 The BMS has three sockets: CAN, RS485-1 and RS485-2. Besides CAN, the CAN socket carries a second RS485 bus (9600 baud).
@@ -329,7 +340,7 @@ Home Assistant names describe what a value actually does (verified against the B
 | Charge MOSFET | `telesignalization.binary.charge_switch` | On-off state bit 1 "Charge switch state" (0x44) |
 | Current Limiter | `telesignalization.binary.current_limit_switch` | On-off state bit 2 "Current limit switch state" (0x44) |
 | Heater | `telesignalization.binary.heating_switch` | On-off state bit 3 "Heating switch state" (0x44) |
-| Device Name | `info.normal.device_name` | device name (0x51 bytes 0-9) |
+| Device Name | `info.normal.device_name` | name reported by the BMS (0x51 bytes 0-9), e.g. `SP16S020` |
 | Firmware Version | `info.normal.firmware_version` | software version (0x51 bytes 10-11) |
 | Firmware Patch (derived) | `info.normal.firmware_patch` | – (derived from features, see firmware analysis) |
 | CAN Protocol | `info.normal.can_protocol` | manufacturer name field = active CAN protocol (0x51 bytes 12-31) |

@@ -701,17 +701,29 @@ def test_resync_on_ha_birth_and_reconnect():
 def test_main_loop_resync_republishes(monkeypatch):
     client, _ = api.run_main(monkeypatch, _single_pack_bms(), number_of_packs=1, telemetry_polls=2, resync_after_polls=1)
     sensors = [r for r in client.as_records() if r["topic"] == "seplos/pack-0/sensors"]
-    configs = [r for r in client.as_records() if r["topic"] == "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_1/config"]
+    configs = [r for r in client.as_records() if r["topic"] == "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_2/config"]
     assert len(sensors) >= 2 and len(configs) == 2     # unchanged data replayed, discovery resent
+    # the anchor config also carries the device block: startup (no firmware yet), the one update when the
+    # device info arrives, then the resync. Nothing is republished a second time after the resync.
+    anchors = [r["payload"]["dev"] for r in client.as_records()
+               if r["topic"] == "homeassistant/sensor/seplos-mqtt-pack-0/voltage_cell_1/config"]
+    assert [d["sw"] for d in anchors] == ["", "16.06.13+", "16.06.13+"]
+    assert anchors[-1]["sn"] == "SN-BATTERY-0001"
 
 
 def test_discovery_device_block_retried_after_failed_publish():
-    """E04/R01: the full device block is only considered sent after a successful publish."""
+    """E04/R01: only the anchor config carries the full device block; if its publish fails, discovery is
+    flagged and the next reconcile sends it again (no other config takes over the block)."""
     disc, client = api.discovery()
     client.fail_next = 1
     api.discovery_startup(disc, 1)
-    first_ok = next(r for r in client.as_records() if r["topic"].endswith("/voltage_cell_2/config"))
-    assert "mf" in first_ok["payload"]["dev"]
+    assert disc.failed
+    second = next(r for r in client.as_records() if r["topic"].endswith("/voltage_cell_2/config"))
+    assert second["payload"]["dev"] == {"ids": "seplos_bms_pack_0"}
+    client.published.clear()
+    disc.publish_pack(0, pack_bus=True)
+    anchor = next(r for r in client.as_records() if r["topic"].endswith("/voltage_cell_1/config"))
+    assert "mf" in anchor["payload"]["dev"]
 
 
 def test_signal_handler_exits_through_cleanup(monkeypatch):

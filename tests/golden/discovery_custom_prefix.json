@@ -5450,12 +5450,13 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_voltage_cell_1",
       "dev": {
-        "hw": "10E",
+        "hw": "V16",
         "ids": "seplos_bms_pack_0",
-        "mdl": "BMS V14 / V16",
+        "mdl": "BMS 2.0 / EMU1101",
+        "mdl_id": "1101-10E",
         "mf": "Seplos",
         "name": "Seplos BMS Pack-0 (Master)",
-        "sw": "2.x / 16.x"
+        "sw": ""
       },
       "dev_cla": "voltage",
       "ic": "mdi:battery-outline",
@@ -8557,12 +8558,13 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_1_voltage_cell_1",
       "dev": {
-        "hw": "10E",
+        "hw": "V16",
         "ids": "seplos_bms_pack_1",
-        "mdl": "BMS V14 / V16",
+        "mdl": "BMS 2.0 / EMU1101",
+        "mdl_id": "1101-10E",
         "mf": "Seplos",
         "name": "Seplos BMS Pack-1 (Slave)",
-        "sw": "2.x / 16.x",
+        "sw": "",
         "via_device": "seplos_bms_pack_0"
       },
       "dev_cla": "voltage",
@@ -9535,12 +9537,12 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_system_system_state",
       "dev": {
-        "hw": "10E",
+        "hw": "",
         "ids": "seplos_bms_system",
-        "mdl": "BMS V14 / V16",
+        "mdl": "Bank aggregate (virtual)",
         "mf": "Seplos",
         "name": "Seplos BMS System",
-        "sw": "2.x / 16.x",
+        "sw": "",
         "via_device": "seplos_bms_pack_0"
       },
       "ic": "mdi:information-outline",

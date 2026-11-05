@@ -167,7 +167,12 @@ export function settingsView(ctx) {
     storeBanner(session),
     readOnly ? h('div', { class: 'banner info', role: 'status' }, t('readonly.hint')) : null,
     notice,
-    form);
+    form,
+    h('section', { class: 'card', 'aria-labelledby': 'hw-title' },
+      h('h3', { id: 'hw-title' }, t('settings.hw.title')),
+      h('dl', { class: 'kvs' }, ['generation', 'platform', 'variant', 'hardware'].map((key) =>
+        h('div', { class: 'kv' }, h('dt', {}, t(`settings.hw.${key}`)), h('dd', {}, t(`settings.hw.${key}.value`))))),
+      h('p', { class: 'help' }, t('settings.hw.note'))));
 
   function readRaw() {
     const raw = {};
