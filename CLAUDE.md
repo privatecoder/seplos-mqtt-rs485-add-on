@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Home Assistant add-on that polls Seplos V2/V16 BMS packs (protocol "SEPLOS BMS Communication Protocol V2.0") over RS485 and publishes the data to MQTT, optionally with HA MQTT discovery. Pure Python 3 with only `paho-mqtt` and `pyserial` (installed via Alpine `apk` in the `Dockerfile`, no requirements file). All HA base images ship paho-mqtt 1.6.1 and Python 3.12 (armv7/armhf/i386, Alpine 3.22) to 3.14 (amd64/aarch64), so the code must run on Python 3.12 with the Paho 1.x API.
+A Home Assistant add-on that polls Seplos BMS 2.0/10E/V16 (EMU1101) packs (protocol "SEPLOS BMS Communication Protocol V2.0") over RS485 and publishes the data to MQTT, optionally with HA MQTT discovery. Pure Python 3 with only `paho-mqtt` and `pyserial` (installed via Alpine `apk` in the `Dockerfile`, no requirements file). All HA base images ship paho-mqtt 1.6.1 and Python 3.12 (armv7/armhf/i386, Alpine 3.22) to 3.14 (amd64/aarch64), so the code must run on Python 3.12 with the Paho 1.x API.
 
 ## Development commands
 

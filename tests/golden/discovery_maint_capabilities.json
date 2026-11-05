@@ -4023,7 +4023,7 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_voltage_cell_1",
       "dev": {
-        "hw": "10C / 10E",
+        "hw": "10E",
         "ids": "seplos_bms_pack_0",
         "mdl": "BMS V14 / V16",
         "mf": "Seplos",

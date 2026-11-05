@@ -1,6 +1,6 @@
 # Seplos MQTT RS485 Add-on
 
-This Home Assistant add-on reads one or more Seplos V2/V16 BMS packs over RS485 and publishes their data to MQTT.
+This Home Assistant add-on reads one or more Seplos BMS 2.0/10E/V16 (EMU1101) packs over RS485 and publishes their data to MQTT.
 
 ## What you get
 
@@ -19,13 +19,13 @@ This Home Assistant add-on reads one or more Seplos V2/V16 BMS packs over RS485 
 
 ## Who this is for
 
-- You have Seplos BMS V2/V16 (10C/10E) packs
+- You have Seplos BMS 2.0/10E/V16 (EMU1101) packs
 - You have a working MQTT broker
 - You can connect to the BMS via RS485 (local serial or RS485-to-Ethernet)
 
 ## Hardware requirements
 
-- Seplos BMS V2/V16 pack(s)
+- Seplos BMS 2.0/10E/V16 (EMU1101) pack(s)
 - RS485 interface (local serial or RS485-to-Ethernet gateway)
 - Cabling for your setup (see wiring below)
 - MQTT broker

@@ -1,1 +1,1 @@
-"""Seplos V2/V16 BMS (EMU1101) to MQTT / Home Assistant."""
+"""Seplos BMS 2.0/10E/V16 (EMU1101) to MQTT / Home Assistant."""

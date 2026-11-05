@@ -12,7 +12,7 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_0_firmware_version",
       "dev": {
-        "hw": "10C / 10E",
+        "hw": "10E",
         "ids": "seplos_bms_pack_0",
         "mdl": "BMS V14 / V16",
         "mf": "Seplos",
@@ -44,7 +44,7 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_system_system_state",
       "dev": {
-        "hw": "10C / 10E",
+        "hw": "10E",
         "ids": "seplos_bms_system",
         "mdl": "BMS V14 / V16",
         "mf": "Seplos",
@@ -76,7 +76,7 @@
       "avty_mode": "all",
       "default_entity_id": "sensor.seplos_bms_pack_1_firmware_version",
       "dev": {
-        "hw": "10C / 10E",
+        "hw": "10E",
         "ids": "seplos_bms_pack_1",
         "mdl": "BMS V14 / V16",
         "mf": "Seplos",

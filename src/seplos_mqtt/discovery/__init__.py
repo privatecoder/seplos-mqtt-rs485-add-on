@@ -11,7 +11,7 @@ from .catalog import BALANCER_ENTITY, CELL_ENTITIES, FIRMWARE_ENTITY, OBSOLETE, 
 logger = logging.getLogger("SeplosBMS.discovery")
 
 DEVICE_BASE = {
-    "hw": "10C / 10E",
+    "hw": "10E",
     "sw": "2.x / 16.x",
     "mdl": "BMS V14 / V16",
     "mf": "Seplos",
