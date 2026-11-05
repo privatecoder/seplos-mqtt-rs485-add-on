@@ -130,3 +130,138 @@ Sub-stages, each reviewed: **2a** model + API + live apply, **2b** values + HA d
   "Propose neighbour pairs" fills a draft with (0,1), (2,3), … for packs not yet in a set; nothing is saved
   until the user saves. Same revision/CSRF/read-only rules as the settings tab.
 - Overview: one card per set with the 2b values; inactive sets show the reason.
+
+## Stage 3 in detail (cell types, checks, computed balancer)
+
+One release, sub-stages each reviewed: **3a** catalog + model + API, **3b** checks + energy + HA, **3c** computed
+balancer, **3d** UI. Research: `.orch/codex-stage3-cells-proposal.md` (local).
+
+### 3a: catalog, model, API
+
+- **Bundled catalog**: a vendored copy of OpenBMS Monitor's `data/cells/cells.json` + `data/schema/cells.schema.json`
+  under `src/seplos_mqtt/cells/data/`, unchanged, plus `MANIFEST.json` (source repo, commit, sha256 of both files)
+  and the MIT notice. `scripts/update_cell_catalog.py <path-to-openbms-monitor>` copies both files and rewrites the
+  manifest (maintainer tool, no network). A test checks the manifest digests. No download at build or run time. A
+  separate upstream repo may replace the source later; only the manifest's source changes then.
+- **Validation** in Python without new runtime dependencies, two layers (like OpenBMS `validate.ts`):
+  1. *structural*, equivalent to the vendored schema (required keys, types — booleans are not numbers —, enums,
+     `additionalProperties: false` everywhere, no `null`, `minimum`/`exclusiveMinimum`, patterns, `date`/`uri`
+     formats, the derating point `oneOf`); a dev-only test runs the bundled file plus mutated entries through
+     `jsonschema` (format checking on) and requires the same accept/reject result;
+  2. *semantic*, tested on its own: finite numbers, positive nominal V/Ah/Wh, charge cutoff > discharge cutoff,
+     min < max temperatures, band bounds ordered, SOC bands 0..100, `interpolation: linear` only with a provenance
+     entry for it; may reject structurally valid entries.
+  Entries are strict: an unknown key inside an entry is an error (save and import); schema fields the form does not
+  show are kept on edit. Errors carry a JSON path. Unknown keys outside entries (pack/profile objects, top level)
+  survive load/save like `connection`.
+- **Model** (`/data/monitoring.json`, optional keys, defaults empty):
+  - `cell_types: [entry]`: own types, full schema entries. A new own id must not collide with a bundled id ("copy
+    as template" proposes `<id>-custom`, `-custom-2`, …). **Upgrade collision** (a later bundle adds an id that is
+    already an own type): loading never fails for it; the own type stays usable under its id, is listed as
+    `conflict: bundled_id` with a "rename" action, and the bundled entry with that id is hidden until resolved.
+    Rename is one server operation (`POST /api/cells/rename {from, to}`, one store write): it changes the own entry's
+    id, every pack reference to it (also addresses ≥ `pack_count`) and the `id` inside those snapshots; all other
+    snapshot content (version, limits) stays. Tested with catalog A → catalog B.
+  - `packs: {"<address>": {cell: {id, entry_version, parallel, entry} | null, balancer_profile: id | null,
+    bms_serial: str | null, serial_mismatch: bool}}`. `entry` is the server-made snapshot of the assigned entry (a
+    catalog update never changes an assignment's limits); on load, `entry.id`/`entry_version` must equal the
+    reference, else that assignment is treated as invalid (checks not evaluated, shown for re-assignment).
+  - **Identity guard**: `bms_serial` = BMS serial (0xA4 string 2, trimmed; never the 0xA2 battery serial) read
+    when the assignment was saved or confirmed. Readable only on RS485-1/2 (single pack) or with MAINT UART1; else
+    null and the pack is shown "identity not verifiable" (checks still run). When a readable serial differs from the
+    stored one, `serial_mismatch` is set: checks of that pack are not evaluated, its balancer state goes unknown,
+    and the user confirms (`POST /api/packs/confirm-identity`, stores the new serial) or reassigns.
+  - `balancer_profiles: [{id, name, values: {start_mv, stop_cell_mv, trigger_mv, stop_mv, when, max_a}}]` with the
+    value rules of `docs/exchange/seplos-bank-settings-v1.md` (`balancers[]`); ids server-assigned (`next_profile_id`,
+    never reused), name 1..40 unique. Deleting a profile that any stored pack references (including addresses ≥
+    `pack_count`) is refused (`in_use`, addresses); an unknown profile id in a pack is `invalid_fields`.
+  - Removed packs (address ≥ `pack_count`) keep their stored assignment.
+- `parallel` is an integer ≥ 1 as in the exchange contract; the add-on additionally caps it at 10 000, only as a guard
+  against absurd input. Numbers in a cell entry must be finite and at most 1e9 in magnitude (semantic `range`).
+- **Update offer**: when the bundled entry with an assigned id has a higher `entry_version` than the snapshot,
+  `GET /api/packs` marks the pack `update_available` with the changed fields; only an explicit
+  `POST /api/packs/accept-update` (addresses) replaces the snapshot.
+- **Own types**: editing increments `entry_version` and sets `updated`; assigned snapshots stay until the user
+  accepts the new version (same offer as above). Deleting a type that is assigned is refused (`in_use`, addresses).
+- **API** (CSRF + If-Match + revision like `/api/sets`): `GET /api/cells` (bundled + own, `source: bundled|own`,
+  manifest version), `PUT /api/cells` (own list), `GET /api/packs` (stored assignments with their snapshots, update
+  offers, identity state, series count read-only from the last 0x42), `PUT /api/packs` with **references only**:
+  `{packs: {"<address>": {cell: {id, parallel} | null, balancer_profile: id | null}}}` — a listed address is
+  replaced, an unlisted one stays unchanged, `null` clears; the server resolves `id` against own + bundled types
+  and makes the snapshot only when the cell **id** changes (or the pack had none); the same id keeps the stored
+  snapshot even when `parallel` or the profile changes — only accept-update replaces it (tested for bundled and
+  own types); bulk = the client lists every address. `GET/PUT /api/balancer-profiles` (whole list, like sets). Saves apply
+  without restart (handed to the main loop at the cycle boundary, like sets). Import/export of own types: the
+  OpenBMS cell array as JSON (client side download/upload through `PUT /api/cells`). The full bank exchange stays
+  stage 6.
+- **Parallel suggestion**: when the type is chosen, the UI proposes `round(rated_capacity / nominal_ah)` if it is
+  within 2 %; never applied automatically. Series count is never stored or entered (measured).
+
+### 3b: checks, energy, Home Assistant
+
+- Inputs per pack: the latest valid 0x42 sample (cell voltages, the four cell probes, current with charging
+  positive before the HA inversion, SOC, rated capacity) with its receive time, independent of MQTT change
+  suppression and of a failed 0x44; parameters from 0x47 (single pack) or MAINT binary 47 with their read time.
+- **Live checks** (OpenBMS rules and margins, shared test vectors):
+  - cell voltage vs `charge_cutoff_v` / `discharge_cutoff_v`: over beyond, near within 50 mV / 200 mV (equality =
+    near);
+  - cell probes vs the charge or discharge temperature range for the current direction: over outside while
+    current flows that way, near within 5 °C or "would not be allowed now" at rest;
+  - direction thresholds: charging = current ≥ +0.2 A, discharging = current < −0.5 A, otherwise at rest;
+  - permitted charge current: with a derating table, the table value at the measured probe temperatures (every
+    probe evaluated, the lowest result wins; lower neighbour, worst SOC row when SOC unknown, zero outside the
+    table, linear only when the entry says so), capped by `max_continuous_charge_a` when present; without a table
+    (11 of 31 bundled entries), `max_continuous_charge_a` inside the charge temperature range and zero outside;
+    missing basis → not evaluated; × `parallel`. Charge check: limit 0 → over at ≥ 0.2 A; limit > 0 → over above
+    limit + 0.5 A, near above 80 % of the limit;
+  - discharge current check (static, like OpenBMS): discharge component `max(0, −current)` vs
+    `max_continuous_discharge_a` × `parallel`; over above the limit (no tolerance), near above 80 %; a temperature
+    outside the discharge range is reported by the temperature check (flow thresholds above), not by this check;
+  - permitted discharge budget (advisory, HA sensor only): `max_continuous_discharge_a` × `parallel` inside the
+    discharge temperature range, zero outside, unknown without basis;
+  - rates: C × `nominal_ah`, P × `nominal_energy_wh` (else Ah × V) / `nominal_v`; never the learned capacity.
+  - Boundary values (equality, zero-rate bands, shared band bounds, +charging vs discharge check, −0.1 A and −0.5 A
+    at rest/edge, real discharge) are in the shared test vectors.
+- **Parameter checks** (only where parameters are readable): cell/pack voltage alarm and protection settings,
+  charge/discharge temperature settings and current settings vs the datasheet; P65 ≠ measured series count is a
+  configuration warning; rated capacity vs `nominal_ah` × `parallel` beyond 2 % is near (informational).
+- Each check: `ok | near | over | not_evaluated` with reason, value, limit, unit. Summary per group (live,
+  parameters) = worst result; any `not_evaluated` check makes an otherwise ok summary `not_evaluated`, `over`
+  always wins. No assignment, missing fields, stale sample (pack availability limit) or stale parameters (two
+  missed refreshes) → not_evaluated.
+- **Full energy**: pack `full_energy` = learned full capacity (0x42) × measured series cells × nominal V of the
+  assigned entry, else `connection.nominal_cell_voltage` (default 3.2 V); never × parallel. System
+  `total_full_energy` = sum of all configured packs' `full_energy`, unknown if any is unknown (replaces master
+  Ah × one series count × one voltage). Recomputed after an assignment change without restart.
+- **HA** (existing pack device, no new devices, existing IDs unchanged), all diagnostic:
+  - `cell_type` (text; attributes id, entry_version, manufacturer, model, chemistry, nominal_v, nominal_ah,
+    parallel, series, update_available);
+  - `datasheet_check_live`, `datasheet_check_parameters` (`device_class: enum`, options ok/near/over/
+    not_evaluated; attribute `checks` with key, result, value, limit, unit, reason; no timestamps in attributes);
+  - `datasheet_charge_current_limit`, `datasheet_discharge_current_limit` (A, measurement, disabled by default,
+    advisory): the permitted currents above at the current temperatures (0 when not allowed, unknown without basis
+    or while not evaluated);
+  - published in the pack's state JSON under a new group `cells`; README sensor table updated.
+- `/api/status` per pack: assignment summary, both summaries, the checks.
+
+### 3c: computed balancer
+
+- Per pack with a `balancer_profile`: state `active | inactive | unknown` from the latest fresh sample: spread
+  (mV) = highest − lowest cell; start when spread ≥ `trigger_mv` and (no `start_mv` or highest cell ≥ `start_mv`)
+  and the `when` condition holds (`charging`: current > +1 A, `not-discharging`: ≥ −1 A); stop when spread <
+  `stop_mv` (null or ≥ trigger → trigger), or highest cell < `stop_cell_mv` (rules of the exchange format), or the
+  condition fails; otherwise keep the state. Starts `unknown`, back to `unknown` after a restart, a stale sample,
+  an identity mismatch, assigning/unassigning/reassigning a profile, or any edit of the assigned profile's values
+  (same id). No cell catalog data involved.
+- HA: `external_balancer` (enum active/inactive/unknown, diagnostic) on the pack, only for packs with a profile;
+  unassigning clears its discovery config (retried until the broker accepted it, like removed sets).
+
+### 3d: UI
+
+- Tab "Cells": list (search manufacturer/model/Ah, bundled/own badge), detail (limits, derating table, source
+  link), own types: create, copy as template, edit (common fields in the form, everything else preserved),
+  delete, import/export JSON.
+- Tab "Packs": per pack address, BMS serial, measured series, rated capacity, cell type + parallel, balancer
+  profile, check summaries, update offer with diff; "apply to all packs" with the list of affected packs.
+- Balancer profiles editor (in the Packs tab): name and the values with their rules.
+- Overview pack card: cell type and the live check summary; balancer state when a profile is assigned.
