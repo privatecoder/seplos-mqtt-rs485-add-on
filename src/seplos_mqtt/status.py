@@ -11,7 +11,7 @@ from .cells import evaluate as cell_report
 from .monitoring.model import activity
 
 # fields of the last pack data (decoder keys, canonical values: the HA inversion is not applied)
-_PACK_VALUES = ("state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage")
+_PACK_VALUES = ("state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage", "rated_capacity")
 _SYSTEM_VALUES = ("system_soc", "system_voltage", "system_current", "system_power", "total_capacity", "total_full_energy", "system_state")
 
 

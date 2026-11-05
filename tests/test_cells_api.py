@@ -46,7 +46,8 @@ async def error_of(res):
 
 def make_app(store, serials=None, **callbacks):
     """A WebApp whose status snapshot reports the given BMS serials {address: serial}."""
-    status = {"packs": [{"address": a, "cell_count": 16, "bms_serial": s} for a, s in (serials or {}).items()]}
+    status = {"packs": [{"address": a, "cell_count": 16, "bms_serial": s, "rated_capacity": 280.0 if a == 0 else None}
+                        for a, s in (serials or {}).items()]}
     return WebApp(LOCAL, store, status_provider=lambda: status, **callbacks), status
 
 
@@ -229,8 +230,44 @@ def test_get_packs_shape(tmp_path):
         assert first["cell"]["update_available"] is False and first["cell"]["changed"] == []
         assert (second["cell"], second["identity"], second["live_bms_serial"]) == (None, None, "X1")
         assert not far["configured"] and far["series_count"] is None and far["identity"] is None
+        assert (first["rated_capacity_ah"], second["rated_capacity_ah"], far["rated_capacity_ah"]) == (280.0, None, None)
 
     run_with(app_, scenario)
+
+
+def test_server_rejection_maps_to_a_form_field_of_the_ui(tmp_path):
+    """A value the client accepts (a number) but the server rejects: the UI must find the field by the server's path."""
+    import shutil
+    import subprocess
+
+    from test_web import STATIC_DIR
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    store = cells_store(tmp_path)
+    app_ = WebApp(LOCAL, store)
+    answer = {}
+
+    async def scenario(client):
+        entry = {**own_cell(), "capacity": {"nominal_ah": -1}}
+        res = await call(client, "PUT", "/api/cells", {"cells": [entry]}, store.revision)
+        answer["status"], answer["body"] = res.status, await res.json()
+
+    run_with(app_, scenario)
+    assert answer["status"] == 422 and answer["body"]["error"]["key"] == "invalid_fields"
+    fields = answer["body"]["error"]["params"]["fields"]
+    script = (
+        f"import {{ splitProblemPath }} from {(STATIC_DIR / 'cellui.js').as_uri()!r};"
+        f"import {{ FIELDS }} from {(STATIC_DIR / 'cells.js').as_uri()!r};"
+        f"const fields = {json.dumps(fields)};"
+        "const mapped = fields.map((f) => splitProblemPath(f.path));"
+        "const known = mapped.filter((m) => FIELDS.some((f) => f.path === m.field));"
+        "if (known.length === 0 || known[0].index !== 0 || known[0].field !== 'capacity.nominal_ah') {"
+        " console.log(JSON.stringify(fields), JSON.stringify(mapped)); process.exit(1); }"
+    )
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
 
 
 def test_get_packs_before_the_first_status_and_identity_states(tmp_path):
@@ -241,7 +278,7 @@ def test_get_packs_before_the_first_status_and_identity_states(tmp_path):
     async def scenario(client):
         body = await (await client.get("/api/packs")).json()
         assert [p["identity"] for p in body["packs"]] == ["not_verifiable", "mismatch", None]
-        assert all(p["series_count"] is None and p["live_bms_serial"] is None for p in body["packs"])
+        assert all(p["series_count"] is None and p["live_bms_serial"] is None and p["rated_capacity_ah"] is None for p in body["packs"])
 
     run_with(app_, scenario)
 

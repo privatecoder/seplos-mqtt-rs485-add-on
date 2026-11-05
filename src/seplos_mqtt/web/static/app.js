@@ -7,8 +7,10 @@ import { overviewView } from './overview.js';
 import { settingsView } from './settings.js';
 import { setsView } from './sets.js';
 import { detectView } from './detect.js';
+import { cellsView } from './cells.js';
+import { packsView } from './packs.js';
 
-const VIEWS = { overview: overviewView, settings: settingsView, sets: setsView, detect: detectView };
+const VIEWS = { overview: overviewView, settings: settingsView, sets: setsView, cells: cellsView, packs: packsView, detect: detectView };
 const RESTART_POLL_MS = 2000;
 const RESTART_GIVE_UP_MS = 180000;
 

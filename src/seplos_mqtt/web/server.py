@@ -484,6 +484,7 @@ class WebApp:
                     "address": address,
                     "configured": address < config.connection.pack_count,
                     "series_count": now.get("cell_count"),
+                    "rated_capacity_ah": _number_or_none(now.get("rated_capacity")),
                     "live_bms_serial": now.get("bms_serial"),
                     "cell": cell,
                     "balancer_profile": stored.balancer_profile if stored else None,
@@ -883,6 +884,10 @@ def _body_value(body: Any, key: str, kind: type, status: LoadStatus) -> Any:
     if status is LoadStatus.MISSING:
         raise ApiError("store_missing", 409)
     return body[key]
+
+
+def _number_or_none(value: Any) -> float | int | None:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _is_address(key: Any) -> bool:

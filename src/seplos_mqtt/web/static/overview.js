@@ -3,6 +3,7 @@
 import { api, ApiError } from './api.js';
 import { t, errorText, fmt, fmtDuration, orDash, packName } from './i18n.js';
 import { h, chip } from './ui.js';
+import { resultChip, balancerChip } from './cellui.js';
 
 const POLL_MS = 5000;
 
@@ -143,7 +144,23 @@ function packCard(pack, multi, snapshotSeconds) {
       kv(t('pack.voltage'), fmt(pack.total_pack_voltage, 'V', 2)),
       kv(t('pack.current'), fmt(pack.current, 'A', 2)),
       kv(t('pack.cell_high'), fmt(pack.highest_cell_voltage, 'V', 3)),
-      kv(t('pack.cell_low'), fmt(pack.lowest_cell_voltage, 'V', 3))));
+      kv(t('pack.cell_low'), fmt(pack.lowest_cell_voltage, 'V', 3)),
+      ...cellRows(pack)));
+}
+
+// Cell type and live check summary (only with an assignment); balancer state only with a profile.
+function cellRows(pack) {
+  const cells = pack.cells;
+  const assignment = cells && cells.assignment;
+  const rows = [];
+  if (assignment) {
+    rows.push(kv(t('pack.cell_type'), `${assignment.name || assignment.id} × ${assignment.parallel}`));
+    rows.push(kv(t('pack.datasheet_check'), cells.live ? resultChip(cells.live.summary) : resultChip('not_evaluated')));
+  } else {
+    rows.push(kv(t('pack.cell_type'), t('pack.cell_type.none')));
+  }
+  if (pack.balancer) rows.push(kv(t('pack.balancer'), balancerChip(pack.balancer.state)));
+  return rows;
 }
 
 export function overviewView(ctx) {

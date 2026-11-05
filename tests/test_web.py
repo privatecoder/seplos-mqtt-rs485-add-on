@@ -495,7 +495,7 @@ STATIC_DIR = Path(server_module.__file__).parent / "static"
 CONTENT_TYPES = {".html": "text/html", ".css": "text/css", ".js": "javascript", ".json": "application/json", ".svg": "image/svg+xml"}
 UI_FILES = {
     "index.html", "app.css", "api.js", "ui.js", "i18n.js", "app.js", "overview.js", "settings.js", "sets.js", "detect.js",
-    "i18n/de.json", "i18n/en.json", "icon.svg",
+    "cells.js", "packs.js", "cellui.js", "i18n/de.json", "i18n/en.json", "icon.svg",
 }
 JS_FILES = sorted(STATIC_DIR.glob("*.js"))
 
@@ -555,7 +555,9 @@ def test_referenced_files_exist_and_urls_are_relative():
         for target in re.findall(r"fetch\(\s*[`'\"]([^`'\"$]+)", text):
             assert target.startswith("static/") or target.startswith("api/"), f"{rel(path)} fetches {target}"
         for _method, target in re.findall(r"api\(\s*'(GET|POST|PUT)'\s*,\s*[`']([^`'$]*)", text):
-            assert target in {"api/session", "api/connection", "api/sets", "api/status", "api/jobs/detect"} or target.startswith("api/jobs/"), target
+            known = {"api/session", "api/connection", "api/sets", "api/status", "api/jobs/detect", "api/cells", "api/cells/rename",
+                     "api/packs", "api/packs/accept-update", "api/packs/confirm-identity", "api/balancer-profiles"}
+            assert target in known or target.startswith("api/jobs/"), target
 
 
 def test_no_absolute_urls_no_external_resources_no_inline_code():
@@ -741,6 +743,171 @@ def test_sets_client_checks_mirror_the_model():
     )
     done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
     assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_cell_and_pack_texts_for_built_keys_exist_in_both_languages():
+    from seplos_mqtt.cells import checks
+
+    de, en = load_texts()
+    cells_js = (STATIC_DIR / "cells.js").read_text(encoding="utf-8")
+    form_paths = re.findall(r"\{ path: '([a-z_.]+)'", cells_js)
+    keys = (
+        [f"check.result.{v}" for v in ("ok", "near", "over", "not_evaluated")]
+        + [f"balancer.state.{v}" for v in ("active", "inactive", "unknown")]
+        + [f"cells.form.{p}" for p in form_paths]
+        + [f"cells.source.{v}" for v in ("bundled", "own")]
+        + [f"cells.source_type.{v}" for v in ("manufacturer_pdf", "manufacturer_web", "distributor_pdf")]
+        + [f"cells.form_factor.{v}" for v in ("prismatic", "cylindrical", "pouch")]
+        + [f"cells.rate.{v}" for v in "CP"] + [f"cells.derating.{v}" for v in "CP"] + ["cells.verified", "cells.unverified"]
+        + [f"packs.identity.{v}" for v in ("verified", "not_verifiable", "mismatch")]
+        + [f"packs.check.{v}" for v in ("live", "parameters")]
+        + [f"profiles.when.{v}" for v in ("always", "charging", "not-discharging")]
+        + [f"profiles.f.{k}{s}" for k in ("name", "trigger_mv", "stop_mv", "start_mv", "stop_cell_mv", "when", "max_a") for s in ("", ".help")]
+        + [f"check.key.{k}" for k in [p[0] for p in checks._PARAMETERS]]
+        + [f"check.key.{k}" for k in ("cell_voltage_high", "cell_voltage_low", "charge_temperature", "discharge_temperature",
+                                      "charge_current", "discharge_current", "rated_capacity_ah", "cells_in_series")]
+    )
+    assert len(form_paths) == 21
+    for lang in (de, en):
+        assert not [k for k in keys if k not in lang]
+    # every reason the checks can give has a text
+    reasons = (
+        "no_assignment", "serial_mismatch", "invalid_snapshot", "no_sample", "stale_sample", "no_parameters",
+        "stale_parameters", "check_error", "missing_sample", "missing_value", "missing_limit", "no_series",
+        "above_charge_cutoff", "near_charge_cutoff", "below_discharge_cutoff", "near_discharge_cutoff",
+        "outside_range", "near_range_edge", "charge_not_allowed", "above_limit", "below_limit", "near_limit",
+        "rated_capacity_mismatch", "series_mismatch",
+    )
+    source = Path(checks.__file__).read_text(encoding="utf-8")
+    for reason in reasons:
+        assert f"check.reason.{reason}" in en and f"check.reason.{reason}" in de, reason
+    # every reason string the check module produces is covered by the list above
+    produced = set(re.findall(r'"((?:above|below|near|missing|stale|outside|rated|series)_[a-z_]+)"', source))
+    assert not [r for r in produced if r not in reasons and r != "rated_capacity_ah"], sorted(produced)
+
+
+def test_cells_tab_is_wired_and_never_renders_links_it_did_not_validate():
+    app_js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "cells: cellsView" in app_js and "packs: packsView" in app_js
+    index = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    assert index.index('data-tab="sets"') < index.index('data-tab="cells"') < index.index('data-tab="packs"') < index.index('data-tab="detect"')
+    cells_js = (STATIC_DIR / "cells.js").read_text(encoding="utf-8")
+    assert "rel: 'noopener noreferrer'" in cells_js and "safeHttpUrl(ds.url)" in cells_js
+    for name in ("cells.js", "packs.js"):
+        text = (STATIC_DIR / name).read_text(encoding="utf-8")
+        for needle in ("let generation", "let saving", "controlsDisabled()", "{ revision }", "revision_stale"):
+            assert needle in text, (name, needle)
+        assert "awaitRestart" not in text                       # assignments and profiles never restart the add-on
+
+
+NODE_EQ = (
+    "const eq = (a, b) => {"
+    " if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(JSON.stringify(a), JSON.stringify(b)); process.exit(1); } };"
+)
+
+
+def test_review_fixes_3d_are_in_the_sources():
+    cells_js = (STATIC_DIR / "cells.js").read_text(encoding="utf-8")
+    packs_js = (STATIC_DIR / "packs.js").read_text(encoding="utf-8")
+    # R1: absent children never reach the native replaceChildren
+    assert "body.replaceChildren(...children.filter(" in cells_js
+    # R4: the error is focused after the final render, never before a render that replaces it
+    write = cells_js[cells_js.index("async function write("):cells_js.index("async function removeCell")]
+    assert write.count("focusError()") == 1
+    final = write.index("} finally {")
+    assert final < write.index("render();", final) < write.index("focusError()")
+    # R2: save feedback sits in the sticky save bar and receives the focus
+    assert "class: 'savebar'" in packs_js and "target.focus({ preventScroll: true })" in packs_js
+    assert packs_js.count("feedback(packNotice") >= 4 and packs_js.count("feedback(profileNotice") >= 2
+    assert "saving = false;\n      if (error.key === 'revision_stale')" in packs_js      # not busy while errors are drawn and focused
+    # R3: one summary row per pack with an explicit expand control; drafts do not live in the DOM
+    assert "'aria-expanded'" in packs_js and "const open = new Set()" in packs_js and "pack-row" in packs_js
+    assert "profilesTitle.scrollIntoView()" in packs_js                                  # no hash change: the router owns the hash
+    css = (STATIC_DIR / "app.css").read_text(encoding="utf-8")
+    assert ".savebar" in css and "position: sticky" in css
+
+
+def run_node(script: str) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_cell_helpers():
+    ui = (STATIC_DIR / "cellui.js").as_uri()
+    script = (
+        f"import {{ safeHttpUrl, proposeId, suggestParallel, splitProblemPath, cellName }} from {ui!r};"
+        + NODE_EQ +
+        "eq(safeHttpUrl('javascript:alert(1)'), null); eq(safeHttpUrl('data:text/html,x'), null); eq(safeHttpUrl('nonsense'), null);"
+        "eq(safeHttpUrl('http://example.org/a.pdf'), 'http://example.org/a.pdf');"
+        "eq(proposeId('eve', new Set(['eve'])), 'eve-custom');"
+        "eq(proposeId('eve', new Set(['eve', 'eve-custom', 'eve-custom-2'])), 'eve-custom-3');"
+        "eq(proposeId('eve-custom', new Set(['eve', 'eve-custom'])), 'eve-custom-2');"
+        "eq(suggestParallel(560, 280), 2); eq(suggestParallel(570, 280), 2); eq(suggestParallel(600, 280), null);"
+        "eq(suggestParallel(null, 280), null); eq(suggestParallel(280, 0), null); eq(suggestParallel(100, 280), null);"
+        "eq(splitProblemPath('cell_types[2].voltage.nominal_v'), { index: 2, field: 'voltage.nominal_v' });"
+        "eq(splitProblemPath('cell_types[0]'), { index: 0, field: '' });"
+        "eq(cellName({ manufacturer: 'EVE', model: 'LF280K', variant: 'Rev B' }), 'EVE LF280K Rev B');"
+        "console.log('ok');"
+    )
+    run_node(script)
+
+
+def test_cell_form_keeps_unshown_fields_and_checks_numbers():
+    cells = (STATIC_DIR / "cells.js").as_uri()
+    script = (
+        f"import {{ buildEntry, FIELDS, fieldText }} from {cells!r};"
+        + NODE_EQ +
+        "const base = { schema_version: 1, id: 'x', entry_version: 2, updated: '2026-01-01', manufacturer: 'A', model: 'B', chemistry: 'LFP',"
+        " datasheet: { title: 't', source_type: 'manufacturer_pdf', url: 'u', sha256: 'f'.repeat(64) },"
+        " capacity: { nominal_ah: 280, test_condition: { temperature_c: 25 } }, voltage: { nominal_v: 3.2, storage_v: 3.3 },"
+        " current: { standard_charge: { value: 0.5, basis: 'C' } }, charge_derating: { basis: 'C', points: [{ temp_c: 0, value: 0 }] },"
+        " provenance: { 'voltage.nominal_v': { verified: true } } };"
+        "const texts = { isNew: false }; for (const f of FIELDS) texts[f.path] = fieldText(base, f);"
+        "let r = buildEntry(base, texts); eq(r.errors, {}); eq(r.entry, base);"                       # untouched form = identical entry
+        "texts['voltage.nominal_v'] = '3,25'; r = buildEntry(base, texts); eq(r.entry.voltage, { nominal_v: 3.25, storage_v: 3.3 });"
+        "eq(r.entry.charge_derating, base.charge_derating); eq(r.entry.provenance, base.provenance); eq(r.entry.datasheet.sha256, 'f'.repeat(64));"
+        "texts['voltage.nominal_v'] = ''; r = buildEntry(base, texts); eq(r.entry.voltage, { storage_v: 3.3 });"        # optional cleared
+        "texts['voltage.storage_v'] = 'x'; texts['capacity.nominal_ah'] = ''; r = buildEntry(base, texts);"
+        "eq(r.entry.capacity, { test_condition: { temperature_c: 25 } });"
+        "texts['capacity.nominal_ah'] = '28O'; r = buildEntry(base, texts); eq(r.errors['capacity.nominal_ah'], 'type');"
+        "texts.manufacturer = ' '; r = buildEntry(base, texts); eq(r.errors.manufacturer, 'required');"
+        "const fresh = { ...texts, isNew: true, id: 'Bad Id' }; r = buildEntry(base, fresh); eq(r.errors.id, 'format');"
+        "console.log('ok');"
+    )
+    run_node(script)
+
+
+def test_pack_and_profile_helpers():
+    packs = (STATIC_DIR / "packs.js").as_uri()
+    script = (
+        f"import {{ checkProfiles, profilePayload, packsPayload, parseParallel }} from {packs!r};"
+        + NODE_EQ +
+        "const p = (o = {}) => ({ name: 'A', trigger_mv: '5', stop_mv: '', start_mv: '', stop_cell_mv: '',"
+        " when: 'always', max_a: '', base: null, ...o });"
+        "eq(checkProfiles([p(), p({ name: 'a' })]), [{}, { name: 'duplicate' }]);"
+        "eq(checkProfiles([p({ name: ' ' })]), [{ name: 'range' }]);"
+        "eq(checkProfiles([p({ trigger_mv: '' })]), [{ trigger_mv: 'required' }]);"
+        "eq(checkProfiles([p({ trigger_mv: '0', stop_mv: '5001', start_mv: '3,5' })]),"
+        " [{ trigger_mv: 'range', stop_mv: 'range', start_mv: 'range' }]);"
+        "eq(checkProfiles([p({ stop_cell_mv: 'abc', when: 'never', max_a: '-1' })]), [{ stop_cell_mv: 'type', when: 'value', max_a: 'range' }]);"
+        "eq(profilePayload(p({ trigger_mv: '6', max_a: '4,5', base: { id: 3, extra: 1, values: { keep: true } } })),"
+        " { id: 3, extra: 1, values: { keep: true, trigger_mv: 6, stop_mv: null, start_mv: null,"
+        " stop_cell_mv: null, when: 'always', max_a: 4.5 }, name: 'A' });"
+        "const base = { 0: { cellId: 'a', parallel: '1', profile: '' }, 1: { cellId: '', parallel: '', profile: '2' } };"
+        "const draft = JSON.parse(JSON.stringify(base)); draft[0].parallel = '2';"
+        " draft[1].cellId = 'b'; draft[1].parallel = '3'; draft[1].profile = '';"
+        "eq(packsPayload(draft, base), { 0: { cell: { id: 'a', parallel: 2 }, balancer_profile: null },"
+        " 1: { cell: { id: 'b', parallel: 3 }, balancer_profile: null } });"
+        "eq(packsPayload(base, base), {});"                                                          # unchanged packs are not sent
+        "const clear = JSON.parse(JSON.stringify(base)); clear[0].cellId = '';"
+        " eq(packsPayload(clear, base), { 0: { cell: null, balancer_profile: null } });"
+        "eq(['1', '0', '1,5', '10000', '10001', ''].map(parseParallel), [1, null, null, 10000, null, null]);"
+        "console.log('ok');"
+    )
+    run_node(script)
 
 
 def test_sets_member_moves_stay_inside_the_list():

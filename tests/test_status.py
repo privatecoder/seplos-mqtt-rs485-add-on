@@ -21,7 +21,7 @@ from seplos_mqtt.web.server import WebApp, WebSettings
 PACK_KEYS = {
     "address", "availability", "last_success_age_s", "device_name", "firmware_version", "firmware_patch", "cell_count",
     "bms_serial", "maint", "maint_version", "state_of_charge", "total_pack_voltage", "current", "highest_cell_voltage", "lowest_cell_voltage",
-    "cells", "balancer",
+    "rated_capacity", "cells", "balancer",
 }
 SYSTEM_KEYS = {"system_soc", "system_voltage", "system_current", "system_power", "total_capacity", "total_full_energy", "system_state"}
 

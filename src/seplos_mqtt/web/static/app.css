@@ -147,6 +147,22 @@ progress { width: min(100%, 22rem); height: 1rem; vertical-align: middle; accent
 .table th, .table td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
 .table th { color: var(--muted); font-weight: 500; }
 
+/* cells and packs */
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.row { padding: .5rem 0; border-bottom: 1px solid var(--line); }
+.row-main { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem; }
+.checks { margin: .25rem 0 0; padding-left: 1.25rem; }
+details { border-top: 1px solid var(--line); padding-top: .5rem; }
+summary { cursor: pointer; font-weight: 500; }
+/* save buttons and their feedback stay in view while a long list scrolls */
+.savebar { position: sticky; bottom: 0; z-index: 2; background: var(--bg); border-top: 1px solid var(--line); padding: .5rem 0; display: flex; flex-direction: column; gap: .5rem; }
+.savebar .banner { margin: 0; }
+.pack-row { display: flex; flex-direction: column; gap: .25rem; }
+.pack-row p { margin: 0; }
+h4 { margin: 0 0 .5rem; font-size: .95rem; }
+code { font-size: .9em; }
+
 @media (max-width: 30rem) {
   #app { padding: 0 .75rem 4rem; }
   .kv dd { text-align: left; }
