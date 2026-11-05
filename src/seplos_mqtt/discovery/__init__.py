@@ -77,7 +77,7 @@ class Discovery:
             return "{{ value_json.last_publish }}"
         if entity.kind == "parameters":
             return "{{ value_json.get('parameters', {}).get('read_at') }}"
-        if entity.kind == "balancer":
+        if entity.kind in ("balancer", "summary"):
             # "unknown" is no enum option: it becomes HA's unknown state (None renders as the MQTT "None" payload)
             path = f"value_json.{entity.group}.normal.{entity.key}"
             return f"{{{{ none if {path} == 'unknown' else {path} }}}}"

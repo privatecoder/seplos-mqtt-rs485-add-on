@@ -1,5 +1,14 @@
 {
   "master": {
+    "alarm_summary": {
+      "attributes": {
+        "active": [],
+        "count": 0
+      },
+      "normal": {
+        "bms_alarm": "ok"
+      }
+    },
     "clock": {
       "normal": {
         "bms_time": null,
@@ -344,6 +353,15 @@
     }
   },
   "slave": {
+    "alarm_summary": {
+      "attributes": {
+        "active": [],
+        "count": 0
+      },
+      "normal": {
+        "bms_alarm": "ok"
+      }
+    },
     "info": {
       "normal": {
         "can_protocol": "Pylon",

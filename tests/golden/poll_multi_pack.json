@@ -1,5 +1,14 @@
 {
   "0": {
+    "alarm_summary": {
+      "attributes": {
+        "active": [],
+        "count": 0
+      },
+      "normal": {
+        "bms_alarm": "ok"
+      }
+    },
     "info": {
       "normal": {
         "can_protocol": "Pylon",
@@ -154,6 +163,15 @@
     }
   },
   "1": {
+    "alarm_summary": {
+      "attributes": {
+        "active": [],
+        "count": 0
+      },
+      "normal": {
+        "bms_alarm": "ok"
+      }
+    },
     "info": {
       "normal": {
         "can_protocol": "Pylon",

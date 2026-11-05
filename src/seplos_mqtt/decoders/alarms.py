@@ -126,6 +126,86 @@ BIT_FIELDS: list[BitField] = [
 ]
 
 
+# --- aggregate pack alarm (published as ``alarm_summary``) ------------------------------------------------
+# The ONE place that says how severe each decoded 0x44 condition is. Values: a fixed severity, TIERED (a two-bit
+# field: "Alarm" is an alarm, "Protection"/"Lockout" a protection) or None (ordinary operating state or an
+# aggregate of other keys: never contributes). Indexed keys (cell_voltage_alarm_3, balancer_cell_5) use their base key.
+OK, ALARM, PROTECTION, FAULT = "ok", "alarm", "protection", "fault"
+SEVERITIES = (OK, ALARM, PROTECTION, FAULT)           # ascending
+TIERED = "tiered"
+UNKNOWN = "unknown"
+
+SEVERITY: dict[str, str | None] = {
+    # byte alarms (Alarm (low) / Alarm (high) / Alarm (other))
+    "cell_voltage_alarm": ALARM, "cell_temperature_alarm": ALARM, "ambient_temperature_alarm": ALARM,
+    "component_temperature_alarm": ALARM, "dis_charging_current_alarm": ALARM, "pack_voltage_alarm": ALARM,
+    "any_cell_voltage_alarm": None, "any_cell_temperature_alarm": None,          # aggregates of the keys above
+    "system_status": None,
+    # alarm event 1: failures
+    "voltage_sensing_failure": FAULT, "temperature_sensing_failure": FAULT, "current_sensing_failure": FAULT,
+    "power_switch_failure": FAULT, "cell_voltage_difference_fault": FAULT, "charging_switch_failure": FAULT,
+    "discharging_switch_failure": FAULT, "current_limit_switch_failure": FAULT,
+    # alarm events 2, 3, 5 and the soc: bit pairs alarm/protection(/lockout)
+    "cell_overvoltage": TIERED, "cell_voltage_low": TIERED, "pack_overvoltage": TIERED, "pack_voltage_low": TIERED,
+    "charging_temperature_high": TIERED, "charging_temperature_low": TIERED,
+    "discharging_temperature_high": TIERED, "discharging_temperature_low": TIERED,
+    "ambient_temperature_high": TIERED, "ambient_temperature_low": TIERED, "component_temperature_high": TIERED,
+    "charging_overcurrent": TIERED, "discharging_overcurrent": TIERED,
+    "transient_overcurrent": TIERED, "output_short_circuit": TIERED, "soc_low": TIERED,
+    "low_temperature_heating": None,                     # normal operation, not an alarm
+    "severe_fault": FAULT,
+    "charging_high_voltage_protection": PROTECTION, "cell_low_voltage_forbidden_charging": PROTECTION,
+    "intermittent_power_supplement": None, "output_connection_failure": FAULT,
+    # on-off states and balancing: operating state
+    "discharge_switch": None, "charge_switch": None, "current_limit_switch": None, "heating_switch": None,
+    "balancer_cell": None,
+    # charge activation windows: operating state
+    "auto_charging_wait": None, "manual_charging_wait": None,
+    # alarm event 8
+    "eep_storage_failure": FAULT, "rtc_clock_failure": FAULT, "no_calibration_of_voltage": ALARM,
+    "no_calibration_of_current": ALARM, "no_calibration_of_null_point": ALARM, "rtc_time_invalid": ALARM,
+    # MAINT (maint.binary): flash storage fault counts, the manual pack lock is an operating state
+    "storage_problem": FAULT, "pack_lock_active": None, "maintenance_mode": None,
+}
+TIER_BY_STATE = {"Alarm": ALARM, "Protection": PROTECTION, "Lockout": PROTECTION}
+INACTIVE_STATES = frozenset({"OK", "OFF"})
+
+
+def _severity(key: str, state: object) -> str | None:
+    base = key
+    if base not in SEVERITY:
+        head, _, tail = key.rpartition("_")
+        base = head if tail.isdigit() else key
+    rule = SEVERITY.get(base)
+    if rule == TIERED:
+        return TIER_BY_STATE.get(state) if isinstance(state, str) else None
+    return rule
+
+
+def summarize(telesignalization: dict | None, maint_binary: dict | None = None) -> dict:
+    """The aggregate alarm of a pack from its decoded 0x44 groups (and the MAINT binaries): ``normal.bms_alarm`` is
+    ``ok | alarm | protection | fault``, or ``unknown`` without valid alarm data (never ``ok``). The attributes list
+    every contributing condition as ``{key, state}`` sorted by key, with no timestamps or measurements."""
+    groups = telesignalization if isinstance(telesignalization, dict) else {}
+    normal, binary = groups.get("normal"), groups.get("binary")
+    if not isinstance(normal, dict) or not isinstance(binary, dict) or "system_status" not in normal:
+        return {"normal": {"bms_alarm": UNKNOWN}, "attributes": {"active": [], "count": 0}}
+    active: list[dict] = []
+    worst = OK
+    for source in (normal, binary, maint_binary if isinstance(maint_binary, dict) else {}):
+        for key, state in source.items():
+            if state is None or state in INACTIVE_STATES:
+                continue
+            severity = _severity(key, state)
+            if severity is None:
+                continue
+            active.append({"key": key, "state": state})
+            if SEVERITIES.index(severity) > SEVERITIES.index(worst):
+                worst = severity
+    active.sort(key=lambda item: item["key"])
+    return {"normal": {"bms_alarm": worst}, "attributes": {"active": active, "count": len(active)}}
+
+
 def bit_state(byte: int, field: BitField, bit: int | None = None) -> str:
     bit = field.bit if bit is None else bit
     if field.mode in SINGLE_BIT_MODES:

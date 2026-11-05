@@ -131,6 +131,7 @@ def pack_report(state: Any, pack_state: Any, now: float) -> dict[str, Any]:
         },
         "entry": None if cell is None else cell.entry,       # shown even when the checks are blocked
         "series": series,
+        "limits": checks.limits(entry, parallel),            # None without a trusted assignment
         "live": _safe("live", checks.live_checks, entry, parallel, sample, now, blocked=blocked),
         "parameters": _safe("parameter", checks.parameter_checks, entry, parallel, parameters, series, now, blocked=blocked),
         "sample_age_s": None if sample is None else round(max(0.0, now - sample.at), 1),
@@ -142,7 +143,7 @@ def pack_report(state: Any, pack_state: Any, now: float) -> dict[str, Any]:
 def mqtt_group(report: dict[str, Any]) -> dict[str, Any]:
     """The ``cells`` group of the pack's state JSON (HA entities read ``normal``; the rest are attributes)."""
     assignment, entry, live, parameters = report["assignment"], report["entry"], report["live"], report["parameters"]
-    attributes: dict[str, Any] = {}
+    attributes: dict[str, Any] = {"limits": None}            # static datasheet bounds; null = unknown or no assignment
     if assignment is not None:
         shown = entry or {}
         attributes = {
@@ -150,6 +151,7 @@ def mqtt_group(report: dict[str, Any]) -> dict[str, Any]:
             "manufacturer": shown.get("manufacturer"), "model": shown.get("model"), "chemistry": shown.get("chemistry"),
             "nominal_v": checks.entry_number(shown, "voltage", "nominal_v"), "nominal_ah": checks.entry_number(shown, "capacity", "nominal_ah"),
             "parallel": assignment["parallel"], "series": report["series"], "update_available": assignment["update_available"],
+            "limits": report["limits"],
         }
     # MQTT attributes carry key/result/limit/unit/reason without ``value``: a changing measurement must not rewrite
     # the HA state on every poll (the full values are in /api/status)

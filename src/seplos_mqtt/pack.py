@@ -401,6 +401,7 @@ class BatteryPack:
                 if self.parameters:
                     data["parameters"] = parameters.public_view(self.parameters)
 
+            data["alarm_summary"] = alarms.summarize(telesignal_feedback, (data.get("maint") or {}).get("binary"))
             return data, True
         except Exception as e:
             logger.error("Pack%s:Error reading serial data: %s", self.address, e)

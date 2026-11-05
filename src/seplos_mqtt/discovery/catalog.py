@@ -269,7 +269,16 @@ CELLS: list[Entity] = [
 BALANCER_ENTITY = Entity("external_balancer", "External Balancer", C_, kind="balancer", device_class="enum",
                          options=("active", "inactive"), icon="mdi:scale-balance", category=DIAG)
 
-PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *MAINT, *CLOCK, *CELLS]
+# One aggregate alarm state per pack (alarms.summarize, mapping table alarms.SEVERITY), published under "alarm_summary".
+# "unknown" (no valid alarm data) becomes HA's own unknown state, so the enum options are only the four severities.
+ALARM_SUMMARY: list[Entity] = [
+    Entity("bms_alarm", "BMS Alarm", "alarm_summary", kind="summary", device_class="enum", options=alarms.SEVERITIES,
+           icon="mdi:shield-check-outline",
+           attributes="{{ value_json.get('alarm_summary', {}).get('attributes', {}) | tojson }}"),
+]
+
+PACK_ENTITIES: list[Entity] = [*TELEMETRY, HEARTBEAT, *INFO, *STATUS, *TELESIGNALIZATION, *ALARM_SUMMARY, *MAINT, *CLOCK,
+                               *CELLS]
 
 Y = "system"
 # System values from the master via Modbus 0x1000 (CAN port RS485 bus only), topic <topic>/system/sensors

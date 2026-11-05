@@ -28,8 +28,19 @@
   },
   {
     "payload": {
+      "alarm_summary": {
+        "attributes": {
+          "active": [],
+          "count": 0
+        },
+        "normal": {
+          "bms_alarm": "ok"
+        }
+      },
       "cells": {
-        "cell_type": {},
+        "cell_type": {
+          "limits": null
+        },
         "live": {
           "checks": [],
           "reason": "no_assignment"
@@ -211,8 +222,19 @@
   },
   {
     "payload": {
+      "alarm_summary": {
+        "attributes": {
+          "active": [],
+          "count": 0
+        },
+        "normal": {
+          "bms_alarm": "ok"
+        }
+      },
       "cells": {
-        "cell_type": {},
+        "cell_type": {
+          "limits": null
+        },
         "live": {
           "checks": [],
           "reason": "no_assignment"
@@ -403,8 +425,19 @@
   },
   {
     "payload": {
+      "alarm_summary": {
+        "attributes": {
+          "active": [],
+          "count": 0
+        },
+        "normal": {
+          "bms_alarm": "ok"
+        }
+      },
       "cells": {
-        "cell_type": {},
+        "cell_type": {
+          "limits": null
+        },
         "live": {
           "checks": [],
           "reason": "no_assignment"

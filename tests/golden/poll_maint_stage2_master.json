@@ -1,4 +1,13 @@
 {
+  "alarm_summary": {
+    "attributes": {
+      "active": [],
+      "count": 0
+    },
+    "normal": {
+      "bms_alarm": "ok"
+    }
+  },
   "clock": {
     "normal": {
       "bms_time": "2026-11-04T12:00:00",

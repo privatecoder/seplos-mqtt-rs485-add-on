@@ -103,6 +103,30 @@ def decode_telesignal(info: bytes) -> dict:
     return alarms.decode(info)
 
 
+def alarm_summary(telesignalization, maint_binary=None) -> dict:
+    return alarms.summarize(telesignalization, maint_binary)
+
+
+def alarm_rules() -> types.SimpleNamespace:
+    """The severity table and the decoder metadata it must cover."""
+    return types.SimpleNamespace(
+        severity=alarms.SEVERITY, bit_fields=alarms.BIT_FIELDS, byte_alarms=tuple(alarms.BYTE_ALARMS),
+        two_bit_modes=alarms.TWO_BIT_MODES, tiered=alarms.TIERED, severities=alarms.SEVERITIES,
+        ok=alarms.OK, alarm=alarms.ALARM, protection=alarms.PROTECTION, fault=alarms.FAULT)
+
+
+def alarm_entity_config(scope: int = 0) -> dict:
+    """The rendered discovery config of the pack's ``bms_alarm`` entity."""
+    from seplos_mqtt.discovery.catalog import PACK_ENTITIES
+    disc, _client = discovery()
+    return disc.render(next(e for e in PACK_ENTITIES if e.key == "bms_alarm"), scope)
+
+
+def cell_limits(entry, parallel: int) -> dict | None:
+    from seplos_mqtt.cells import checks
+    return checks.limits(entry, parallel)
+
+
 def decode_device_info(info: bytes) -> dict:
     return identity.decode_device_info(info)
 

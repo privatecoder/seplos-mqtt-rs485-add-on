@@ -278,6 +278,29 @@ def permitted_charge_a(entry: Mapping[str, Any], parallel: int, temps: Sequence[
     return cap * parallel if _ge(min(temps), low) and _le(max(temps), high) else 0.0
 
 
+def limits(entry: Mapping[str, Any] | None, parallel: int) -> dict[str, float | None] | None:
+    """The static datasheet bounds of the assigned type for the ``cell_type`` attributes (cell values per cell, the
+    currents for the pack: x parallel); None without a trusted entry. The same fields the checks use."""
+    if entry is None:
+        return None
+
+    def pack(value: float | None) -> float | None:
+        return None if value is None else value * parallel
+
+    charge = charge_range(entry)         # the effective range (derating table), as the live checks use it
+    return {
+        "cell_voltage_min_v": entry_number(entry, "voltage", "discharge_cutoff_v"),
+        "cell_voltage_max_v": entry_number(entry, "voltage", "charge_cutoff_v"),
+        "cell_voltage_nominal_v": entry_number(entry, "voltage", "nominal_v"),
+        "charge_temperature_min_c": None if charge is None else charge[0],
+        "charge_temperature_max_c": None if charge is None else charge[1],
+        "discharge_temperature_min_c": entry_number(entry, "temperature", "discharge_min_c"),
+        "discharge_temperature_max_c": entry_number(entry, "temperature", "discharge_max_c"),
+        "charge_current_max_a": pack(entry_number(entry, "current", "max_continuous_charge_a")),
+        "discharge_current_max_a": pack(entry_number(entry, "current", "max_continuous_discharge_a")),
+    }
+
+
 def permitted_discharge_a(entry: Mapping[str, Any], parallel: int, temps: Sequence[float]) -> float | None:
     """Advisory discharge budget: ``max_continuous_discharge_a`` x parallel inside the discharge temperature
     range, 0 outside, None without a basis."""

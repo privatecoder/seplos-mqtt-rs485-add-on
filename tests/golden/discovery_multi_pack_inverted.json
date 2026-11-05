@@ -3100,6 +3100,41 @@
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/battery_capacity/config"
   },
   {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-0/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_0_bms_alarm",
+      "dev": {
+        "ids": "seplos_bms_pack_0"
+      },
+      "dev_cla": "enum",
+      "ic": "mdi:shield-check-outline",
+      "json_attr_t": "seplos/pack-0/sensors",
+      "json_attr_tpl": "{{ value_json.get('alarm_summary', {}).get('attributes', {}) | tojson }}",
+      "name": "BMS Alarm",
+      "obj_id": "seplos_bms_pack_0_bms_alarm",
+      "ops": [
+        "ok",
+        "alarm",
+        "protection",
+        "fault"
+      ],
+      "stat_t": "seplos/pack-0/sensors",
+      "uniq_id": "seplos_bms_pack_0_bms_alarm",
+      "val_tpl": "{{ none if value_json.alarm_summary.normal.bms_alarm == 'unknown' else value_json.alarm_summary.normal.bms_alarm }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/bms_alarm/config"
+  },
+  {
     "payload": "",
     "qos": 1,
     "retain": true,
@@ -6127,6 +6162,42 @@
     "qos": 1,
     "retain": true,
     "topic": "homeassistant/sensor/seplos-mqtt-pack-1/battery_capacity/config"
+  },
+  {
+    "payload": {
+      "avty": [
+        {
+          "t": "seplos/availability"
+        },
+        {
+          "t": "seplos/pack-1/availability"
+        }
+      ],
+      "avty_mode": "all",
+      "default_entity_id": "sensor.seplos_bms_pack_1_bms_alarm",
+      "dev": {
+        "ids": "seplos_bms_pack_1",
+        "via_device": "seplos_bms_pack_0"
+      },
+      "dev_cla": "enum",
+      "ic": "mdi:shield-check-outline",
+      "json_attr_t": "seplos/pack-1/sensors",
+      "json_attr_tpl": "{{ value_json.get('alarm_summary', {}).get('attributes', {}) | tojson }}",
+      "name": "BMS Alarm",
+      "obj_id": "seplos_bms_pack_1_bms_alarm",
+      "ops": [
+        "ok",
+        "alarm",
+        "protection",
+        "fault"
+      ],
+      "stat_t": "seplos/pack-1/sensors",
+      "uniq_id": "seplos_bms_pack_1_bms_alarm",
+      "val_tpl": "{{ none if value_json.alarm_summary.normal.bms_alarm == 'unknown' else value_json.alarm_summary.normal.bms_alarm }}"
+    },
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-1/bms_alarm/config"
   },
   {
     "payload": "",

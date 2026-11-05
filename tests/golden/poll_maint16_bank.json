@@ -1,5 +1,14 @@
 {
   "master": {
+    "alarm_summary": {
+      "attributes": {
+        "active": [],
+        "count": 0
+      },
+      "normal": {
+        "bms_alarm": "ok"
+      }
+    },
     "clock": {
       "normal": {
         "bms_time": "2026-11-04T21:23:46",
@@ -307,6 +316,15 @@
     }
   },
   "slave": {
+    "alarm_summary": {
+      "attributes": {
+        "active": [],
+        "count": 0
+      },
+      "normal": {
+        "bms_alarm": "ok"
+      }
+    },
     "clock": {
       "normal": {
         "bms_time": "2026-11-04T21:13:47",

@@ -238,7 +238,7 @@ def test_unassigned_pack_publishes_not_evaluated(monkeypatch):
     cells = last_payload(client)["cells"]
     assert cells["normal"] == {"cell_type": None, "datasheet_check_live": "not_evaluated", "datasheet_check_parameters": "not_evaluated",
                                "datasheet_charge_current_limit": None, "datasheet_discharge_current_limit": None}
-    assert cells["cell_type"] == {} and cells["live"] == {"reason": "no_assignment", "checks": []}
+    assert cells["cell_type"] == {"limits": None} and cells["live"] == {"reason": "no_assignment", "checks": []}
     assert cells["parameters"] == {"reason": "no_assignment", "checks": []}
 
 
@@ -252,6 +252,12 @@ def test_assigned_pack_publishes_checks_without_timestamps(monkeypatch):
     assert cells["cell_type"] == {
         "id": LF280K, "entry_version": 2, "manufacturer": "EVE", "model": "LF280K", "chemistry": "LFP", "nominal_v": 3.2,
         "nominal_ah": 280.0, "parallel": 2, "series": 16, "update_available": False,
+        "limits": {
+            "cell_voltage_min_v": 2.5, "cell_voltage_max_v": 3.65, "cell_voltage_nominal_v": 3.2,
+            "charge_temperature_min_c": 0.0, "charge_temperature_max_c": 55.0,
+            "discharge_temperature_min_c": -20.0, "discharge_temperature_max_c": 55.0,
+            "charge_current_max_a": 560.0, "discharge_current_max_a": 560.0,
+        },
     }
     keys = [c["key"] for c in cells["live"]["checks"]]
     assert keys == ["cell_voltage_high", "cell_voltage_low", "charge_temperature", "discharge_temperature", "charge_current", "discharge_current"]

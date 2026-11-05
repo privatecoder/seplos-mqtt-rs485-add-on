@@ -1,4 +1,22 @@
 {
+  "alarm_summary": {
+    "attributes": {
+      "active": [
+        {
+          "key": "cell_voltage_alarm_15",
+          "state": "Alarm (high)"
+        },
+        {
+          "key": "severe_fault",
+          "state": "Fault"
+        }
+      ],
+      "count": 2
+    },
+    "normal": {
+      "bms_alarm": "fault"
+    }
+  },
   "clock": {
     "normal": {
       "bms_time": "2026-11-04T11:59:30",

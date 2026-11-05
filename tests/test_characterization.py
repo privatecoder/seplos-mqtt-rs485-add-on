@@ -211,7 +211,7 @@ def test_single_pack_poll(monkeypatch, golden):
         assert ok and data is not None
         assert data["info"]["normal"]["firmware_patch"] == "16.06.13+"
         assert data["info"]["normal"]["serial_number"] == "SN-BATTERY-0001"
-        assert set(data) == {"telemetry", "telesignalization", "info", "status", "parameters", "clock"}
+        assert set(data) == {"telemetry", "telesignalization", "info", "status", "parameters", "clock", "alarm_summary"}
         assert data["clock"]["normal"] == {"bms_time": "2026-11-04T11:59:30", "clock_offset": -30}   # G09
         golden("poll_single_pack", data)
         # an unchanged second poll returns the same data; the publisher suppresses the publish
@@ -254,7 +254,7 @@ def test_multi_pack_poll(monkeypatch, golden):
         assert results[0]["info"]["normal"]["firmware_patch"] == "16.06.13+"
         assert results[1]["info"]["normal"]["firmware_patch"] == "16.06 (unknown, only derivable for the master)"
         assert "serial_number" not in results[0]["info"]["normal"]
-        assert set(results[0]) == {"telemetry", "telesignalization", "info"}
+        assert set(results[0]) == {"telemetry", "telesignalization", "info", "alarm_summary"}
         assert not any(r.cid2 in (0xA2, 0x47, 0x5A) for r in bms.requests if r.kind == "ascii")
         golden("poll_multi_pack", results)
 
