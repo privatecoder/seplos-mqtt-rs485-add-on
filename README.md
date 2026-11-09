@@ -115,7 +115,8 @@ With a regular patch cable (T568B) plugged into the CAN socket (or a splitter ou
 
 ### Wiring the RS485 device to ONE SINGLE battery pack
 
-Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one connector and crimp the following wires for the RS485 device:
+Connect to RS485-1 or RS485-2 (or, like a bank, to the RS485 pins of the CAN socket: choose the bus in the app's
+**Settings**). When using a regular patch cable (T568B), cut one connector and crimp the following wires for the RS485 device:
 - orange (pin 2) => RS485-A
 - orange-white (pin 1) => RS485-B
 - green-white (pin 3) => GND
@@ -128,7 +129,7 @@ Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one
 2. Configure your RS485 device.
    - Waveshare example: IP Mode Static, Port 4196, Work Mode TCP Server, Transfer Protocol None.
    - Baud rate: 9600 for multiple packs (RS485 bus on the CAN socket), 19200 for a single pack (RS485-1/2).
-     With the option `serial_baudrate: auto` (default) the add-on derives the baud rate from the number of packs. Firmware 16.04.06 (`..._9600.ehex`) uses 9600 baud on RS485-1/2 as well: set `serial_baudrate: "9600"` for a single pack with that firmware.
+     With the baud rate `auto` (default) the add-on derives it from the chosen bus. Firmware 16.04.06 (`..._9600.ehex`) uses 9600 baud on RS485-1/2 as well: set `serial_baudrate: "9600"` for a single pack with that firmware.
 3. Install the add-on.
 4. Open the add-on configuration and set:
    - MQTT topic prefix (default: seplos)
@@ -146,12 +147,34 @@ Connect to RS485-1 or RS485-2. When using a regular patch cable (T568B), cut one
 ### Settings app (sidebar)
 
 The add-on adds a **Seplos BMS** entry to the Home Assistant sidebar (Ingress). The connection settings
-(remote gateway or serial device, baud rate, number of packs, cell voltage range, update interval, MAINT
-firmware) are stored in `/data/monitoring.json`. The corresponding legacy add-on options are only used once,
+(remote gateway or serial device, baud rate, number of packs, bus, bus quiet, cell voltage range, update interval,
+MAINT firmware) are stored in `/data/monitoring.json`. The corresponding legacy add-on options are only used once,
 to create these initial settings on the first start with this version, and are then removed from the add-on
 configuration; change them in the Seplos BMS app. Saving a changed connection restarts the add-on's process in place, so all packs,
 discovery entities and the gateway bridge are rebuilt from the saved settings. The MQTT, discovery and logging
 options stay in the add-on configuration.
+
+**Bus.** Several packs are always read on the RS485 pins of the CAN socket (UART1, 9600 Bd). A single pack can be
+read there as well, or on RS485-1/2 (UART0, 19200 Bd).
+
+**Bus quiet** (200–2000 ms, default 1000 ms) is the wait without bus traffic before each request. The packs
+recognize the end of a frame only after about 100 ms of silence; 200 ms leave a safe margin. Longer values slow
+each poll round, so Home Assistant stores fewer data points.
+
+### OpenBMS Monitor feed
+
+[OpenBMS Monitor](https://github.com/privatecoder/openbms-monitor) can analyse the bank (pair check, balancing,
+history, health report) over MQTT instead of polling the RS485 bus a second time. Switch on **OpenBMS Monitor feed**
+in the app's **Overview**; optionally it switches itself off after 1, 4 or 24 hours. While it is on:
+
+- every pack poll and every system read is also published raw, with its read time, under
+  `<mqtt_topic>/openbms/v1/` (format: [docs/exchange/openbms-feed-v1.md](docs/exchange/openbms-feed-v1.md));
+- the round pause is 0 and the bus quiet 200 ms, so the values update faster (your stored settings stay and apply
+  again when it is off);
+- the packs of a parallel set are read directly one after the other.
+
+The feed is read-only: writing parameters, calibration or firmware updates need a direct OpenBMS Monitor
+connection, with the add-on stopped. The add-on keeps no archive; OpenBMS Monitor records only while it receives.
 
 ### Parallel sets
 
@@ -240,14 +263,16 @@ Example log output:
 
 ## MQTT topics (default prefix: seplos)
 
-- seplos/pack-{n}/sensors: JSON with the groups `telemetry`, `telesignalization`, `info` and (single pack mode only) `status` and `parameters`
+- seplos/pack-{n}/sensors: JSON with the groups `telemetry`, `telesignalization`, `info` and (RS485-1/2 only) `status` and `parameters`
 - seplos/pack-{n}/heartbeat: last_publish (time of the last successful poll, ISO 8601 with UTC offset) and publish_counter (JSON)
 - seplos/pack-{n}/availability: per-pack online/offline
-- seplos/system/sensors: system aggregate of the master over all packs (multiple pack mode only)
-- seplos/system/availability: system online/offline (multiple pack mode only)
+- seplos/system/sensors: system aggregate of the master over all packs (CAN socket bus only)
+- seplos/system/availability: system online/offline (CAN socket bus only)
 - seplos/set-{id}/sensors: values of a parallel set (`normal`) and its membership (`set`)
 - seplos/set-{id}/availability: online while the set is active
 - seplos/availability: global online/offline
+- seplos/openbms/v1/pack/{n}, seplos/openbms/v1/system, seplos/openbms/v1/meta (retained): the OpenBMS Monitor feed,
+  only while it is on (see above)
 
 Home Assistant discovery uses the prefix defined by ha_discovery_prefix (default: homeassistant).
 

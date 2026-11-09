@@ -70,6 +70,10 @@ decisions. Implementation in stages, each reviewed.
 OpenBMS pairs; balancer profiles ↔ OpenBMS device definitions (current revision); per-pack balancer = the profile of
 the pack's unit. The add-on's own backup export additionally carries every referenced cell entry snapshot.
 
+Live data: the **OpenBMS Monitor feed** (`docs/exchange/openbms-feed-v1.md`, `feed.py`). A switch in the Overview
+(`PUT /api/feed`, kept in the state file, adopted at a cycle boundary) publishes every raw pack and system answer with
+its read time; while on, the round pause is 0, the bus quiet 200 ms and parallel sets are read back to back.
+
 ## Stages
 
 1. Ingress foundation: security, store + option migration, socat/connection ownership, setup with read-only test,

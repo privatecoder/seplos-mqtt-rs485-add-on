@@ -31,11 +31,13 @@ Startup chain: `run.sh` (bashio) reads the add-on options and the MQTT service c
 
 **Adding a config option**: connection settings live in `monitoring/model.py` (`ConnectionSettings`), `monitoring/migration.py` (legacy env), `Config.from_monitoring()` and the app UI; they need no `config.yaml` entry. Options that stay in the add-on configuration (MQTT, discovery, logging) mean touching `config.yaml` (`options` + `schema`), `run.sh` (export), `Config.from_env()` and `Config.from_monitoring()` in `src/seplos_mqtt/config.py`, and both `translations/en.yaml` and `translations/de.yaml`.
 
-### Two operating modes, decided by `NUMBER_OF_PACKS`
+### Two buses, decided by `Config.can_bus`
 
-`Config.multi_pack` (`number_of_packs > 1`) is the central switch:
+`Config.can_bus` (`bus == "uart1"` or `number_of_packs > 1`) decides what is read; several packs are always on UART1, a
+single pack on either (connection setting `bus`). `Config.multi_pack` (`number_of_packs > 1`) only matters for
+parallel sets and the "mode" label.
 
-| | Single pack (`== 1`) | Multiple packs (`> 1`) |
+| | RS485-1/2 (`bus: uart0`, one pack) | CAN socket (`bus: uart1`) |
 |---|---|---|
 | Physical port | RS485-1/2 (UART0) | RS485 pins of the CAN socket (UART1) |
 | Baud | 19200 | 9600 |
@@ -47,11 +49,15 @@ The UART1 bus only answers 0x42/0x44/0x4F/0x51/0x60-0x63 plus Modbus. Don't add 
 ### `src/seplos_mqtt/`
 
 - `framing/ascii.py`, `framing/modbus.py`: encode requests, validate answers (no I/O).
-- `transport.py`: `SerialBus`, the single owner of the serial port. Every request (ASCII, Modbus, later MAINT binary frames and commands) runs as one locked transaction and waits for 1 s of continuous quiet (bytes arriving meanwhile are discarded and restart the timer; `BusBusy` if it can't be established), retries included. Never `sleep` between requests elsewhere. A later command path must go through the same owner (the lock is not reentrant; don't wrap public bus methods in it).
+- `transport.py`: `SerialBus`, the single owner of the serial port. Every request (ASCII, Modbus, later MAINT binary frames and commands) runs as one locked transaction and waits for the bus quiet (connection setting `bus_quiet_ms`, 200–2000 ms, default 1000; 200 ms while the OpenBMS Monitor feed is on) of continuous silence (bytes arriving meanwhile are discarded and restart the timer; `BusBusy` if it can't be established), retries included. Never `sleep` between requests elsewhere. A later command path must go through the same owner (the lock is not reentrant; don't wrap public bus methods in it).
 - `decoders/*`: pure functions, binary INFO bytes in, JSON-ready dicts out (`telemetry` 0x42, `alarms` 0x44 incl. the `BIT_FIELDS` table, `intrapack` 0x5A, `identity` 0x51/0xA2, `parameters` 0x47, `system` Modbus 0x1000).
 - `pack.py`: `BatteryPack` (one per DIP address 0..n-1) schedules the requests of one poll and caches static data. `read()` returns `(data_or_None_if_failed, poll_success)`; change suppression happens in the publisher. Device info is fetched once; the firmware reports only major.minor, so the **patch level is derived by probing features** (`_derive_patch_pack_bus` / `_derive_patch_can_port`). On the CAN port bus only the master can be classified.
-- **A pause between consecutive BMS requests is mandatory**; `SerialBus` enforces it (`QUIET_GAP_SECONDS`). Without it the responses get corrupted.
+- **A pause between consecutive BMS requests is mandatory**; `SerialBus` enforces it (`gap`, `set_gap`). Without it the responses get corrupted; the packs end a frame after about 100 ms of silence, so 200 ms is the floor.
 - `energy.py` keeps the 0x42 energy counters continuous across the 6500 kWh fallback, persisted via `state.py` (`/data/seplos_state.json`).
+- `feed.py`: the OpenBMS Monitor feed (`docs/exchange/openbms-feed-v1.md`): raw answers with read times
+  (`BatteryPack.raw`/`raw_ids`/`raw47`, `SystemReader.raw`), the retained meta and the round order that keeps a
+  parallel set's packs back to back. `BatteryPack.read()` = `read_core()` (0x42/0x44) + `read_extras()`; a failed
+  0x44 keeps the 0x42 (no complete success, status unknown). While the feed is on: round pause 0, bus quiet 200 ms.
 - `app.py`: composition and main loop. Polls the packs round-robin, publishes data/heartbeat/availability, after each full cycle the system data, then sleeps `MQTT_UPDATE_INTERVAL`. SIGTERM raises `SystemExit`; cleanup runs once in `main()`'s `finally`. `health.py` serves `/health` on :8080 for the Supervisor watchdog.
 - `mqtt_client.py`: `MqttConnection` supports the Paho 1.x and 2.x callback APIs (callbacks only set flags; a reconnect or the HA birth message `<prefix>/status` = `online` requests a resync in the main loop). `Publisher.state()` suppresses a payload only if the same payload was already accepted by the client, and `replay()` resends all latest states (5 s after discovery changes, then every 10 min). Availability changes count as sent only after the client accepted them.
 - `maint.py` (option `maint_firmware`): supported are MAINT 1.5.4 / 1.6.4 (MNT05) and newer. The MNT03/MNT04 decoding and the inverse BitGroup0 polarity (images without flag 0x08) are deprecated test support for older builds and are to be removed in an upcoming version.
