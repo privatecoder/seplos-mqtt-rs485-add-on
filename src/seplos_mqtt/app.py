@@ -598,6 +598,10 @@ def load_feed(store: StateStore | None) -> tuple[bool, int | None]:
     return value.get("on") is True, auto_off if isinstance(auto_off, int) else None
 
 
+def feed_was_used(store: StateStore | None) -> bool:
+    return store is not None and isinstance(store.get(FEED_STATE_KEY), dict)
+
+
 def persist_identity(state: AppState, new: Any) -> str:
     """Write ``bms_serial``/``serial_mismatch`` of one pack into the monitoring document. Returns "ok",
     "retry" (the write failed) or "superseded" (a save changed the pack's assignment or confirmed another
@@ -926,6 +930,9 @@ def main(config: Config | None = None) -> None:
         reconcile_balancers(state)     # balancers unassigned while the add-on was stopped
 
         state.feed.on, state.feed.auto_off = load_feed(state.store)
+        # a feed that was ever switched: its retained meta may still say "on" (switched off while the broker was gone,
+        # or an automatic switch-off that came due while stopped), so the meta goes out once, also when off
+        state.feed_meta_on = feed_was_used(state.store)
         state.adopt_feed()                 # an automatic switch-off that came due while stopped
         if state.bus is not None:
             state.bus.set_gap(state.bus_gap)

@@ -34,6 +34,7 @@ _FIELDS = {
     "BUS": "bus",
     "BUS_QUIET_MS": "bus_quiet_ms",
     "MQTT_UPDATE_INTERVAL": "mqtt_update_interval",
+    "STATE_FILE": "state_file",
 }
 
 
@@ -282,6 +283,7 @@ def run_main(
     feed_after_polls: list[tuple[int, tuple]] | None = None,
     update_interval: int = 0,
     maint_firmware: bool = False,
+    state_file: str = "",
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -375,7 +377,7 @@ def run_main(
 
     monkeypatch.setattr(app, "AppState", SpyState)
     with mode(number_of_packs, ENABLE_HA_DISCOVERY_CONFIG=discovery, MQTT_TOPIC=topic, HA_DISCOVERY_PREFIX=prefix,
-              MQTT_UPDATE_INTERVAL=update_interval, MAINT_FIRMWARE=maint_firmware):
+              MQTT_UPDATE_INTERVAL=update_interval, MAINT_FIRMWARE=maint_firmware, STATE_FILE=state_file):
         LAST_RUN["exit"] = None
         try:
             app.main(None if startup else config())

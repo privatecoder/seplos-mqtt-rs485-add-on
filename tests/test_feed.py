@@ -417,3 +417,23 @@ def test_put_feed_validates(tmp_path):
 
     run_with(app_, scenario)
     assert switched == [(True, 4), (False, None)]
+
+
+def test_a_stored_off_republishes_meta_off_after_a_restart(monkeypatch, tmp_path):
+    import json
+    state_file = tmp_path / "state.json"
+    # switched off while the broker was unreachable: the retained meta may still say on
+    state_file.write_text(json.dumps({"openbms_feed": {"on": False, "auto_off": None}}))
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=2, state_file=str(state_file))
+    metas = _feed_msgs(client, "meta")
+    assert metas and metas[0].payload["on"] is False and metas[0].retain
+
+
+def test_an_auto_off_due_while_stopped_republishes_meta_off(monkeypatch, tmp_path):
+    import json
+    state_file = tmp_path / "state.json"
+    state_file.write_text(json.dumps({"openbms_feed": {"on": True, "auto_off": 1}}))
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=2, state_file=str(state_file))
+    metas = _feed_msgs(client, "meta")
+    assert metas and metas[-1].payload["on"] is False
+    assert not _feed_msgs(client, "pack/")
