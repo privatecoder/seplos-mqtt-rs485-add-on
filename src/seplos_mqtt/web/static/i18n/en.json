@@ -184,7 +184,7 @@
   "sets.val.members": "Members reporting",
   "sets.val.age": "Sample age",
 
-  "guard.text": "There are unsaved changes in the settings.",
+  "guard.text": "There are unsaved changes on this page.",
   "guard.stay": "Stay and keep editing",
   "guard.discard": "Discard and leave",
   "restart.waiting": "Applying the new connection: the add-on is restarting. This can take a moment …",
@@ -509,6 +509,7 @@
   "feed.auto_off.1": "after 1 hour",
   "feed.auto_off.4": "after 4 hours",
   "feed.auto_off.24": "after 24 hours",
+  "feed.auto_off.until": "running until {time}",
   "feed.hint_on": "Feed active. The round pause is 0 for now; the bus quiet is 200 ms. Your stored settings are kept. Current round: {s} s. The add-on keeps no archive.",
   "feed.hint_until": "Automatic switch-off at {time}.",
   "feed.hint_off": "When on, the add-on also publishes every answer with its read time, so OpenBMS Monitor can analyse the bank over MQTT without polling it a second time. Polling gets faster while it is on (round pause 0, bus quiet 200 ms).",

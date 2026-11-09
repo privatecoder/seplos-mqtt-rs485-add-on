@@ -1370,3 +1370,15 @@ def test_settings_loaded_unchanged_has_no_changes_and_saves_bus_and_quiet():
         "  nominal_cell_voltage: 3.2, update_interval: 1 });"
         "eq([p.bus, p.bus_quiet_ms, p.future], ['uart1', 300, 1]);"
     ))
+
+
+def test_feed_auto_off_choice_applies_at_once_while_on():
+    _node_check("feed.js", (
+        "eq(m.autoOffValue({ on: true, until_ms: 5 }, ''), 'keep');"
+        "eq(m.autoOffValue({ on: true, until_ms: null }, '4'), '');"
+        "eq(m.autoOffValue({ on: false }, '4'), '4');"
+        "eq(m.autoOffRequest({ on: true, until_ms: null }, '1'), { on: true, auto_off_hours: 1 });"
+        "eq(m.autoOffRequest({ on: true, until_ms: 5 }, ''), { on: true, auto_off_hours: null });"
+        "eq(m.autoOffRequest({ on: true, until_ms: 5 }, 'keep'), null);"
+        "eq(m.autoOffRequest({ on: false }, '1'), null);"
+    ))

@@ -184,7 +184,7 @@
   "sets.val.members": "Packs melden sich",
   "sets.val.age": "Alter der Werte",
 
-  "guard.text": "In den Einstellungen gibt es ungespeicherte Änderungen.",
+  "guard.text": "Auf dieser Seite gibt es ungespeicherte Änderungen.",
   "guard.stay": "Bleiben und weiter bearbeiten",
   "guard.discard": "Verwerfen und verlassen",
   "restart.waiting": "Neue Verbindung wird übernommen: Das Add-on startet neu. Das kann einen Moment dauern …",
@@ -509,6 +509,7 @@
   "feed.auto_off.1": "nach 1 Stunde",
   "feed.auto_off.4": "nach 4 Stunden",
   "feed.auto_off.24": "nach 24 Stunden",
+  "feed.auto_off.until": "läuft bis {time}",
   "feed.hint_on": "Datenstrom aktiv. Die Rundenpause ist vorübergehend 0, die Busruhe 200 ms. Deine gespeicherten Einstellungen bleiben erhalten. Aktuelle Runde: {s} s. Das Add-on legt kein Archiv an.",
   "feed.hint_until": "Automatisch aus um {time}.",
   "feed.hint_off": "Eingeschaltet veröffentlicht das Add-on zusätzlich jede Antwort mit ihrem Lesezeitpunkt, damit OpenBMS Monitor die Bank über MQTT auswerten kann, ohne sie ein zweites Mal abzufragen. Solange er an ist, wird schneller abgefragt (Rundenpause 0, Busruhe 200 ms).",

@@ -9,13 +9,28 @@ import { h, chip } from './ui.js';
 const POLL_MS = 5000;
 const AUTO_OFF_HOURS = ['', '1', '4', '24'];
 
+// The auto-off choice as shown: while on, the running deadline ("keep") or "never"; while off, the choice for switching on.
+export function autoOffValue(feed, chosen) {
+  if (feed && feed.on) return feed.until_ms ? 'keep' : '';
+  return chosen;
+}
+
+// What a new auto-off choice does: while on it applies at once (a new deadline from now), while off it is kept for the
+// next switch-on. Returns the PUT body, or null when nothing is sent.
+export function autoOffRequest(feed, value) {
+  if (!feed || !feed.on || value === 'keep') return null;
+  return { on: true, auto_off_hours: value === '' ? null : Number(value) };
+}
+
 export function feedSection(ctx) {
   const readOnly = !ctx.session.user;
-  const state = { feed: null, round: null, hours: '', busy: false, error: null, loaded: false };
+  // loadError: the last status read failed (cleared by the next good one); switchError: the last switch failed
+  const state = { feed: null, round: null, hours: '', busy: false, loadError: null, switchError: null, loaded: false };
   const el = h('section', { class: 'card feed-card', 'aria-labelledby': 'feed-title' });
   let timer = null;
   let destroyed = false;
   let generation = 0;
+  let inflight = false;    // one status read at a time: a slow answer is taken, never overtaken by the next poll
 
   function render() {
     const feed = state.feed;
@@ -23,17 +38,22 @@ export function feedSection(ctx) {
     const pending = Boolean(feed && feed.pending);
     const toggle = h('input', { id: 'feed-on', type: 'checkbox' });
     toggle.checked = on;
+    const until = on && feed.until_ms ? new Date(feed.until_ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
     const hours = h('select', { id: 'feed-auto-off' },
+      until ? h('option', { value: 'keep' }, t('feed.auto_off.until', { time: until })) : null,
       AUTO_OFF_HOURS.map((value) => h('option', { value }, t(`feed.auto_off.${value || 'none'}`))));
-    hours.value = state.hours;
-    hours.addEventListener('change', () => { state.hours = hours.value; });
+    hours.value = autoOffValue(feed, state.hours);
+    hours.addEventListener('change', () => {
+      const body = autoOffRequest(feed, hours.value);
+      if (body) send(body);
+      else if (hours.value !== 'keep') state.hours = hours.value;
+    });
     toggle.disabled = readOnly || !state.loaded || state.busy || pending;
     hours.disabled = toggle.disabled;
-    toggle.addEventListener('change', () => switchFeed(toggle.checked, state.hours === '' ? null : Number(state.hours)));
+    toggle.addEventListener('change', () => send({ on: toggle.checked, auto_off_hours: toggle.checked && state.hours !== '' ? Number(state.hours) : null }));
     let hint = t('feed.hint_off');
     if (pending) hint = t('feed.pending');
     else if (on) {
-      const until = feed.until_ms ? new Date(feed.until_ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
       hint = t('feed.hint_on', { s: state.round === null || state.round === undefined ? '–' : fmt(state.round, '', 1).trim() })
         + (until ? ` ${t('feed.hint_until', { time: until })}` : '');
     }
@@ -44,41 +64,48 @@ export function feedSection(ctx) {
       h('div', { class: 'field check' }, h('div', { class: 'check-row' }, toggle, h('label', { for: 'feed-on' }, t('feed.switch')))),
       h('div', { class: 'field' }, h('label', { for: 'feed-auto-off' }, t('feed.auto_off')), hours),
       h('p', { class: 'help', role: 'status' }, hint),
-      state.error ? h('p', { class: 'field-error' }, state.error) : null,
+      state.switchError ? h('p', { class: 'field-error' }, state.switchError) : null,
+      state.loadError ? h('p', { class: 'field-error' }, state.loadError) : null,
     ].filter((child) => child !== null);
     el.replaceChildren(...children);
   }
 
   async function refresh() {
-    if (destroyed || document.visibilityState !== 'visible') return;
-    const mine = ++generation;
+    if (destroyed || inflight || document.visibilityState !== 'visible') return;
+    inflight = true;
+    const mine = generation;
     try {
       const data = await api('GET', 'api/status');
-      if (destroyed || mine !== generation) return;          // a late answer changes nothing
+      if (destroyed || mine !== generation) return;          // an answer from before a switch changes nothing
       const status = data.status || {};
       state.feed = status.feed || null;
       state.round = status.last_cycle_s;
       state.loaded = state.feed !== null;
+      state.loadError = null;
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
       if (destroyed || mine !== generation) return;
-      // the state stays unknown, never shown as "off"
-      state.error = error.status === 0 ? t('conn.lost') : errorText(error);
+      // the state stays as last read (unknown before the first read), never shown as "off"
+      state.loadError = error.status === 0 ? t('conn.lost') : errorText(error);
+    } finally {
+      inflight = false;
     }
     render();
   }
 
-  async function switchFeed(on, hours) {
+  async function send(body) {
     state.busy = true;
-    state.error = null;
+    state.switchError = null;
+    generation += 1;          // a status read still under way describes the state before this switch
     render();
     try {
-      await api('PUT', 'api/feed', { on, auto_off_hours: hours });
+      await api('PUT', 'api/feed', body);
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
-      state.error = errorText(error);
+      state.switchError = errorText(error);
     }
     state.busy = false;
+    inflight = false;
     await refresh();
   }
 
