@@ -167,3 +167,14 @@ code { font-size: .9em; }
   #app { padding: 0 .75rem 4rem; }
   .kv dd { text-align: left; }
 }
+
+/* the leave guard's list of unsaved changes */
+.guard-changes {
+  margin: 0.25rem 0 0.75rem 1.25rem;
+  padding: 0;
+}
+
+/* the OpenBMS Monitor feed card: spaced like the settings fieldsets */
+.feed-card { display: flex; flex-direction: column; gap: .75rem; }
+.feed-card .card-head { margin-bottom: 0; }
+.feed-card .help { margin: 0; }

@@ -4,6 +4,7 @@ import { api, ApiError } from './api.js';
 import { t, errorText, currentLanguage, parseNumber } from './i18n.js';
 import { h, uid, busy } from './ui.js';
 import { storeBanner } from './overview.js';
+import { feedSection } from './feed.js';
 
 // keys the form knows; everything else in the loaded document is sent back untouched
 const KNOWN = new Set([
@@ -50,7 +51,7 @@ export function expandExponent(text) {
   return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
 }
 
-function toRaw(conn) {
+export function toRaw(conn) {
   const volt = exactText;
   return {
     transport: conn.transport === 'serial' ? 'serial' : 'tcp',
@@ -67,6 +68,59 @@ function toRaw(conn) {
     bus: conn.bus === 'uart1' || (conn.pack_count ?? 1) > 1 ? 'uart1' : 'uart0',
     bus_quiet_ms: String(conn.bus_quiet_ms ?? 1000),
   };
+}
+
+const NUMERIC = new Set(['port', 'pack_count', 'bus_quiet_ms', 'update_interval', 'min_cell_voltage', 'max_cell_voltage',
+  'nominal_cell_voltage']);
+
+// One field as it would be saved: a number however it is written ("3,2" = "3.2", " 1000 " = "1000"), the bus as it
+// applies (several packs: always the CAN socket); an invalid entry stays as typed, so it still counts as a change.
+function normalised(raw, name) {
+  const value = raw[name];
+  if (name === 'maint_firmware') return Boolean(value);
+  const text = String(value ?? '').trim();
+  if (name === 'bus') return Number(String(raw.pack_count ?? '').trim()) > 1 ? 'uart1' : text;
+  if (NUMERIC.has(name)) {
+    const number = parseNumber(text);
+    return Number.isNaN(number) ? text : String(number);
+  }
+  return text;
+}
+
+// The fields of the draft that differ from the loaded document, field by field (never by key order), with the old
+// and new value: [{ name, from, to }]. Only the fields of the chosen transport count.
+export function changes(baseline, raw) {
+  const out = [];
+  for (const spec of FIELDS) {
+    const name = spec.name;
+    if (spec.group && spec.group !== raw.transport && spec.group !== baseline.transport) continue;
+    const from = normalised(baseline, name);
+    const to = normalised(raw, name);
+    if (from !== to) out.push({ name, from: String(from), to: String(to) });
+  }
+  return out;
+}
+
+// One change as a line of the leave guard: "Busruhe: 1000 → 200 ms".
+export function describeChange(c, translate = t) {
+  const spec = FIELDS.find((f) => f.name === c.name) || {};
+  const value = (v) => {
+    if (spec.kind === 'checkbox') return translate(v === 'true' ? 'guard.on' : 'guard.off');
+    if (spec.kind === 'select') return translate(`settings.opt.${c.name}.${v}`);
+    return v === '' ? '–' : v;
+  };
+  const unit = spec.unit ? ` ${spec.unit}` : '';
+  return `${translate(`settings.f.${c.name}.label`)}: ${value(c.from)} → ${value(c.to)}${unit}`;
+}
+
+// The settings document to save: unknown keys of the loaded one travel back unchanged, known ones come from the form.
+export function payload(loaded, values) {
+  const out = {};
+  for (const [key, value] of Object.entries(loaded || {})) if (!KNOWN.has(key)) out[key] = value;
+  const names = ['transport', 'baud', 'pack_count', 'bus', 'bus_quiet_ms', 'maint_firmware', 'min_cell_voltage', 'max_cell_voltage',
+    'nominal_cell_voltage', 'update_interval', ...(values.transport === 'tcp' ? ['host', 'port'] : ['device'])];
+  for (const name of names) out[name] = values[name];
+  return out;
 }
 
 // Client-side checks mirror the server model (which stays authoritative). Returns { errors, values }.
@@ -121,7 +175,7 @@ export function settingsView(ctx) {
   const errorEls = {};
   let loaded = null;       // the connection object as loaded (unknown keys travel back unchanged)
   let revision = null;
-  let initial = null;      // JSON of the raw values when loaded
+  let baseline = null;     // the raw values as loaded (or as last saved): what counts as unchanged
   // Request state: a load or a save in flight freezes the controls; every load and every save
   // bumps the generation, so a load that finishes after a newer request began is ignored entirely.
   let generation = 0;
@@ -172,17 +226,21 @@ export function settingsView(ctx) {
       fieldEls.min_cell_voltage, fieldEls.max_cell_voltage, fieldEls.nominal_cell_voltage),
     h('div', { class: 'actions' }, saveButton, resetButton));
 
+  const feed = feedSection(ctx);
   const el = h('section', { 'aria-labelledby': 'view-title' },
     h('h2', { id: 'view-title', tabindex: '-1' }, t('tab.settings')),
     storeBanner(session),
     readOnly ? h('div', { class: 'banner info', role: 'status' }, t('readonly.hint')) : null,
     notice,
+    // one stack: the same gap between the form's buttons, the hardware card and the feed card
+    h('div', { class: 'stack' },
     form,
     h('section', { class: 'card', 'aria-labelledby': 'hw-title' },
       h('h3', { id: 'hw-title' }, t('settings.hw.title')),
       h('dl', { class: 'kvs' }, ['generation', 'platform', 'variant', 'hardware'].map((key) =>
         h('div', { class: 'kv' }, h('dt', {}, t(`settings.hw.${key}`)), h('dd', {}, t(`settings.hw.${key}.value`))))),
-      h('p', { class: 'help' }, t('settings.hw.note'))));
+      h('p', { class: 'help' }, t('settings.hw.note'))),
+    feed.el));
 
   function readRaw() {
     const raw = {};
@@ -193,6 +251,7 @@ export function settingsView(ctx) {
   }
 
   function writeRaw(raw) {
+    singleBus = null;
     for (const spec of FIELDS) {
       if (spec.kind === 'checkbox') inputs[spec.name].checked = raw[spec.name];
       else inputs[spec.name].value = raw[spec.name];
@@ -207,10 +266,19 @@ export function settingsView(ctx) {
   }
 
   // the bus choice exists only for a single pack
+  // the bus choice exists only for a single pack: several force the CAN socket, and going back to one pack restores
+  // the choice made for it
+  let singleBus = null;
   function applyBus() {
     const several = Number(inputs.pack_count.value) > 1;
+    if (several && singleBus === null) singleBus = inputs.bus.value;
+    if (!several && singleBus !== null) { inputs.bus.value = singleBus; singleBus = null; }
     if (several) inputs.bus.value = 'uart1';
     inputs.bus.disabled = several || controlsDisabled();
+  }
+
+  function pending() {
+    return loaded !== null && baseline !== null && !lockedReason() ? changes(baseline, readRaw()) : [];
   }
 
   function setDisabled(disabled) {
@@ -290,19 +358,9 @@ export function settingsView(ctx) {
       ctx.pendingPackCount = null;
       showNotice(t('settings.prefilled', { n: raw.pack_count }), 'info');
     }
-    initial = JSON.stringify(toRaw(loaded));
+    baseline = toRaw(loaded);
     writeRaw(raw);
     setDisabled(controlsDisabled());
-  }
-
-  function payload(values) {
-    // unknown keys of the loaded document travel back; known ones come from the form
-    const out = {};
-    for (const [key, value] of Object.entries(loaded || {})) if (!KNOWN.has(key)) out[key] = value;
-    const names = ['transport', 'baud', 'pack_count', 'maint_firmware', 'min_cell_voltage', 'max_cell_voltage',
-      'nominal_cell_voltage', 'update_interval', ...(values.transport === 'tcp' ? ['host', 'port'] : ['device'])];
-    for (const name of names) out[name] = values[name];
-    return out;
   }
 
   function reloadHint() {
@@ -329,8 +387,8 @@ export function settingsView(ctx) {
     setDisabled(true);
     busy(saveButton, true);
     try {
-      const result = await api('PUT', 'api/connection', { connection: payload(values) }, { revision });
-      initial = JSON.stringify(submitted);     // only the submitted draft is clean now
+      const result = await api('PUT', 'api/connection', { connection: payload(loaded, values) }, { revision });
+      baseline = submitted;     // only the submitted draft is clean now
       showNotice(t('settings.saved'), 'ok');
       ctx.awaitRestart(result.revision);
     } catch (error) {
@@ -361,8 +419,10 @@ export function settingsView(ctx) {
 
   return {
     el,
-    dirty: () => loaded !== null && !lockedReason() && JSON.stringify(readRaw()) !== initial,
-    discardDraft() { initial = JSON.stringify(readRaw()); },
-    destroy() {},
+    dirty: () => pending().length > 0,
+    // the lines the leave guard names
+    changes: () => pending().map((c) => describeChange(c)),
+    discardDraft() { baseline = readRaw(); },
+    destroy() { feed.destroy(); },
   };
 }

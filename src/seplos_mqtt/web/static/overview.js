@@ -50,12 +50,14 @@ function snapshotAge(status) {
 
 function headerLine(status) {
   const bridge = ['alive', 'dead', 'none'].includes(status.bridge) ? status.bridge : 'none';
-  return h('ul', { class: 'facts' },
+  return h('ul', { class: 'facts' }, ...[
     fact(t('overview.mode'), t(`mode.${status.mode === 'multi' ? 'multi' : 'single'}`)),
     fact(t('overview.mqtt'), chip(t(status.mqtt_connected ? 'mqtt.connected' : 'mqtt.disconnected'), status.mqtt_connected ? 'avail-online' : 'avail-offline')),
     fact(t('overview.bridge'), chip(t(`bridge.${bridge}`), bridge === 'alive' ? 'avail-online' : bridge === 'dead' ? 'avail-offline' : '')),
     fact(t('overview.last_cycle'), fmtDuration(status.last_cycle_s)),
-    fact(t('overview.snapshot_age'), fmtDuration(snapshotAge(status))));
+    // the OpenBMS Monitor feed only while it is on, a link to its switch at the bottom of the settings
+    status.feed && status.feed.on ? fact(t('overview.feed'), h('a', { href: '#/settings' }, chip(t('feed.state.on'), 'avail-online'))) : null,
+    fact(t('overview.snapshot_age'), fmtDuration(snapshotAge(status)))].filter((child) => child !== null));
 }
 
 // Setup mode: the add-on could not open its BMS connection and waits for a saved one.
@@ -163,38 +165,6 @@ function cellRows(pack) {
   return rows;
 }
 
-// OpenBMS Monitor feed: the switch, the optional automatic switch-off and what it changes while on.
-const AUTO_OFF_HOURS = ['', '1', '4', '24'];
-
-function feedCard(feed, lastCycle, ctx, state, onSwitch) {
-  const readOnly = !ctx.session.user;
-  const on = Boolean(feed && feed.on);
-  const toggle = h('input', { id: 'feed-on', type: 'checkbox' });
-  toggle.checked = on;
-  const hours = h('select', { id: 'feed-auto-off' },
-    AUTO_OFF_HOURS.map((value) => h('option', { value }, t(`feed.auto_off.${value || 'none'}`))));
-  hours.value = state.hours;
-  hours.addEventListener('change', () => { state.hours = hours.value; });
-  toggle.disabled = readOnly || state.busy || Boolean(feed && feed.pending);
-  hours.disabled = toggle.disabled;
-  toggle.addEventListener('change', () => onSwitch(toggle.checked, state.hours === '' ? null : Number(state.hours)));
-  let hint;
-  if (on) {
-    const until = feed.until_ms ? new Date(feed.until_ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-    hint = t('feed.hint_on', { s: lastCycle === null || lastCycle === undefined ? '–' : fmt(lastCycle, '', 1).trim() })
-      + (until ? ` ${t('feed.hint_until', { time: until })}` : '');
-  } else {
-    hint = t('feed.hint_off');
-  }
-  return h('article', { class: 'card', 'aria-labelledby': 'feed-title' },
-    h('div', { class: 'card-head' }, h('h3', { id: 'feed-title' }, t('feed.title')),
-      chip(t(on ? 'feed.state.on' : 'feed.state.off'), on ? 'avail-online' : 'avail-unknown')),
-    h('div', { class: 'field check' }, h('div', { class: 'check-row' }, toggle, h('label', { for: 'feed-on' }, t('feed.switch')))),
-    h('div', { class: 'field' }, h('label', { for: 'feed-auto-off' }, t('feed.auto_off')), hours),
-    h('p', { class: 'help', role: 'status' }, hint),
-    state.error ? h('p', { class: 'field-error' }, state.error) : null);
-}
-
 export function overviewView(ctx) {
   const banner = h('div', { class: 'banner error', role: 'alert', hidden: true });
   const body = h('div', { class: 'stack' });
@@ -204,7 +174,6 @@ export function overviewView(ctx) {
     banner,
     body);
   let timer = null;
-  const feedState = { hours: '', busy: false, error: null };
   let status = null;
   let loaded = false;
   let destroyed = false;
@@ -225,26 +194,11 @@ export function overviewView(ctx) {
     const children = [
       typeof status.connection_error === 'string' ? connectionBanner(status.connection_error) : null,
       headerLine(status),
-      feedCard(status.feed, status.last_cycle_s, ctx, feedState, switchFeed),
       multi || status.system ? systemCard(status.system) : null,
       sets.length > 0 ? h('div', { class: 'grid' }, sets.map((set) => setCard(set, age))) : null,
       h('div', { class: 'grid' }, status.packs.map((pack) => packCard(pack, multi, age))),
     ].filter((child) => child !== null);
     body.replaceChildren(...children);
-  }
-
-  async function switchFeed(on, hours) {
-    feedState.busy = true;
-    feedState.error = null;
-    render();
-    try {
-      await api('PUT', 'api/feed', { on, auto_off_hours: hours });
-    } catch (error) {
-      if (!(error instanceof ApiError)) throw error;
-      feedState.error = errorText(error);
-    }
-    feedState.busy = false;
-    await refresh();
   }
 
   async function refresh() {

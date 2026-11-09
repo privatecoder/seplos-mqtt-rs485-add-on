@@ -60,8 +60,11 @@ function onHashChange() {
   if (target === currentTab) return;
   if (current && current.dirty && current.dirty()) {
     history.replaceState(null, '', `#/${currentTab}`);
-    guard.replaceChildren(
+    const lines = current.changes ? current.changes() : [];
+    // replaceChildren turns null into the text "null": only real nodes go in
+    guard.replaceChildren(...[
       h('p', {}, t('guard.text')),
+      lines.length ? h('ul', { class: 'guard-changes' }, lines.map((line) => h('li', {}, line))) : null,
       h('div', { class: 'actions' },
         h('button', { class: 'btn', type: 'button', onClick: hideGuard }, t('guard.stay')),
         h('button', {
@@ -72,7 +75,7 @@ function onHashChange() {
             hideGuard();
             ctx.navigate(target);
           },
-        }, t('guard.discard'))));
+        }, t('guard.discard')))].filter((child) => child !== null));
     guard.hidden = false;
     guard.querySelector('button').focus();
     return;

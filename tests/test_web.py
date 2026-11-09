@@ -706,7 +706,7 @@ def test_settings_loads_and_saves_are_serialised_by_generation():
     for needle in ("let generation", "let loading", "let saving", "mine !== generation", "generation += 1", "controlsDisabled()"):
         assert needle in text, needle
     # a stale load answer returns before it touches the draft, baseline, revision or disabled state
-    load = text[text.index("async function load()"):text.index("function payload(")]
+    load = text[text.index("async function load()"):text.index("function reloadHint(")]
     assert load.index("mine !== generation") < load.index("loaded = data.connection")
     assert load.index("mine !== generation") < load.index("writeRaw(raw)")
 
@@ -1336,3 +1336,37 @@ def test_stop_does_not_wait_for_partial_request(tmp_path):
         sock.close()
     assert not thread._thread.is_alive()
     assert not asyncio.all_tasks(thread._loop)
+
+
+def _node_check(module: str, body: str) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = (
+        f"import * as m from {(STATIC_DIR / module).as_uri()!r};"
+        "const eq = (a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) {"
+        " console.log(JSON.stringify(a), '!==', JSON.stringify(b)); process.exit(1); } };"
+        + body + "console.log('ok');"
+    )
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_settings_loaded_unchanged_has_no_changes_and_saves_bus_and_quiet():
+    _node_check("settings.js", (
+        # an old document without bus/bus_quiet_ms and a new one: loading alone is no change
+        "for (const conn of [{ transport: 'tcp', host: 'h', pack_count: 1 }, { transport: 'tcp', host: 'h', pack_count: 12 },"
+        "  { transport: 'serial', device: '/dev/x', pack_count: 1, bus: 'uart1', bus_quiet_ms: 300, min_cell_voltage: 2.5 }]) {"
+        "  const raw = m.toRaw(conn); eq(m.changes(raw, { ...raw }), []);"
+        "  eq(m.changes(raw, Object.fromEntries(Object.entries(raw).reverse())), []); }"
+        # a value written another way is no change; a real one is listed with old and new value
+        "const base = m.toRaw({ transport: 'tcp', host: 'h', pack_count: 1, nominal_cell_voltage: 3.2, bus_quiet_ms: 1000 });"
+        "eq(m.changes(base, { ...base, nominal_cell_voltage: '3,2', bus_quiet_ms: ' 1000 ' }), []);"
+        "eq(m.changes(base, { ...base, bus_quiet_ms: '200', pack_count: '2' }).map((c) => [c.name, c.from, c.to]),"
+        "  [['pack_count', '1', '2'], ['bus', 'uart0', 'uart1'], ['bus_quiet_ms', '1000', '200']]);"
+        # the save payload carries bus and bus quiet
+        "const p = m.payload({ transport: 'serial', device: '/dev/x', future: 1 }, { transport: 'serial', device: '/dev/x', baud: 'auto',"
+        "  pack_count: 1, bus: 'uart1', bus_quiet_ms: 300, maint_firmware: false, min_cell_voltage: 2.5, max_cell_voltage: 3.65,"
+        "  nominal_cell_voltage: 3.2, update_interval: 1 });"
+        "eq([p.bus, p.bus_quiet_ms, p.future], ['uart1', 300, 1]);"
+    ))
