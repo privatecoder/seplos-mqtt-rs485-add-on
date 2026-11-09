@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" role="img" aria-labelledby="title desc">
-  <title id="title">16S pack physical series path</title>
-  <desc id="desc">Cells 1 to 8 left to right above cells 16 to 9. Live cells and probes are native Home Assistant overlays.</desc>
-  <g fill="none" stroke="#94a3b8" stroke-width="2" stroke-linejoin="round">
-    <path d="M62.5 185H937.5V315H62.5" stroke-dasharray="5 5"/>
-  </g>
-</svg>
