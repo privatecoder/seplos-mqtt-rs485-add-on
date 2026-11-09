@@ -76,6 +76,9 @@ class MaintSupport:
     marker: Timed = field(default_factory=Timed)
     calibration: Timed = field(default_factory=Timed)
     group0: int | None = None           # BitGroup0 from the latest parameter read (ASCII or binary 47)
+    # answers as received, for the OpenBMS Monitor feed: maint (64/03), a2/a4 (binary serial DATA), r47 (the binary
+    # parameter block as the 169-byte ASCII layout: address byte + 168 data bytes); {"t": epoch ms, "hex"}
+    raw: dict = field(default_factory=dict)
 
     # --- detection -------------------------------------------------------------------------
 
@@ -101,6 +104,7 @@ class MaintSupport:
             if self.attempts >= DETECT_ATTEMPTS:
                 self.state = "unknown"
             return
+        self.raw["maint"] = {"t": bus.last_at, "hex": answer.info.hex()}
         try:
             self.identity = md.decode_identity(answer.info)
         except md.MaintFormatError as e:
@@ -209,7 +213,9 @@ class MaintSupport:
         data = bus.request_binary(self.address, BIN_PARAMETERS)
         if data is None or len(data) != PARAMETER_BLOCK_LEN:
             return None
-        return parameter_decoder.decode_block(data)
+        decoded = parameter_decoder.decode_block(data)
+        self.raw["r47"] = {"t": bus.last_at, "hex": (bytes([self.address]) + data).hex()}
+        return decoded
 
     def _read_serials(self, bus: SerialBus) -> None:
         self.serial_attempts += 1
@@ -226,6 +232,8 @@ class MaintSupport:
                 data = b""
             if data is None:
                 return            # retried with the next poll
+            if len(data) == SERIAL_LEN:
+                self.raw["a2" if command == BIN_BATTERY_SERIAL else "a4"] = {"t": bus.last_at, "hex": data.hex()}
             self.serials[key] = identity_decoder.decode_serial_number(data, key)["normal"][key] if len(data) == SERIAL_LEN else None
         self.serials_done = True
 

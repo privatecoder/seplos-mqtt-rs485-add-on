@@ -84,15 +84,23 @@ class BatteryPack:
         self.clock_ts = 0.0
         self.clock_next = 0.0
         self._uart1_parameters_read_at: str | None = None
+        # raw answers for the OpenBMS Monitor feed: {"t": epoch ms, "hex": INFO} or {"t", "err"}
+        self.raw: dict[str, dict] = {}          # r42/r44 of the latest core read (r44 absent when 0x42 failed)
+        self._raw_ascii_ids: dict[str, dict | None] = {"r51": None, "a2": None, "a4": None}
+        self._raw47_ascii: dict | None = None   # the latest ASCII 0x47 INFO (RS485-1/2)
+        self._telesignal_shape: dict | None = None   # the latest valid 0x44 decode, for an unknown copy
+        self._payload: bytes | None = None      # INFO of the latest _request
         self.energy = EnergyGuard(address, store if store is not None else StateStore(None))
 
     # --- request helpers ----------------------------------------------------------------------
 
     def _request(self, cid2: int, expected: ExpectedLength, decoder: Callable[[bytes], dict], label: str,
                  info: bytes = b"\x01") -> dict | None:
+        self._payload = None
         payload = self.bus.request(self.address, cid2, expected, label, info)
         if payload is None:
             return None
+        self._payload = payload
         feedback = decoder(payload)
         logger.info("Pack%s:%s received", self.address, label)
         if logger.isEnabledFor(logging.DEBUG):
@@ -126,6 +134,8 @@ class BatteryPack:
         self.info_attempts += 1
 
         feedback = self._request(0x51, DEVICE_INFO_LEN, identity.decode_device_info, "DeviceInfo", info=b"")
+        if feedback is not None:
+            self._raw_ascii_ids["r51"] = self._raw_ok()
         if feedback is None:
             if self.info_attempts >= self.INFO_MAX_ATTEMPTS:
                 logger.warning("Pack%s:Giving up on device info", self.address)
@@ -135,10 +145,12 @@ class BatteryPack:
         # 0xA2/0xA4 are only served on the RS485-1/2 port (UART0); the RS485 bus on the CAN port
         # (UART1) only knows 0x42/0x44/0x4F/0x51/0x60-0x63
         if not self.config.can_bus:
-            for cid2, key, label in ((0xA2, "serial_number", "SerialNumber"), (0xA4, "bms_serial_number", "BmsSerialNumber")):
+            for cid2, key, label, raw_key in ((0xA2, "serial_number", "SerialNumber", "a2"),
+                                              (0xA4, "bms_serial_number", "BmsSerialNumber", "a4")):
                 serial = self._request(cid2, SERIAL_LEN, lambda raw, k=key: identity.decode_serial_number(raw, k), label, info=b"")
                 if serial is not None:
                     info["normal"].update(serial["normal"])
+                    self._raw_ascii_ids[raw_key] = self._raw_ok()
 
         info["normal"]["firmware_patch"] = self._derive_firmware_patch(info["normal"]["firmware_version"])
         self.info = info
@@ -242,6 +254,7 @@ class BatteryPack:
             logger.warning("Pack%s:Invalid parameter answer: %s", self.address, e)
             feedback = None
         if feedback is not None:
+            self._raw47_ascii = self._raw_ok()
             self.parameters = {**feedback["normal"], "read_at": timeutil.now_iso()}
             self.parameters_ts = time.monotonic()
         else:
@@ -355,54 +368,119 @@ class BatteryPack:
 
     # --- poll -----------------------------------------------------------------------------------
 
+    # --- raw answers (OpenBMS Monitor feed) ---------------------------------------------------
+
+    def _raw_ok(self) -> dict:
+        """The INFO of the latest _request with its read time."""
+        return {"t": self.bus.last_at, "hex": self._payload.hex()}
+
+    def _raw_failed(self) -> dict:
+        return {"t": timeutil.now_ms(), "err": self.bus.last_failure or "failed"}
+
+    @property
+    def raw_ids(self) -> dict[str, dict | None]:
+        """The identity reads as received, ``None`` while not read: r51 (0x51), a2/a4 (30 string bytes, ASCII or
+        MAINT binary), maint (the MAINT identity 64/03)."""
+        maint_raw = self.maint.raw if self.maint is not None else {}
+        return {
+            "r51": self._raw_ascii_ids["r51"],
+            "a2": self._raw_ascii_ids["a2"] or maint_raw.get("a2"),
+            "a4": self._raw_ascii_ids["a4"] or maint_raw.get("a4"),
+            "maint": maint_raw.get("maint"),
+        }
+
+    @property
+    def raw47(self) -> dict | None:
+        """The latest parameter block as the 169-byte ASCII 0x47 INFO (a binary UART1 read: address byte + 168 data
+        bytes), with its read time."""
+        if self.config.can_bus:
+            return self.maint.raw.get("r47") if self.maint is not None else None
+        return self._raw47_ascii
+
+    @staticmethod
+    def _unknown(value):
+        if isinstance(value, dict):
+            return {k: BatteryPack._unknown(v) for k, v in value.items()}
+        return None
+
+    # --- poll -----------------------------------------------------------------------------------
+
     def read(self) -> tuple[BatteryData | None, bool]:
         """
         Poll the pack. Returns (data, success); data is None if the poll failed. Change suppression
-        happens when publishing.
+        happens when publishing. A failed 0x44 keeps the valid 0x42 (success False, status unknown).
         """
-        logger.info("Pack%s:Requesting data...", self.address)
-        data: BatteryData = {"telemetry": {}, "telesignalization": {}}
+        data, success = self.read_core()
+        if data is None:
+            return None, False
         try:
-            telemetry_feedback = self._request(0x42, TELEMETRY_LEN, self._decode_telemetry, "Telemetry")
-            if telemetry_feedback is None:
-                return None, False
-            data["telemetry"] = telemetry_feedback
-            self.sample = Sample(dict(telemetry_feedback["normal"]), time.monotonic())
-
-            telesignal_feedback = self._request(0x44, TELESIGNAL_LEN, self._decode_telesignal, "Telesignalization")
-            if telesignal_feedback is None:
-                return None, False
-            data["telesignalization"] = telesignal_feedback
-            self.core_success = time.monotonic()
-
-            if self.maint is not None:
-                self._guarded(self.maint.detect)
-            self._fetch_device_info()
-            if self.info:
-                data["info"] = self.info
-            if self.maint is not None:
-                self._guarded(self.maint.poll)
-                self._merge_maint(data)
-            self._guarded(lambda _bus: self._read_clock())
-            clock_payload = self._clock_payload()
-            if clock_payload is not None:
-                data["clock"] = clock_payload
-
-            if not self.config.can_bus:
-                extended_status = self._fetch_extended_status()
-                now = time.monotonic()
-                if extended_status is not None:
-                    self.extended_status = extended_status
-                    self.extended_status_ts = now
-                # bridge single failed requests, but never present an old (or a previous run's) status as current
-                fresh = now - self.extended_status_ts <= max(STATUS_MAX_AGE_SECONDS, 3 * self.config.mqtt_update_interval)
-                data["status"] = self.extended_status if self.extended_status is not None and fresh else UNKNOWN_STATUS
-                self._fetch_parameters()
-                if self.parameters:
-                    data["parameters"] = parameters.public_view(self.parameters)
-
-            data["alarm_summary"] = alarms.summarize(telesignal_feedback, (data.get("maint") or {}).get("binary"))
-            return data, True
+            self.read_extras(data)
         except Exception as e:
             logger.error("Pack%s:Error reading serial data: %s", self.address, e)
             return None, False
+        return data, success
+
+    def read_core(self) -> tuple[BatteryData | None, bool]:
+        """0x42 and 0x44 only. 0x42 failed: (None, False). 0x44 failed: the telemetry with the last known status
+        groups set to unknown, (data, False)."""
+        logger.info("Pack%s:Requesting data...", self.address)
+        self.raw = {}
+        try:
+            telemetry_feedback = self._request(0x42, TELEMETRY_LEN, self._decode_telemetry, "Telemetry")
+        except Exception as e:
+            logger.error("Pack%s:Error reading serial data: %s", self.address, e)
+            telemetry_feedback = None
+        if telemetry_feedback is None:
+            self.raw["r42"] = self._raw_failed()
+            return None, False
+        self.raw["r42"] = self._raw_ok()
+        data: BatteryData = {"telemetry": telemetry_feedback}
+        self.sample = Sample(dict(telemetry_feedback["normal"]), time.monotonic())
+        try:
+            telesignal_feedback = self._request(0x44, TELESIGNAL_LEN, self._decode_telesignal, "Telesignalization")
+        except Exception as e:
+            logger.error("Pack%s:Error reading serial data: %s", self.address, e)
+            telesignal_feedback = None
+        if telesignal_feedback is None:
+            self.raw["r44"] = self._raw_failed()
+            if self._telesignal_shape is not None:
+                data["telesignalization"] = self._unknown(self._telesignal_shape)
+            return data, False
+        self.raw["r44"] = self._raw_ok()
+        self._telesignal_shape = telesignal_feedback
+        data["telesignalization"] = telesignal_feedback
+        self.core_success = time.monotonic()
+        return data, True
+
+    def read_extras(self, data: BatteryData) -> None:
+        """Everything after the core reads (MAINT, device info, clock, 0x5A, parameters, alarm summary), added to
+        ``data``. Runs whenever the telemetry is valid, also after a failed 0x44."""
+        if self.maint is not None:
+            self._guarded(self.maint.detect)
+        self._fetch_device_info()
+        if self.info:
+            data["info"] = self.info
+        if self.maint is not None:
+            self._guarded(self.maint.poll)
+            self._merge_maint(data)
+        self._guarded(lambda _bus: self._read_clock())
+        clock_payload = self._clock_payload()
+        if clock_payload is not None:
+            data["clock"] = clock_payload
+
+        if not self.config.can_bus:
+            extended_status = self._fetch_extended_status()
+            now = time.monotonic()
+            if extended_status is not None:
+                self.extended_status = extended_status
+                self.extended_status_ts = now
+            # bridge single failed requests, but never present an old (or a previous run's) status as current
+            fresh = now - self.extended_status_ts <= max(STATUS_MAX_AGE_SECONDS, 3 * self.config.mqtt_update_interval)
+            data["status"] = self.extended_status if self.extended_status is not None and fresh else UNKNOWN_STATUS
+            self._fetch_parameters()
+            if self.parameters:
+                data["parameters"] = parameters.public_view(self.parameters)
+
+        valid_status = self.raw.get("r44", {}).get("hex") is not None
+        data["alarm_summary"] = alarms.summarize(data["telesignalization"] if valid_status else None,
+                                                 (data.get("maint") or {}).get("binary"))

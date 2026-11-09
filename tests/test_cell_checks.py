@@ -184,7 +184,7 @@ def test_sample_survives_a_failed_0x44(monkeypatch):
         first = pack_.sample
         del bms.ascii[(0, 0x44)]
         data, ok = api.poll(pack_, bms)
-        assert data is None and not ok                          # nothing published, availability unchanged
+        assert data is not None and not ok                      # telemetry kept, no complete success
         assert pack_.sample is not first and pack_.sample.values["current"] == -12.34     # the new 0x42 decode is kept
         assert pack_.sample.at >= first.at
 

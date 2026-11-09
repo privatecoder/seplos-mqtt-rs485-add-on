@@ -497,12 +497,13 @@ def test_poll_changed_second_payload(monkeypatch):
         assert ok and data["telemetry"]["normal"]["charging_cycles"] == 43
 
 
-def test_poll_fails_when_44_fails(monkeypatch):
+def test_poll_is_no_success_when_44_fails(monkeypatch):
     api.no_sleep(monkeypatch)
     with api.mode(1):
         bms = _single_pack_bms()
         bms.ascii[(0, 0x44)] = None
-        assert api.poll(api.make_pack(0), bms) == (None, False)
+        data, ok = api.poll(api.make_pack(0), bms)
+        assert not ok and data["telemetry"]["normal"]["voltage_cell_1"] == 3.3
 
 
 def test_poll_rejects_wrong_address_answer(monkeypatch):
@@ -630,7 +631,9 @@ def test_inconsistent_cell_count_rejected(monkeypatch):
             bad[2] = 15
             bms = _single_pack_bms()
             bms.ascii[(0, cid2)] = bytes(bad)
-            assert api.poll(api.make_pack(0), bms) == (None, False), hex(cid2)
+            data, ok = api.poll(api.make_pack(0), bms)
+            assert not ok, hex(cid2)
+            assert (data is None) == (cid2 == 0x42), hex(cid2)     # a bad 0x44 keeps the valid 0x42
 
 
 # --- step 3: bus ownership, timing, strict framing -------------------------------------------------
@@ -986,7 +989,7 @@ def test_cell_count_validation(monkeypatch):
         for name, (t, s) in cases.items():
             bms = _single_pack_bms()
             bms.ascii[(0, 0x42)], bms.ascii[(0, 0x44)] = t, s
-            assert api.poll(api.make_pack(0), bms) == (None, False), name
+            assert not api.poll(api.make_pack(0), bms)[1], name
         for m in (7, 16):
             bms = _single_pack_bms()
             bms.ascii[(0, 0x42)] = f.telemetry_info(cells_mv=[3300 + i for i in range(m)])

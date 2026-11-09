@@ -82,3 +82,95 @@ def test_set_gap():
     bus.set_gap(0.2)
     bus.request_rtn(0, 0x51)
     assert writes[1] - writes[0] == pytest.approx(0.2)
+
+
+# ---------------------------------------------------------------- pack: core/extras split, raw answers
+
+import api  # noqa: E402
+from test_characterization import _maint_responder, _multi_pack_bms, _single_pack_bms  # noqa: E402
+
+
+def test_status_failure_keeps_telemetry(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1):
+        bms = _single_pack_bms()
+        pack = api.make_pack(0)
+        data, ok = api.poll(pack, bms)
+        assert ok
+        bms.ascii[(0, 0x42)] = f.telemetry_info(cycles=77)
+        bms.ascii[(0, 0x44)] = None
+        data, ok = api.poll(pack, bms)
+    assert not ok and data is not None
+    assert data["telemetry"]["normal"]["charging_cycles"] == 77
+    # the last known status groups with every value unknown, the alarm summary unknown
+    assert data["telesignalization"] and all(
+        v is None for group in data["telesignalization"].values() for v in group.values())
+    assert data["alarm_summary"]["normal"]["bms_alarm"] == "unknown"
+
+
+def test_raw_parts(monkeypatch):
+    api.no_sleep(monkeypatch)
+    monkeypatch.setattr(timeutil, "now_ms", lambda: 5000)
+    with api.mode(2):
+        bms = _multi_pack_bms()
+        pack = api.make_pack(0)
+        api.poll(pack, bms)
+        assert pack.raw["r42"] == {"t": 5000, "hex": f.telemetry_info(adr=0).hex()}
+        assert pack.raw["r44"] == {"t": 5000, "hex": f.telesignal_info(adr=0).hex()}
+        bms.ascii[(0, 0x42)] = None
+        api.poll(pack, bms)
+    assert pack.raw == {"r42": {"t": 5000, "err": "failed"}}
+
+
+def test_raw_ids_uart0(monkeypatch):
+    api.no_sleep(monkeypatch)
+    monkeypatch.setattr(timeutil, "now_ms", lambda: 7000)
+    with api.mode(1):
+        pack = api.make_pack(0)
+        api.poll(pack, _single_pack_bms())
+    ids = pack.raw_ids
+    assert ids["r51"] == {"t": 7000, "hex": f.device_info_info().hex()}
+    assert ids["a2"] == {"t": 7000, "hex": f.serial_info().hex()} and len(ids["a2"]["hex"]) == 60
+    assert ids["maint"] is None
+    assert pack.raw47 == {"t": 7000, "hex": f.parameter_info().hex()} and len(pack.raw47["hex"]) == 338
+
+
+def test_raw_ids_and_raw47_uart1_maint(monkeypatch):
+    api.no_sleep(monkeypatch)
+    monkeypatch.setattr(timeutil, "now_ms", lambda: 9000)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        bms.binary[(0, 0x47)] = f.parameter_info()[1:]
+        bms.binary[(0, 0xA2)] = f.serial_info("BAT-SN-0")
+        bms.binary[(0, 0xA4)] = f.serial_info("BMS-SN-0")
+        bms.echo_binary = True
+        pack = api.make_pack(0)
+        api.poll(pack, bms)
+    ids = pack.raw_ids
+    assert ids["a2"]["hex"] == f.serial_info("BAT-SN-0").hex() and len(ids["a2"]["hex"]) == 60
+    assert ids["maint"]["hex"] == f.MAINT_FULL_IDENTITY.hex()
+    assert pack.raw47["hex"] == (bytes([0]) + f.parameter_info()[1:]).hex() and len(pack.raw47["hex"]) == 338
+
+
+def test_raw_ids_uart1_oem_has_no_a2(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(2):
+        pack = api.make_pack(0)
+        api.poll(pack, _multi_pack_bms())
+    assert pack.raw_ids["a2"] is None and pack.raw_ids["r51"] is not None
+
+
+def test_status_failure_keeps_maint_energy_source(monkeypatch, tmp_path):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500)
+        bms.ascii[(0, 0x64)] = _maint_responder()
+        pack = api.make_pack(0, state_file=tmp_path / "state.json")
+        data, ok = api.poll(pack, bms)
+        assert ok and data["telemetry"]["normal"]["energy_charged"] == 7000.1
+        bms.ascii[(0, 0x44)] = None
+        data, ok = api.poll(pack, bms)
+    assert not ok
+    assert data["telemetry"]["normal"]["energy_charged"] in (7000.1, None)      # never the narrow 650.0

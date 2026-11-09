@@ -160,7 +160,9 @@ def test_a_failed_alarm_read_publishes_nothing_so_the_state_is_never_a_stale_ok(
         assert api.poll(pack, bms)[1]
         bms.ascii[(0, 0x44)] = None
         data, ok = api.poll(pack, bms)
-        assert data is None and not ok
+        # the telemetry is kept, the alarm state becomes unknown (never a stale ok)
+        assert data is not None and not ok
+        assert data["alarm_summary"]["normal"]["bms_alarm"] == "unknown"
 
 
 # --- datasheet limits -------------------------------------------------------------------------------------------
