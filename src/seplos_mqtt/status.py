@@ -136,4 +136,15 @@ def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
         "packs": [_pack_status(state, p, now_mono) for p in state.packs],
         "system": system,
         "sets": sets,
+        "feed": _feed_status(state),
+    }
+
+
+def _feed_status(state: Any) -> dict[str, Any]:
+    """The OpenBMS Monitor feed switch as the loop runs it (``pending``: a switch the loop has not adopted yet)."""
+    feed = getattr(state, "feed", None)
+    return {
+        "on": bool(feed is not None and feed.on),
+        "until_ms": feed.auto_off if feed is not None else None,
+        "pending": getattr(state, "pending_feed", None) is not None,
     }

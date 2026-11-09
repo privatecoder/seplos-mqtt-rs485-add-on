@@ -375,7 +375,7 @@ class BatteryPack:
         return {"t": self.bus.last_at, "hex": self._payload.hex()}
 
     def _raw_failed(self) -> dict:
-        return {"t": timeutil.now_ms(), "err": self.bus.last_failure or "failed"}
+        return {"t": timeutil.now_ms(), "err": getattr(self.bus, "last_failure", None) or "failed"}
 
     @property
     def raw_ids(self) -> dict[str, dict | None]:

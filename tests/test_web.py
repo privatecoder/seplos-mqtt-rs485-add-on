@@ -555,7 +555,7 @@ def test_referenced_files_exist_and_urls_are_relative():
         for target in re.findall(r"fetch\(\s*[`'\"]([^`'\"$]+)", text):
             assert target.startswith("static/") or target.startswith("api/"), f"{rel(path)} fetches {target}"
         for _method, target in re.findall(r"api\(\s*'(GET|POST|PUT)'\s*,\s*[`']([^`'$]*)", text):
-            known = {"api/session", "api/connection", "api/sets", "api/status", "api/jobs/detect", "api/cells", "api/cells/rename",
+            known = {"api/session", "api/connection", "api/sets", "api/status", "api/feed", "api/jobs/detect", "api/cells", "api/cells/rename",
                      "api/packs", "api/packs/accept-update", "api/packs/confirm-identity", "api/balancer-profiles"}
             assert target in known or target.startswith("api/jobs/"), target
 
@@ -612,6 +612,7 @@ def test_every_text_the_code_asks_for_exists():
         [f"settings.opt.transport.{v}" for v in ("tcp", "serial")]
         + [f"settings.opt.baud.{v}" for v in ("auto", "9600", "19200")]
         + [f"settings.opt.bus.{v}" for v in ("uart0", "uart1")]
+        + [f"feed.auto_off.{v}" for v in ("none", "1", "4", "24")]
         + [f"avail.{v}" for v in ("online", "offline", "unknown")]
         + ["maint.pending"]
         + [f"bridge.{v}" for v in ("alive", "dead", "none")]

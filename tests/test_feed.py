@@ -253,3 +253,167 @@ def test_system_raw(monkeypatch):
     del bms.modbus[(0x03, 0x0074, 1)]
     api.read_system_with(reader, bms)
     assert reader.raw["r0074"]["err"] == "failed" and "hex" in reader.raw["r1000"]
+
+
+# ---------------------------------------------------------------- the switch, timing and the loop
+
+def _feed_msgs(client, kind):
+    return [r for r in client.published if r.topic.startswith(f"seplos/openbms/v1/{kind}")]
+
+
+def _bank():
+    bms = _multi_pack_bms()
+    return bms
+
+
+def test_feed_on_publishes_pack_and_system(monkeypatch):
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=6, feed_after_polls=[(0, (True, None))])
+    packs, systems, metas = _feed_msgs(client, "pack/"), _feed_msgs(client, "system"), _feed_msgs(client, "meta")
+    assert {r.topic for r in packs} == {"seplos/openbms/v1/pack/0", "seplos/openbms/v1/pack/1"}
+    assert systems and not any(r.retain for r in packs + systems)
+    assert metas and all(r.retain for r in metas) and metas[-1].payload["on"] is True
+    seqs = [r.payload["seq"] for r in client.published if r.topic in {*(x.topic for x in packs), "seplos/openbms/v1/system"}]
+    assert seqs == list(range(1, len(seqs) + 1))
+    first = packs[0].payload
+    assert first["r42"]["hex"] and first["r44"]["hex"] and first["boot"] == metas[-1].payload["boot"]
+
+
+def test_feed_off_by_default_publishes_nothing(monkeypatch):
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=4)
+    assert not [r for r in client.published if "/openbms/" in r.topic]
+
+
+def test_feed_on_sets_gap_and_no_round_pause(monkeypatch):
+    # rounds of two polls; on adopted at the end of round 1, off at the end of round 3
+    api.run_main(monkeypatch, _bank(), 2, telemetry_polls=8, update_interval=30,
+                 feed_after_polls=[(0, (True, None)), (4, (False, None))])
+    assert api.LAST_RUN["waits"] == [30, 30]
+    assert api.LAST_RUN["states"][0].bus.gap == 1.0
+
+
+def test_gap_is_short_while_on(monkeypatch):
+    api.run_main(monkeypatch, _bank(), 2, telemetry_polls=6, feed_after_polls=[(0, (True, None))])
+    assert api.LAST_RUN["states"][0].bus.gap == pytest.approx(0.2)
+
+
+def test_core_reads_of_a_set_back_to_back(monkeypatch):
+    bms = _bank()
+    bms.ascii[(0, 0x51)] = None                     # device info of pack 0 keeps failing: retried in the extras
+    s = ParallelSet(id=1, name="A", packs=(0, 1))
+    api.run_main(monkeypatch, bms, 2, telemetry_polls=4, sets_after_polls=[(0, (s,))],
+                 feed_after_polls=[(0, (True, None))])
+    asked = [(r.cid2, r.adr) for r in bms.requests if r.kind == "ascii" and r.cid2 in (0x42, 0x44, 0x51)]
+    second_round = asked[asked.index((0x42, 0), 1):]
+    assert second_round[:5] == [(0x42, 0), (0x44, 0), (0x42, 1), (0x44, 1), (0x51, 0)]
+
+
+def test_feed_off_republishes_meta_off(monkeypatch):
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=8,
+                             feed_after_polls=[(0, (True, None)), (4, (False, None))])
+    metas = _feed_msgs(client, "meta")
+    assert metas[-1].payload["on"] is False
+    last_off = client.published.index(metas[-1])
+    assert not [r for r in client.published[last_off:] if "/openbms/v1/pack/" in r.topic]
+
+
+def test_auto_off(monkeypatch):
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=12, seconds_per_tick=200.0,
+                             feed_after_polls=[(0, (True, 1))])
+    metas = _feed_msgs(client, "meta")
+    on = [m for m in metas if m.payload["on"]]
+    assert on and on[0].payload["auto_off"] is not None
+    assert metas[-1].payload["on"] is False and api.LAST_RUN["states"][0].feed.on is False
+
+
+def test_reconnect_republishes_meta_not_packs(monkeypatch):
+    client, _ = api.run_main(monkeypatch, _bank(), 2, telemetry_polls=8, resync_after_polls=6,
+                             feed_after_polls=[(0, (True, None))])
+    metas = _feed_msgs(client, "meta")
+    assert len({m.payload["boot"] for m in metas}) == 1 and len(metas) >= 2
+    packs = [r.payload["seq"] for r in _feed_msgs(client, "pack/")]
+    assert len(packs) == len(set(packs))                 # nothing replayed
+
+
+def _maint_bank():
+    bms = _bank()
+    bms.ascii[(0, 0x64)] = _maint_responder()
+    bms.binary[(0, 0x47)] = f.parameter_info()[1:]
+    bms.binary[(0, 0xA2)] = f.serial_info("BAT-SN-0")
+    bms.binary[(0, 0xA4)] = f.serial_info("BMS-SN-0")
+    bms.echo_binary = True
+    return bms
+
+
+def test_due_parameters_are_in_the_same_pack_message(monkeypatch):
+    # the feed is on from round 2; the parameters are due again after their interval (time runs fast)
+    client, _ = api.run_main(monkeypatch, _maint_bank(), 2, telemetry_polls=10, seconds_per_tick=60.0,
+                             maint_firmware=True, feed_after_polls=[(0, (True, None))])
+    with_47 = [r.payload for r in _feed_msgs(client, "pack/0") if "r47" in r.payload]
+    assert with_47 and with_47[-1]["r42"]["t"] <= with_47[-1]["r47"]["t"]
+    assert len(with_47[-1]["r47"]["hex"]) == 338
+
+
+def test_meta_republished_after_identity_reads(monkeypatch):
+    bms = _bank()
+    calls = {"n": 0}
+
+    def device_info_late(req):
+        calls["n"] += 1
+        # the first poll's request (with its retries) stays silent, the second poll gets the answer
+        return f.ascii_frame(1, 0x00, f.device_info_info()) if calls["n"] > 5 else b""
+
+    bms.ascii[(1, 0x51)] = device_info_late
+    client, _ = api.run_main(monkeypatch, bms, 2, telemetry_polls=8, feed_after_polls=[(0, (True, None))])
+    metas = [m.payload for m in _feed_msgs(client, "meta") if m.payload["on"]]
+    assert metas[0]["packs"][1]["r51"] is None and metas[-1]["packs"][1]["r51"] is not None
+
+
+def test_group_keeps_maint_energy_on_status_timeout(monkeypatch):
+    bms = _bank()
+    bms.ascii[(0, 0x64)] = _maint_responder()
+    bms.ascii[(0, 0x42)] = f.telemetry_info(adr=0, energy_charged=6500)
+    calls = {"n": 0}
+
+    def status_then_silent(req):
+        calls["n"] += 1
+        return f.ascii_frame(0, 0x00, f.telesignal_info(adr=0)) if calls["n"] <= 2 else b""
+
+    bms.ascii[(0, 0x44)] = status_then_silent
+    s = ParallelSet(id=1, name="A", packs=(0, 1))
+    client, _ = api.run_main(monkeypatch, bms, 2, telemetry_polls=8, maint_firmware=True,
+                             sets_after_polls=[(0, (s,))], feed_after_polls=[(0, (True, None))])
+    sensors = [r.payload for r in client.published if r.topic == "seplos/pack-0/sensors"]
+    assert sensors and all(p["telemetry"]["normal"]["energy_charged"] != 650.0 for p in sensors)
+
+
+# ---------------------------------------------------------------- /api/feed
+
+def test_put_feed_validates(tmp_path):
+    import json
+
+    from seplos_mqtt.web.server import WebApp
+    from test_web import LOCAL, USER, csrf_of, make_store, run_with
+
+    switched = []
+    app_ = WebApp(LOCAL, make_store(tmp_path), on_feed=lambda on, hours: switched.append((on, hours)),
+                  status_provider=lambda: {"feed": {"on": True, "until_ms": None, "pending": False}})
+
+    async def scenario(client):
+        headers = {**USER, "X-CSRF-Token": await csrf_of(client), "Content-Type": "application/json"}
+
+        async def put(body):
+            return await client.put("/api/feed", data=json.dumps(body), headers=headers)
+
+        assert (await put({"on": True, "auto_off_hours": 4})).status == 200
+        assert (await put({"on": False, "auto_off_hours": None})).status == 200
+        for bad in ({"on": "yes"}, {"on": True, "auto_off_hours": 2}, {"on": True, "auto_off_hours": True},
+                    {"on": True, "x": 1}, []):
+            assert (await put(bad)).status in (400, 422), bad
+        no_csrf = await client.put("/api/feed", data=json.dumps({"on": True}),
+                                   headers={**USER, "Content-Type": "application/json"})
+        assert no_csrf.status == 403
+        body = await (await client.get("/api/feed", headers=USER)).json()
+        assert body["feed"]["on"] is True
+
+    run_with(app_, scenario)
+    assert switched == [(True, 4), (False, None)]

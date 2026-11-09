@@ -59,6 +59,10 @@ _SECURITY_HEADERS = {
 }
 
 
+# automatic switch-off of the OpenBMS Monitor feed after these hours (None: on until switched off)
+FEED_AUTO_OFF_HOURS = (None, 1, 4, 24)
+
+
 @dataclass(frozen=True)
 class WebSettings:
     host: str = "0.0.0.0"
@@ -103,6 +107,7 @@ class WebApp:
         on_connection_saved: Callable[[MonitoringConfig], None] | None = None,
         on_sets_saved: Callable[[MonitoringConfig], None] | None = None,
         on_cells_saved: Callable[[MonitoringConfig], None] | None = None,
+        on_feed: Callable[[bool, int | None], None] | None = None,
         status_provider: Callable[[], dict[str, Any] | None] | None = None,
         jobs: JobQueue | None = None,
     ) -> None:
@@ -118,6 +123,7 @@ class WebApp:
         self._on_connection_saved = on_connection_saved
         self._on_sets_saved = on_sets_saved
         self._on_cells_saved = on_cells_saved
+        self._on_feed = on_feed
         self._status_provider = status_provider or (lambda: None)
         self._jobs = jobs
         # serialises PUT /api/connection and /api/sets from the corrupt check through callback and response
@@ -152,6 +158,8 @@ class WebApp:
         r.add_get("/api/balancer-profiles", self._get_profiles)
         r.add_put("/api/balancer-profiles", self._put_profiles)
         r.add_get("/api/status", self._get_status)
+        r.add_get("/api/feed", self._get_feed)
+        r.add_put("/api/feed", self._put_feed)
         r.add_post("/api/jobs/detect", self._post_detect)
         r.add_get("/api/jobs/{job_id}", self._get_job)
         r.add_post("/api/jobs/{job_id}/cancel", self._cancel_job)
@@ -314,6 +322,29 @@ class WebApp:
 
     async def _get_status(self, request: web.Request) -> web.Response:
         return json_response({"status": self._status_provider()})
+
+    async def _get_feed(self, request: web.Request) -> web.Response:
+        status = self._status_provider() or {}
+        return json_response({"feed": status.get("feed") or {"on": False, "until_ms": None, "pending": False}})
+
+    async def _put_feed(self, request: web.Request) -> web.Response:
+        """Switch the OpenBMS Monitor feed: ``{"on": bool, "auto_off_hours": null | 1 | 4 | 24}``. No revision: the
+        switch is runtime state (kept in the state file by the main loop), not part of the settings document."""
+        _user, body, _ = await self._mutation(request, revision=False)
+        if not isinstance(body, dict):
+            raise ApiError("invalid_request", field="body")
+        unknown = sorted(str(k)[:64] for k in body if k not in ("on", "auto_off_hours"))
+        if unknown:
+            raise ApiError("unknown_field", fields=unknown[:10])
+        on, hours = body.get("on"), body.get("auto_off_hours")
+        if not isinstance(on, bool):
+            raise ApiError("invalid_request", field="on")
+        if hours not in FEED_AUTO_OFF_HOURS or isinstance(hours, bool):
+            raise ApiError("invalid_request", field="auto_off_hours")
+        if self._on_feed is None:
+            raise ApiError("feed_unavailable", 503)
+        self._on_feed(on, hours)
+        return json_response({"on": on, "auto_off_hours": hours})
 
     def _job_queue(self) -> JobQueue:
         if self._jobs is None:

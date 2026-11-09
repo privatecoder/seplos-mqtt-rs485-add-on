@@ -13,6 +13,10 @@ RUN apk add --no-cache \
     py3-paho-mqtt \
     py3-pyserial
 
+# The add-on version (passed by the Home Assistant builder), reported in the OpenBMS Monitor feed
+ARG BUILD_VERSION
+ENV ADDON_VERSION=${BUILD_VERSION}
+
 # Set the working directory
 WORKDIR /usr/src/app
 

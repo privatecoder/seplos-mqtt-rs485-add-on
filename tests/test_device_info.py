@@ -133,7 +133,7 @@ def test_a_later_blank_serial_keeps_the_last_one():
 
 
 def test_bms_serial_never_reaches_the_device_info():
-    source = inspect.getsource(app.poll_pack)
+    source = inspect.getsource(app.publish_poll)
     assert '"serial_number"' in source
     assert source.count("bms_serial_number") == 0
 

@@ -15,6 +15,7 @@ from typing import Any
 import serial
 from serial.serialutil import SerialException
 
+from . import feed as feed_mod
 from . import health, timeutil, topics
 from .bridge import BridgeError, SocatBridge
 from .cells import evaluate as cell_report
@@ -36,6 +37,10 @@ from .transport import SerialBus
 
 logger = logging.getLogger("SeplosBMS")
 
+# OpenBMS Monitor feed: bus quiet while on (the packs end a frame after about 100 ms), key in the state file
+FEED_GAP_SECONDS = 0.2
+FEED_STATE_KEY = "openbms_feed"
+
 MONITORING_FILE = "/data/monitoring.json"
 # the launcher that run.sh executes; a saved connection change re-executes it in place
 LAUNCHER = Path(__file__).resolve().parent.parent / "fetch_bms_data.py"
@@ -55,6 +60,7 @@ class PackState:
     publish_counter: int = 0
     availability: str = "offline"
     last_data: dict | None = None       # data of the last successful poll (for the status snapshot)
+    feed_r47_t: int | None = None       # read time of the parameter block last sent in the feed
 
 
 @dataclass
@@ -103,6 +109,11 @@ class AppState:
     balancers: dict[int, Any] = field(default_factory=dict)
     balancer_inventory: set[int] = field(default_factory=set)       # addresses that may have a retained HA config
     balancer_published: set[int] = field(default_factory=set)       # addresses whose config the client accepted
+    # OpenBMS Monitor feed: switched by the web thread (``pending_feed``), adopted at a cycle boundary
+    feed: feed_mod.Feed = field(default_factory=feed_mod.Feed)
+    pending_feed: tuple | None = None
+    feed_meta_sent: str | None = None     # the identity/parameter caches of the last meta, to resend on a change
+    feed_meta_on: bool = False            # the retained meta (as far as the client accepted it) says "on"
 
     def request_cells(self, config: Any) -> None:
         """A saved change of assignments or balancer profiles (web thread): adopted at the next cycle
@@ -143,6 +154,39 @@ class AppState:
         if pending is not None and pending is not self.parallel_sets:
             self.parallel_sets = pending
             logger.info("Parallel sets updated: %s set(s)", len(pending))
+
+    def request_feed(self, on: bool, auto_off_hours: int | None = None) -> None:
+        """Switch the OpenBMS Monitor feed (web thread): adopted at the next cycle boundary, no restart."""
+        self.pending_feed = (bool(on), auto_off_hours)
+
+    def adopt_feed(self) -> bool:
+        """A pending switch, or the automatic switch-off when its time has come. True if the feed changed."""
+        pending, self.pending_feed = self.pending_feed, None
+        feed, now = self.feed, timeutil.now_ms()
+        if pending is not None:
+            on, hours = pending
+            auto_off = now + hours * 3_600_000 if on and hours else None
+            if (feed.on, feed.auto_off) == (on, auto_off):
+                return False
+            feed.on, feed.auto_off = on, auto_off
+        elif feed.on and feed.auto_off is not None and now >= feed.auto_off:
+            feed.on, feed.auto_off = False, None
+            logger.info("OpenBMS Monitor feed: automatic switch-off")
+        else:
+            return False
+        logger.info("OpenBMS Monitor feed %s", "on" if feed.on else "off")
+        if self.store is not None and not self.store.set_durable(FEED_STATE_KEY, {"on": feed.on, "auto_off": feed.auto_off}):
+            logger.warning("Could not persist the OpenBMS Monitor feed switch")
+        return True
+
+    @property
+    def round_pause(self) -> int:
+        """Seconds between two cycles: 0 while the feed is on, else the configured interval."""
+        return 0 if self.feed.on else self.config.mqtt_update_interval
+
+    @property
+    def bus_gap(self) -> float:
+        return FEED_GAP_SECONDS if self.feed.on else self.config.bus_quiet_ms / 1000
 
     def request_restart(self, _config: Any = None, reason: str = "connection") -> None:
         """A clean process restart is wanted ("connection": a saved change, called from the web
@@ -250,6 +294,7 @@ def resync(state: AppState) -> None:
         pack_state.availability = "unknown"          # current (freshness-derived) value goes out again
         publish_pack_availability(state, pack_state, now)
     state.publisher.publish(topics.availability(state.config.mqtt_topic), "online")
+    publish_feed_meta(state)
     state.publisher.replay()
     state.next_replay = now + REPLAY_DELAY_SECONDS
 
@@ -322,6 +367,8 @@ def publish_system_data(state: AppState, reader: SystemReader) -> None:
     state.publisher.publish(topics.system_availability(base), "online" if data is not None else "offline")
     if data is not None and state.publisher.state(topics.system_sensors(base), data):
         logger.info("System:Publishing updated data to MQTT")
+    if state.feed.on and reader.raw:
+        state.publisher.publish(topics.feed_system(base), state.feed.system_message(reader.raw))
 
 
 def active_sets(state: AppState) -> list:
@@ -434,10 +481,66 @@ def publish_sets(state: AppState) -> None:
         state.publisher.state(topics.set_availability(base, item.id), "online")
 
 
+def publish_feed_meta(state: AppState) -> None:
+    """The retained description of the feed while it is on, and once more with "on": false after it was switched off
+    (until the client accepted that). With the feed never on, nothing is published."""
+    if state.publisher is None or not (state.feed.on or state.feed_meta_on):
+        return
+    packs = [p.pack for p in state.packs]
+    message = state.feed.meta_message(state.config, packs, active_sets(state))
+    if state.publisher.publish(topics.feed_meta(state.config.mqtt_topic), message, retain=True):
+        state.feed_meta_sent = _feed_caches(packs)
+        state.feed_meta_on = state.feed.on
+
+
+def _feed_caches(packs: list) -> str:
+    import json
+    return json.dumps([[p.raw_ids, p.raw47] for p in packs], sort_keys=True)
+
+
+def round_groups(state: AppState) -> list[list[PackState]]:
+    """The packs of the next cycle: the members of a parallel set back to back while the feed is on, else one by
+    one in address order."""
+    if not state.feed.on:
+        return [[p] for p in state.packs]
+    return [[state.packs[a] for a in group] for group in feed_mod.round_order(len(state.packs), active_sets(state))]
+
+
 def poll_pack(state: AppState, pack_state: PackState) -> None:
     """Poll one pack and publish its data, heartbeat and availability."""
+    poll_group(state, [pack_state])
+
+
+def poll_group(state: AppState, members: list[PackState]) -> None:
+    """The core reads (0x42, 0x44) of all members first, then their optional reads, then the publishing: the packs of
+    a parallel set are read as close together as the bus allows."""
+    results = []
+    for pack_state in members:
+        results.append((pack_state, *pack_state.pack.read_core()))
+    for pack_state, data, success in results:
+        if data is not None:
+            try:
+                pack_state.pack.read_extras(data)
+            except Exception as e:
+                logger.error("Pack%s:Error reading serial data: %s", pack_state.address, e)
+                data, success = None, False
+        publish_poll(state, pack_state, data, success)
+    if state.feed.on:
+        base = state.config.mqtt_topic
+        for pack_state in members:
+            pack = pack_state.pack
+            raw47 = pack.raw47
+            new47 = raw47 if raw47 is not None and raw47.get("t") != pack_state.feed_r47_t else None
+            if state.publisher.publish(topics.feed_pack(base, pack_state.address),
+                                       state.feed.pack_message(pack_state.address, pack.raw, new47)) and new47:
+                pack_state.feed_r47_t = new47.get("t")
+        if _feed_caches([p.pack for p in state.packs]) != state.feed_meta_sent:
+            publish_feed_meta(state)
+
+
+def publish_poll(state: AppState, pack_state: PackState, data: dict | None, success: bool) -> None:
+    """Publish one pack's poll result, heartbeat and availability."""
     base, address, discovery = state.config.mqtt_topic, pack_state.address, state.discovery
-    data, success = pack_state.pack.read()
     now = time.monotonic()
 
     if success:
@@ -484,6 +587,15 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
     for other in state.packs:
         publish_pack_availability(state, other, now)
     state.publisher.publish(topics.availability(base), "online")
+
+
+def load_feed(store: StateStore | None) -> tuple[bool, int | None]:
+    """The stored feed switch: (on, auto_off epoch ms)."""
+    value = store.get(FEED_STATE_KEY) if store is not None else None
+    if not isinstance(value, dict):
+        return False, None
+    auto_off = value.get("auto_off")
+    return value.get("on") is True, auto_off if isinstance(auto_off, int) else None
 
 
 def persist_identity(state: AppState, new: Any) -> str:
@@ -723,7 +835,8 @@ def start_web(state: AppState, store: JsonStore, port: str) -> None:
 
         web_app = WebApp(
             WebSettings(port=int(port)), store, on_connection_saved=state.request_restart,
-            on_sets_saved=state.request_sets, on_cells_saved=state.request_cells, status_provider=lambda: with_pending(state, state.status),
+            on_sets_saved=state.request_sets, on_cells_saved=state.request_cells, on_feed=state.request_feed,
+            status_provider=lambda: with_pending(state, state.status),
             jobs=state.jobs if state.connection_error is None else None,     # setup mode: nothing runs jobs
         )
         web = WebThread(web_app)
@@ -812,7 +925,12 @@ def main(config: Config | None = None) -> None:
         state.balancer_inventory = {i for i in state.store.get("published_balancers", []) if isinstance(i, int)}
         reconcile_balancers(state)     # balancers unassigned while the add-on was stopped
 
-        index = 0
+        state.feed.on, state.feed.auto_off = load_feed(state.store)
+        state.adopt_feed()                 # an automatic switch-off that came due while stopped
+        if state.bus is not None:
+            state.bus.set_gap(state.bus_gap)
+        publish_feed_meta(state)
+        groups, index = round_groups(state), 0
         system_reader = SystemReader()
         state.next_replay = time.monotonic() + REPLAY_DELAY_SECONDS
         state.cycle_start = time.monotonic()
@@ -831,13 +949,17 @@ def main(config: Config | None = None) -> None:
                     run_job(state, job)       # at most one probe per iteration, same thread as the polling
                     if state.restart_event.is_set():
                         raise RestartRequested    # no further probe and no further poll
-                poll_pack(state, state.packs[index])
+                poll_group(state, groups[index])
                 update_status(state)
                 index += 1
-                if index >= len(state.packs):
+                if index >= len(groups):
                     index = 0
                     publish_system_data(state, system_reader)
                     state.adopt_sets()
+                    if state.adopt_feed():
+                        state.bus.set_gap(state.bus_gap)
+                        publish_feed_meta(state)
+                    groups = round_groups(state)
                     if state.adopt_cells():
                         for pack_state in state.packs:
                             check_identity(state, pack_state)
@@ -846,9 +968,9 @@ def main(config: Config | None = None) -> None:
                     now = time.monotonic()
                     state.last_cycle, state.cycle_start = now - state.cycle_start, now
                     update_status(state)
-                    if config.mqtt_update_interval > 0:
-                        logger.info("Waiting %s seconds before next cycle", config.mqtt_update_interval)
-                        if wait_or_restart(state, config.mqtt_update_interval):
+                    if state.round_pause > 0:
+                        logger.info("Waiting %s seconds before next cycle", state.round_pause)
+                        if wait_or_restart(state, state.round_pause):
                             raise RestartRequested
             except Exception:
                 logger.exception("Error in main loop")

@@ -33,6 +33,7 @@ _FIELDS = {
     "MAINT_FIRMWARE": "maint_firmware",
     "BUS": "bus",
     "BUS_QUIET_MS": "bus_quiet_ms",
+    "MQTT_UPDATE_INTERVAL": "mqtt_update_interval",
 }
 
 
@@ -278,6 +279,9 @@ def run_main(
     cell_types_after_polls: tuple = (),
     cell_packs: dict | None = None,
     balancer_profiles: tuple = (),
+    feed_after_polls: list[tuple[int, tuple]] | None = None,
+    update_interval: int = 0,
+    maint_firmware: bool = False,
 ) -> tuple[FakeMqtt, FakeSerial]:
     """
     Run main() against the fakes until the bus has answered `telemetry_polls` 0x42 requests
@@ -309,6 +313,9 @@ def run_main(
                 LAST_RUN["states"][0].request_restart()
             if job_after_polls is not None and counter["n"] == job_after_polls + 1:
                 LAST_RUN["job"] = LAST_RUN["states"][0].jobs.submit("detect")
+            for after, (on, hours) in feed_after_polls or []:
+                if counter["n"] == after + 1:
+                    LAST_RUN["states"][0].request_feed(on, hours)
             for after, handed_over in sets_after_polls or []:
                 if counter["n"] == after + 1:
                     LAST_RUN["states"][0].request_sets(types.SimpleNamespace(parallel_sets=handed_over))
@@ -346,7 +353,13 @@ def run_main(
     handlers: dict = {}
     monkeypatch.setattr(app.signal, "signal", lambda sig, handler: handlers.__setitem__(sig.name, handler))
     # no real waiting: the interruptible sleep only reports a requested restart
-    monkeypatch.setattr(app, "wait_or_restart", lambda state, _s: state.restart_event.is_set())
+    LAST_RUN["waits"] = []
+
+    def wait(state, seconds):
+        LAST_RUN["waits"].append(seconds)
+        return state.restart_event.is_set()
+
+    monkeypatch.setattr(app, "wait_or_restart", wait)
     LAST_RUN["execs"].clear()
     LAST_RUN["states"].clear()
     LAST_RUN["job"] = None
@@ -361,7 +374,8 @@ def run_main(
             LAST_RUN["states"].append(self)
 
     monkeypatch.setattr(app, "AppState", SpyState)
-    with mode(number_of_packs, ENABLE_HA_DISCOVERY_CONFIG=discovery, MQTT_TOPIC=topic, HA_DISCOVERY_PREFIX=prefix):
+    with mode(number_of_packs, ENABLE_HA_DISCOVERY_CONFIG=discovery, MQTT_TOPIC=topic, HA_DISCOVERY_PREFIX=prefix,
+              MQTT_UPDATE_INTERVAL=update_interval, MAINT_FIRMWARE=maint_firmware):
         LAST_RUN["exit"] = None
         try:
             app.main(None if startup else config())
@@ -699,9 +713,12 @@ def simulated_bank_cycle(packs: int, seconds_per_pack: float) -> list[int]:
         def parameter_sample(self):
             return None
 
-        def read(self):
+        def read_core(self):
             clock["t"] += seconds_per_pack
             return {"telemetry": {"normal": {"a": self.address}}}, True
+
+        def read_extras(self, _data):
+            pass
 
     state.packs = [app.PackState(SlowPack(i), i) for i in range(packs)]
     original = _time.monotonic
