@@ -1,6 +1,6 @@
 name: "Seplos MQTT RS485 Add-on"
 description: "Read Seplos BMS 2.0 (EMU1101, hardware V16) data via RS485 and publish it to HA via MQTT"
-version: "2.0.0-beta18"
+version: "2.0.0-beta19"
 slug: "seplos_mqtt_rs485_add-on"
 init: false
 arch:
