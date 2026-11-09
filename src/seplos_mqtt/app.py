@@ -156,7 +156,8 @@ class AppState:
         return max([self.last_poll, *(p.pack.core_success for p in self.packs if p.pack.core_success)])
 
     def max_age(self) -> float:
-        return health.max_poll_age(self.config.number_of_packs, self.config.mqtt_update_interval, self.config.multi_pack)
+        c = self.config
+        return health.max_poll_age(c.number_of_packs, c.mqtt_update_interval, c.can_bus, c.bus_quiet_ms / 1000)
 
     def pack_max_age(self, now: float) -> float:
         """
@@ -223,8 +224,8 @@ def publish_discovery(state: AppState) -> None:
     if discovery is None:
         return
     for pack_state in state.packs:
-        discovery.publish_pack(pack_state.address, pack_bus=not config.multi_pack)
-    if config.multi_pack:
+        discovery.publish_pack(pack_state.address, pack_bus=not config.can_bus)
+    if config.can_bus:
         discovery.publish_system()
     else:
         discovery.remove_system()
@@ -311,7 +312,7 @@ def total_full_energy(state: AppState, now: float) -> float | None:
 
 def publish_system_data(state: AppState, reader: SystemReader) -> None:
     """Read and publish the system values (multi pack mode via the CAN port RS485 bus only)."""
-    if not state.config.multi_pack or not state.packs:
+    if not state.config.can_bus or not state.packs:
         return
     data = reader.read(state.bus)
     if data is not None:
@@ -449,7 +450,7 @@ def poll_pack(state: AppState, pack_state: PackState) -> None:
             pack_state.availability = "online"
 
     if discovery and pack_state.pack.capabilities_resolved:
-        if discovery.set_capabilities(address, pack_state.pack.capabilities, pack_bus=not state.config.multi_pack):
+        if discovery.set_capabilities(address, pack_state.pack.capabilities, pack_bus=not state.config.can_bus):
             state.next_replay = now + REPLAY_DELAY_SECONDS
     if discovery and pack_state.pack.cell_count:
         discovery.update_cell_count(address, pack_state.pack.cell_count)
@@ -766,7 +767,7 @@ def main(config: Config | None = None) -> None:
                 except BridgeError as e:
                     raise ConnectionUnavailable(f"gateway bridge failed: {e}") from e
                 state.bridge = bridge
-            state.bus = SerialBus(initialize_serial(config))
+            state.bus = SerialBus(initialize_serial(config), gap=config.bus_quiet_ms / 1000)
         except ConnectionUnavailable as e:
             state.connection_error = str(e)
             logger.error("No connection to the BMS: %s. Waiting for a saved connection in the settings app", e)

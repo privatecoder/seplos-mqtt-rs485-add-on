@@ -31,6 +31,8 @@ _FIELDS = {
     "MQTT_TOPIC": "mqtt_topic",
     "HA_DISCOVERY_PREFIX": "ha_discovery_prefix",
     "MAINT_FIRMWARE": "maint_firmware",
+    "BUS": "bus",
+    "BUS_QUIET_MS": "bus_quiet_ms",
 }
 
 
@@ -180,7 +182,7 @@ def discovery(invert: bool = False, topic: str = "seplos", prefix: str = "homeas
 
 def discovery_startup(disc: Discovery, number_of_packs: int) -> None:
     """The discovery calls main() makes at startup."""
-    multi = number_of_packs > 1
+    multi = config().can_bus if config().number_of_packs == number_of_packs else number_of_packs > 1
     for pack_no in range(number_of_packs):
         disc.publish_pack(pack_no, pack_bus=not multi)
     if multi:

@@ -108,7 +108,7 @@ def _pack_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]
 
 def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
     """Snapshot of the running add-on. Missing values are None."""
-    multi = state.config.multi_pack
+    multi = state.config.can_bus
     if state.bridge is None:
         bridge = "none"
     else:
@@ -128,7 +128,7 @@ def build_status(state: Any, now_mono: float, now_wall: str) -> dict[str, Any]:
     ]
     return {
         "generated_at": now_wall,
-        "mode": "multi" if multi else "single",
+        "mode": "multi" if state.config.multi_pack else "single",
         "mqtt_connected": bool(state.mqtt is not None and state.mqtt.is_connected()),
         "bridge": bridge,
         "connection_error": getattr(state, "connection_error", None),

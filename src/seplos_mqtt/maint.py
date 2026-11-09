@@ -63,7 +63,7 @@ class Timed:
 @dataclass
 class MaintSupport:
     address: int
-    multi_pack: bool
+    can_bus: bool
     state: str = "pending"            # pending | present | absent | unknown | unsupported
     attempts: int = 0
     identity: md.Identity | None = None
@@ -126,12 +126,12 @@ class MaintSupport:
         caps = {CAP_MAINT}
         if self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS):
             caps.add(CAP_STORAGE)
-        if self.multi_pack:
+        if self.can_bus:
             caps.add(CAP_UART1)
             if self.identity.has_flag(md.FLAG_UART1_POWER_RTC):
                 caps.add(CAP_RTC)
         # lock state: from the 64/04 runtime cache, or (older images without 0x20) from BitGroup0 of 0x47
-        if self.identity.has_flag(md.FLAG_PACK_LOCK) and (self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS) or self.multi_pack):
+        if self.identity.has_flag(md.FLAG_PACK_LOCK) and (self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS) or self.can_bus):
             caps.add(CAP_LOCK)
         if self._marker_readable:
             caps.add(CAP_MARKER)
@@ -156,7 +156,7 @@ class MaintSupport:
         """64/02: on UART1 only the master answers, on UART0 every pack with image flag 0x10."""
         if self.identity is None:
             return False
-        return self.address == 0 if self.multi_pack else self.identity.has_flag(md.FLAG_UART0_MARKER)
+        return self.address == 0 if self.can_bus else self.identity.has_flag(md.FLAG_UART0_MARKER)
 
     # --- periodic reads ----------------------------------------------------------------------
 
@@ -196,7 +196,7 @@ class MaintSupport:
         if self.identity.has_capability(md.CAP_CALIBRATION):
             self._due(self.calibration, now, CALIBRATION_INTERVAL,
                       lambda: self._decode(bus, md.INFO_CALIBRATION_ACTIVE, md.CALIBRATION_ACTIVE_LEN, md.decode_calibration_active))
-        if self.multi_pack:
+        if self.can_bus:
             self._due(self.parameters, now, self._parameter_interval, lambda: self._read_parameters(bus))
             if not self.serials_done:
                 self._read_serials(bus)
@@ -282,4 +282,4 @@ class MaintSupport:
         return {"normal": normal, "binary": binary, "attributes": attributes}
 
     def uart1_parameters(self) -> dict | None:
-        return self.parameters.value if self.multi_pack else None
+        return self.parameters.value if self.can_bus else None

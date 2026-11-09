@@ -605,12 +605,13 @@ def test_every_text_the_code_asks_for_exists():
     assert not sorted(k for k in used if k not in en)
     # families built from a variable: every member has to exist
     names = re.findall(r"\{ name: '([a-z_]+)'", (STATIC_DIR / "settings.js").read_text())
-    assert len(names) == 11
+    assert len(names) == 13
     for name in names:
         assert f"settings.f.{name}.label" in en and f"settings.f.{name}.help" in en, name
     family = (
         [f"settings.opt.transport.{v}" for v in ("tcp", "serial")]
         + [f"settings.opt.baud.{v}" for v in ("auto", "9600", "19200")]
+        + [f"settings.opt.bus.{v}" for v in ("uart0", "uart1")]
         + [f"avail.{v}" for v in ("online", "offline", "unknown")]
         + ["maint.pending"]
         + [f"bridge.{v}" for v in ("alive", "dead", "none")]

@@ -77,8 +77,16 @@ _CONNECTION_KEYS = frozenset(
         "max_cell_voltage",
         "nominal_cell_voltage",
         "update_interval",
+        "bus",
+        "bus_quiet_ms",
     }
 )
+
+
+BUSES = ("uart0", "uart1")
+MIN_BUS_QUIET_MS = 200
+MAX_BUS_QUIET_MS = 2000
+DEFAULT_BUS_QUIET_MS = 1000
 
 
 @dataclass(frozen=True)
@@ -94,6 +102,10 @@ class ConnectionSettings:
     max_cell_voltage: float = 3.65
     nominal_cell_voltage: float = 3.2
     update_interval: int = 1
+    # "uart0" = RS485-1/2 (19200 Bd), "uart1" = RS485 pins of the CAN socket (9600 Bd); several packs need uart1
+    bus: str = "uart0"
+    # quiet on the bus before each request (the packs end a frame after about 100 ms of silence)
+    bus_quiet_ms: int = 1000
     # unknown keys (settings of later versions) survive load and save untouched
     _extra: Mapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
@@ -193,6 +205,23 @@ class ConnectionSettings:
             elif update_interval < 0:
                 bad("update_interval", "range")
 
+        # several packs are always read on the CAN socket: the choice exists only for a single pack
+        several = _is_int(pack_count) and pack_count > 1
+        bus = "uart1" if several else "uart0"
+        if "bus" in data:
+            if data["bus"] not in BUSES or not isinstance(data["bus"], str):
+                bad("bus", "value")
+            elif not several:
+                bus = data["bus"]
+
+        bus_quiet_ms = DEFAULT_BUS_QUIET_MS
+        if "bus_quiet_ms" in data:
+            bus_quiet_ms = data["bus_quiet_ms"]
+            if not _is_int(bus_quiet_ms):
+                bad("bus_quiet_ms", "type")
+            elif not MIN_BUS_QUIET_MS <= bus_quiet_ms <= MAX_BUS_QUIET_MS:
+                bad("bus_quiet_ms", "range")
+
         if problems:
             raise ConfigValidationError(problems)
         return cls(
@@ -207,6 +236,8 @@ class ConnectionSettings:
             max_cell_voltage=volts["max_cell_voltage"],
             nominal_cell_voltage=nominal,
             update_interval=update_interval,
+            bus=bus,
+            bus_quiet_ms=bus_quiet_ms,
             _extra={k: copy.deepcopy(v) for k, v in data.items() if k not in _CONNECTION_KEYS},
         )
 
@@ -226,6 +257,8 @@ class ConnectionSettings:
             max_cell_voltage=self.max_cell_voltage,
             nominal_cell_voltage=self.nominal_cell_voltage,
             update_interval=self.update_interval,
+            bus=self.bus,
+            bus_quiet_ms=self.bus_quiet_ms,
         )
         return out
 

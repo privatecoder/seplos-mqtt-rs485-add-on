@@ -74,6 +74,10 @@ class Config:
     invert_ha_dis_charge_measurements: bool = True
     # read the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware (read-only)
     maint_firmware: bool = False
+    # "uart0" | "uart1" (several packs: always uart1)
+    bus: str = "uart0"
+    # quiet on the bus before each request, ms
+    bus_quiet_ms: int = 1000
     # Logging
     logging_level: str = "INFO"
     # persistent state (energy counters); empty = /data/seplos_state.json if writable
@@ -81,17 +85,22 @@ class Config:
 
     @property
     def multi_pack(self) -> bool:
-        """
-        Multiple packs are read via the RS485 bus on the CAN port (UART1, 9600 baud),
-        a single pack via RS485-1/2 (UART0, 19200 baud).
-        """
+        """More than one pack (parallel sets need it). Which bus is read is ``can_bus``."""
         return self.number_of_packs > 1
+
+    @property
+    def can_bus(self) -> bool:
+        """
+        Read via the RS485 bus on the CAN port (UART1, 9600 baud) instead of RS485-1/2 (UART0,
+        19200 baud). Several packs are always read there; a single pack on either bus.
+        """
+        return self.bus == "uart1" or self.multi_pack
 
     @property
     def baudrate(self) -> int:
         if self.serial_baudrate:
             return self.serial_baudrate
-        return 9600 if self.multi_pack else 19200
+        return 9600 if self.can_bus else 19200
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Config:
@@ -117,6 +126,7 @@ class Config:
             ha_discovery_prefix=_env(env, "HA_DISCOVERY_PREFIX", d.ha_discovery_prefix, str),
             invert_ha_dis_charge_measurements=_env(env, "INVERT_HA_DIS_CHARGE_MEASUREMENTS", d.invert_ha_dis_charge_measurements, bool),
             maint_firmware=_env(env, "MAINT_FIRMWARE", d.maint_firmware, bool),
+            bus="uart1" if _env(env, "NUMBER_OF_PACKS", d.number_of_packs, int) > 1 else "uart0",
             logging_level=_env(env, "LOGGING_LEVEL", "info", str).upper(),
             state_file=_env(env, "STATE_FILE", d.state_file, str),
         )
@@ -144,6 +154,8 @@ class Config:
             mqtt_password=_env(env, "MQTT_PASSWORD", d.mqtt_password, str),
             mqtt_topic=_env(env, "MQTT_TOPIC", d.mqtt_topic, str),
             mqtt_update_interval=conn.update_interval,
+            bus=conn.bus,
+            bus_quiet_ms=conn.bus_quiet_ms,
             enable_ha_discovery=_env(env, "ENABLE_HA_DISCOVERY_CONFIG", d.enable_ha_discovery, bool),
             ha_discovery_prefix=_env(env, "HA_DISCOVERY_PREFIX", d.ha_discovery_prefix, str),
             invert_ha_dis_charge_measurements=_env(env, "INVERT_HA_DIS_CHARGE_MEASUREMENTS", d.invert_ha_dis_charge_measurements, bool),
@@ -162,6 +174,10 @@ class Config:
             problems.append(f"nominal cell voltage {self.nominal_cell_voltage} V")
         if not 1 <= self.mqtt_port <= 65535:
             problems.append(f"mqtt_port {self.mqtt_port}")
+        if self.bus not in ("uart0", "uart1"):
+            problems.append(f"bus {self.bus!r}")
+        if not 200 <= self.bus_quiet_ms <= 2000:
+            problems.append(f"bus_quiet_ms {self.bus_quiet_ms} (200-2000)")
         if self.mqtt_update_interval < 0:
             problems.append(f"mqtt_update_interval {self.mqtt_update_interval}")
         for name in ("mqtt_topic", "ha_discovery_prefix"):

@@ -9,6 +9,7 @@ import { storeBanner } from './overview.js';
 const KNOWN = new Set([
   'transport', 'host', 'port', 'device', 'baud', 'pack_count', 'maint_firmware',
   'min_cell_voltage', 'max_cell_voltage', 'nominal_cell_voltage', 'update_interval',
+  'bus', 'bus_quiet_ms',
 ]);
 
 const FIELDS = [
@@ -18,6 +19,8 @@ const FIELDS = [
   { name: 'device', kind: 'text', group: 'serial' },
   { name: 'baud', kind: 'select', options: ['auto', '9600', '19200'], unit: 'Bd' },
   { name: 'pack_count', kind: 'text', inputmode: 'numeric' },
+  { name: 'bus', kind: 'select', options: ['uart0', 'uart1'] },
+  { name: 'bus_quiet_ms', kind: 'text', inputmode: 'numeric', unit: 'ms' },
   { name: 'maint_firmware', kind: 'checkbox' },
   { name: 'min_cell_voltage', kind: 'text', inputmode: 'decimal', unit: 'V' },
   { name: 'max_cell_voltage', kind: 'text', inputmode: 'decimal', unit: 'V' },
@@ -61,6 +64,8 @@ function toRaw(conn) {
     max_cell_voltage: volt(conn.max_cell_voltage ?? 3.65),
     nominal_cell_voltage: volt(conn.nominal_cell_voltage ?? 3.2),
     update_interval: String(conn.update_interval ?? 1),
+    bus: conn.bus === 'uart1' || (conn.pack_count ?? 1) > 1 ? 'uart1' : 'uart0',
+    bus_quiet_ms: String(conn.bus_quiet_ms ?? 1000),
   };
 }
 
@@ -99,6 +104,11 @@ export function checkRaw(raw) {
   }
   if (!INT.test(raw.update_interval.trim())) errors.update_interval = 'type';
   values.update_interval = Number(raw.update_interval);
+  // several packs are always read on the CAN socket (the server enforces it as well)
+  values.bus = values.pack_count > 1 ? 'uart1' : raw.bus;
+  if (!INT.test(raw.bus_quiet_ms.trim())) errors.bus_quiet_ms = 'type';
+  else if (Number(raw.bus_quiet_ms) < 200 || Number(raw.bus_quiet_ms) > 2000) errors.bus_quiet_ms = 'range';
+  values.bus_quiet_ms = Number(raw.bus_quiet_ms);
   return { errors, values };
 }
 
@@ -157,7 +167,7 @@ export function settingsView(ctx) {
     h('fieldset', { class: 'card' }, h('legend', {}, t('settings.group.connection')),
       fieldEls.transport, fieldEls.host, fieldEls.port, fieldEls.device, fieldEls.baud),
     h('fieldset', { class: 'card' }, h('legend', {}, t('settings.group.bank')),
-      fieldEls.pack_count, fieldEls.maint_firmware, fieldEls.update_interval),
+      fieldEls.pack_count, fieldEls.bus, fieldEls.bus_quiet_ms, fieldEls.maint_firmware, fieldEls.update_interval),
     h('fieldset', { class: 'card' }, h('legend', {}, t('settings.group.cells')),
       fieldEls.min_cell_voltage, fieldEls.max_cell_voltage, fieldEls.nominal_cell_voltage),
     h('div', { class: 'actions' }, saveButton, resetButton));
@@ -193,10 +203,19 @@ export function settingsView(ctx) {
   function applyTransport() {
     const tcp = inputs.transport.value === 'tcp';
     for (const [name, group] of Object.entries(groups)) fieldEls[name].hidden = (group === 'tcp') !== tcp;
+    applyBus();
+  }
+
+  // the bus choice exists only for a single pack
+  function applyBus() {
+    const several = Number(inputs.pack_count.value) > 1;
+    if (several) inputs.bus.value = 'uart1';
+    inputs.bus.disabled = several || controlsDisabled();
   }
 
   function setDisabled(disabled) {
     for (const input of Object.values(inputs)) input.disabled = disabled;
+    if (Number(inputs.pack_count.value) > 1) inputs.bus.disabled = true;
     saveButton.disabled = disabled;
     resetButton.disabled = disabled;
   }
@@ -334,6 +353,7 @@ export function settingsView(ctx) {
   }
 
   inputs.transport.addEventListener('change', applyTransport);
+  inputs.pack_count.addEventListener('input', applyBus);
   form.addEventListener('submit', save);
   applyTransport();
   setDisabled(true);

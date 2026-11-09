@@ -735,3 +735,53 @@ def test_from_monitoring_invalid_mqtt_port_raises():
         Config.from_monitoring(mon, {"MQTT_PORT": "abc"})
     with pytest.raises(ConfigError):
         Config.from_monitoring(mon, {"MQTT_PORT": "70000"})
+
+
+# ---------------------------------------------------------------- bus choice, bus quiet
+
+
+def test_bus_defaults_from_pack_count():
+    assert ConnectionSettings.from_dict(_serial(pack_count=3)).bus == "uart1"
+    s = ConnectionSettings.from_dict(_serial(pack_count=1))
+    assert (s.bus, s.bus_quiet_ms) == ("uart0", 1000)
+
+
+def test_bus_and_quiet_round_trip():
+    s = ConnectionSettings.from_dict(_serial(pack_count=1, bus="uart1", bus_quiet_ms=300))
+    assert (s.bus, s.bus_quiet_ms) == ("uart1", 300)
+    assert ConnectionSettings.from_dict(s.to_dict()) == s
+
+
+def test_several_packs_are_always_on_uart1():
+    assert ConnectionSettings.from_dict(_serial(pack_count=2, bus="uart0")).bus == "uart1"
+
+
+@pytest.mark.parametrize(("bus", "kind"), [("can", "value"), (1, "value")])
+def test_bus_value(bus, kind):
+    with pytest.raises(ConfigValidationError) as e:
+        ConnectionSettings.from_dict(_serial(bus=bus))
+    assert ("connection.bus", kind) in e.value.problems
+
+
+@pytest.mark.parametrize(("ms", "problem"), [(199, "range"), (200, None), (2000, None), (2001, "range"),
+                                             (1.5, "type"), (True, "type")])
+def test_bus_quiet_range(ms, problem):
+    if problem is None:
+        assert ConnectionSettings.from_dict(_serial(bus_quiet_ms=ms)).bus_quiet_ms == ms
+    else:
+        with pytest.raises(ConfigValidationError) as e:
+            ConnectionSettings.from_dict(_serial(bus_quiet_ms=ms))
+        assert ("connection.bus_quiet_ms", problem) in e.value.problems
+
+
+def test_config_bus_from_monitoring():
+    mon = MonitoringConfig.from_dict({"connection": _serial(pack_count=1, bus="uart1", bus_quiet_ms=500)})
+    c = Config.from_monitoring(mon, {})
+    assert (c.bus, c.can_bus, c.multi_pack, c.baudrate, c.bus_quiet_ms) == ("uart1", True, False, 9600, 500)
+
+
+def test_config_legacy_bus_follows_pack_count():
+    c = Config.from_env({"NUMBER_OF_PACKS": "1"})
+    assert (c.can_bus, c.baudrate, c.bus_quiet_ms) == (False, 19200, 1000)
+    c = Config.from_env({"NUMBER_OF_PACKS": "3"})
+    assert (c.can_bus, c.baudrate) == (True, 9600)

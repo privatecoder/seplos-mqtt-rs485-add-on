@@ -78,7 +78,7 @@ class BatteryPack:
         self.cell_count: int | None = None
         # monotonic time of the last successful core read (0x42 + 0x44), for the health check
         self.core_success = 0.0
-        self.maint = MaintSupport(address, config.multi_pack) if config.maint_firmware else None
+        self.maint = MaintSupport(address, config.can_bus) if config.maint_firmware else None
         self._uart1_parameters_ts = 0.0
         self.clock_value: dict | None = None
         self.clock_ts = 0.0
@@ -134,7 +134,7 @@ class BatteryPack:
 
         # 0xA2/0xA4 are only served on the RS485-1/2 port (UART0); the RS485 bus on the CAN port
         # (UART1) only knows 0x42/0x44/0x4F/0x51/0x60-0x63
-        if not self.config.multi_pack:
+        if not self.config.can_bus:
             for cid2, key, label in ((0xA2, "serial_number", "SerialNumber"), (0xA4, "bms_serial_number", "BmsSerialNumber")):
                 serial = self._request(cid2, SERIAL_LEN, lambda raw, k=key: identity.decode_serial_number(raw, k), label, info=b"")
                 if serial is not None:
@@ -156,7 +156,7 @@ class BatteryPack:
             return "16.04.x"
         if firmware_version != "16.06":
             return f"{firmware_version} (unknown)"
-        if self.config.multi_pack:
+        if self.config.can_bus:
             return self._derive_patch_can_port()
         return self._derive_patch_pack_bus()
 
@@ -274,7 +274,7 @@ class BatteryPack:
         if self.info is not None and self.info["normal"].get("firmware_patch") != maint.identity.base_version:
             self.info["normal"]["firmware_patch"] = maint.identity.base_version
             self.info_revision += 1
-        if self.parameters is not None and not self.config.multi_pack:
+        if self.parameters is not None and not self.config.can_bus:
             maint.group0 = int(self.parameters["function_switches"][:2], 16)
         elif maint.parameters.value is not None:
             maint.group0 = int(maint.parameters.value["function_switches"][:2], 16)
@@ -291,7 +291,7 @@ class BatteryPack:
             else:
                 logger.warning("Pack%s:Could not persist the MAINT energy source, energy unknown until it is", self.address)
                 data["telemetry"]["normal"].update(energy_charged=None, energy_discharged=None)
-        if self.config.multi_pack:
+        if self.config.can_bus:
             if maint.parameters.value is not None:
                 if maint.parameters.ts != self._uart1_parameters_ts:
                     self._uart1_parameters_ts = maint.parameters.ts
@@ -305,7 +305,7 @@ class BatteryPack:
     CLOCK_INTERVAL = 600
 
     def _clock_readable(self) -> bool:
-        if not self.config.multi_pack:
+        if not self.config.can_bus:
             return True
         return self.maint is not None and "maint_rtc" in self.maint.capabilities
 
@@ -335,7 +335,7 @@ class BatteryPack:
     def parameter_sample(self) -> Sample | None:
         """The readable parameters with their read time: 0x47 on RS485-1/2, MAINT binary 47 on UART1. Stale after
         two missed refreshes of the cadence."""
-        if not self.config.multi_pack:
+        if not self.config.can_bus:
             if self.parameters is None:
                 return None
             return Sample(self.parameters, self.parameters_ts, 3 * self.PARAMETER_REFRESH_SECONDS)
@@ -388,7 +388,7 @@ class BatteryPack:
             if clock_payload is not None:
                 data["clock"] = clock_payload
 
-            if not self.config.multi_pack:
+            if not self.config.can_bus:
                 extended_status = self._fetch_extended_status()
                 now = time.monotonic()
                 if extended_status is not None:

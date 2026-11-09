@@ -9,16 +9,19 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 logger = logging.getLogger("SeplosBMS.health")
 
 PORT = 8080
-# requests per pack and poll incl. the 1 s bus gap: 0x42/0x44 (+ 0x5A on RS485-1/2), with slack for retries
-SECONDS_PER_PACK_SINGLE = 4
-SECONDS_PER_PACK_MULTI = 3
-SYSTEM_SECONDS = 3
+# requests per pack and poll: 0x42/0x44 (+ 0x5A on RS485-1/2); each waits the bus quiet first, plus one second of
+# slack per pack for line time and retries
+REQUESTS_PER_PACK_UART0 = 3
+REQUESTS_PER_PACK_UART1 = 2
+SYSTEM_REQUESTS = 2
+SLACK_SECONDS = 1
 
 
-def max_poll_age(number_of_packs: int, update_interval: int, multi_pack: bool) -> float:
+def max_poll_age(number_of_packs: int, update_interval: int, can_bus: bool, quiet_s: float = 1.0) -> float:
     """Acceptable age of the last successful poll (of any pack), derived from the polling cadence."""
-    per_pack = SECONDS_PER_PACK_MULTI if multi_pack else SECONDS_PER_PACK_SINGLE
-    cycle = max(number_of_packs, 1) * per_pack + max(update_interval, 0) + (SYSTEM_SECONDS if multi_pack else 0)
+    per_pack = (REQUESTS_PER_PACK_UART1 if can_bus else REQUESTS_PER_PACK_UART0) * quiet_s + SLACK_SECONDS
+    system = SYSTEM_REQUESTS * quiet_s + SLACK_SECONDS if can_bus else 0
+    cycle = max(number_of_packs, 1) * per_pack + max(update_interval, 0) + system
     return max(60.0, cycle * 3 + 10.0)
 
 

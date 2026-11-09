@@ -1420,3 +1420,27 @@ def test_maint16_bank_master_and_slave(monkeypatch, golden):
     assert api.capabilities(master) == {"maint", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc"}
     assert not any(r.cid2 == 0x64 and r.info in (b"\x04", b"\x06") for r in bms.requests)
     golden("poll_maint16_bank", {"master": m, "slave": s})
+
+
+def test_single_pack_on_uart1_polls_like_the_can_socket(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, BUS="uart1"):
+        assert api.config().baudrate == 9600
+        bms = _multi_pack_bms()
+        data, ok = api.poll(api.make_pack(0), bms)
+        assert ok and "status" not in data and "parameters" not in data
+        cids = {r.cid2 for r in bms.requests if r.kind == "ascii"}
+        assert 0x5A not in cids and 0x47 not in cids and 0xA2 not in cids
+
+
+def test_single_pack_on_uart1_discovery_has_the_system_device():
+    disc, client = api.discovery()
+    with api.mode(1, BUS="uart1"):
+        api.discovery_startup(disc, 1)
+    assert disc._system_active
+
+
+def test_health_age_follows_bus_quiet():
+    from seplos_mqtt import health
+    assert health.max_poll_age(12, 0, True, 2.0) > health.max_poll_age(12, 0, True, 1.0)
+    assert health.max_poll_age(4, 60, True, 1.0) == (4 * 3 + 60 + 3) * 3 + 10
