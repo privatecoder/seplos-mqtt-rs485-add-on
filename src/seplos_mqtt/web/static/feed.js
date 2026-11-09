@@ -30,7 +30,9 @@ export function feedSection(ctx) {
   let timer = null;
   let destroyed = false;
   let generation = 0;
-  let inflight = false;    // one status read at a time: a slow answer is taken, never overtaken by the next poll
+  // the running status read (one at a time: a slow answer is taken, never overtaken by the next poll); only its owner
+  // clears it
+  let inflight = null;
 
   function render() {
     const feed = state.feed;
@@ -70,9 +72,12 @@ export function feedSection(ctx) {
     el.replaceChildren(...children);
   }
 
-  async function refresh() {
-    if (destroyed || inflight || document.visibilityState !== 'visible') return;
-    inflight = true;
+  // `force`: the read after a switch, which replaces a read still under way (that one's answer is then ignored)
+  async function refresh(force = false) {
+    // no poll while a switch is sent: its read follows the switch
+    if (destroyed || (!force && (inflight || state.busy)) || document.visibilityState !== 'visible') return;
+    const token = {};
+    inflight = token;
     const mine = generation;
     try {
       const data = await api('GET', 'api/status');
@@ -88,9 +93,9 @@ export function feedSection(ctx) {
       // the state stays as last read (unknown before the first read), never shown as "off"
       state.loadError = error.status === 0 ? t('conn.lost') : errorText(error);
     } finally {
-      inflight = false;
+      if (inflight === token) inflight = null;
     }
-    render();
+    if (mine === generation) render();
   }
 
   async function send(body) {
@@ -105,8 +110,7 @@ export function feedSection(ctx) {
       state.switchError = errorText(error);
     }
     state.busy = false;
-    inflight = false;
-    await refresh();
+    await refresh(true);
   }
 
   function start() {

@@ -1382,3 +1382,53 @@ def test_feed_auto_off_choice_applies_at_once_while_on():
         "eq(m.autoOffRequest({ on: true, until_ms: 5 }, 'keep'), null);"
         "eq(m.autoOffRequest({ on: false }, '1'), null);"
     ))
+
+
+def test_feed_card_switch_is_never_undone_by_an_older_status_read():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    feed_js = (STATIC_DIR / "feed.js").as_uri()
+    script = (
+        # a minimal DOM: elements with children, attributes, listeners
+        "class Node {}"
+        "class El extends Node { constructor(tag) { super(); this.tag = tag; this.children = []; this.listeners = {}; this.attrs = {}; }"
+        "  append(c) { this.children.push(c); } replaceChildren(...c) { this.children = c; }"
+        "  setAttribute(k, v) { this.attrs[k] = v; if (k === 'id') this.id = v; } addEventListener(k, f) { this.listeners[k] = f; } }"
+        "globalThis.Node = Node;"
+        "globalThis.document = { visibilityState: 'visible', createElement: (t) => new El(t),"
+        "  createTextNode: (s) => Object.assign(new El('#text'), { text: s }),"
+        "  addEventListener() {}, removeEventListener() {} };"
+        "let poll = null; globalThis.setInterval = (f) => { poll = f; return 1; }; globalThis.clearInterval = () => {};"
+        # fetch answers on demand, in any order
+        "const pending = [];"
+        "globalThis.fetch = (url, opts) => new Promise((resolve) => pending.push({ url, method: opts.method, resolve }));"
+        "const answer = (i, body) => { const p = pending.splice(i, 1)[0]; p.resolve({ ok: true, status: 200, json: async () => body }); };"
+        "const status = (on, pendingFlag = false) => ({ status: { feed: { on, until_ms: null, pending: pendingFlag }, last_cycle_s: 10 } });"
+        "const find = (el, id) => { if (el.id === id) return el;"
+        "  for (const c of el.children || []) { const f = c && find(c, id); if (f) return f; } return null; };"
+        "const tick = () => new Promise((r) => setTimeout(r, 0));"
+        f"const {{ feedSection }} = await import({feed_js!r});"
+        "const card = feedSection({ session: { user: { id: 'u' } } });"
+        # first read: off
+        "answer(0, status(false)); await tick(); await tick();"
+        "let toggle = find(card.el, 'feed-on'); if (toggle.checked !== false) process.exit(2);"
+        # a poll read A is under way, then the user switches on
+        "poll(); await tick(); if (!pending.some((p) => p.method === 'GET')) process.exit(3);"
+        "toggle.checked = true; toggle.listeners.change(); await tick();"
+        # the shown switch after every step: it must never go back from on to off
+        "const shown = []; const look = () => shown.push(find(card.el, 'feed-on').checked);"
+        # PUT answered: the read after the switch (B) starts; the old poll A answers late with off
+        "const put = pending.findIndex((p) => p.method === 'PUT'); answer(put, { on: true }); await tick(); await tick(); look();"
+        "answer(0, status(false)); await tick(); await tick(); look();"
+        # a poll now must not start a second read beside B; if one starts (C), it answers on
+        "poll(); await tick();"
+        "if (pending.filter((p) => p.method === 'GET').length > 1) { answer(pending.length - 1, status(true)); await tick(); await tick(); look(); }"
+        # B, older than C, answers with the state before the add-on adopted the switch
+        "answer(0, status(false, true)); await tick(); await tick(); look();"
+        "for (let i = 1; i < shown.length; i++)"
+        "  if (shown[i - 1] === true && shown[i] === false) { console.log('switched back', shown); process.exit(1); }"
+        "console.log('ok');"
+    )
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stdout + done.stderr
