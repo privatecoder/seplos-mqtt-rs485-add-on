@@ -829,3 +829,11 @@ def pack_report(state, pack_state, now: float) -> dict:
 
 def total_full_energy(state, now: float):
     return app.total_full_energy(state, now)
+
+
+def new_system_reader() -> SystemReader:
+    return SystemReader()
+
+
+def read_system_with(reader: SystemReader, bms: FakeBms):
+    return reader.read(SerialBus(FakeSerial(bms)))

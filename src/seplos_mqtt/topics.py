@@ -66,3 +66,21 @@ def pack_node(pack_no: int) -> str:
 
 
 SYSTEM_NODE = "seplos-mqtt-system"
+
+
+# --- OpenBMS Monitor feed (docs/exchange/openbms-feed-v1.md) ---
+
+def feed_base(base: str) -> str:
+    return f"{base}/openbms/v1"
+
+
+def feed_pack(base: str, pack_no: int) -> str:
+    return f"{feed_base(base)}/pack/{pack_no}"
+
+
+def feed_system(base: str) -> str:
+    return f"{feed_base(base)}/system"
+
+
+def feed_meta(base: str) -> str:
+    return f"{feed_base(base)}/meta"

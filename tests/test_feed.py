@@ -174,3 +174,82 @@ def test_status_failure_keeps_maint_energy_source(monkeypatch, tmp_path):
         data, ok = api.poll(pack, bms)
     assert not ok
     assert data["telemetry"]["normal"]["energy_charged"] in (7000.1, None)      # never the narrow 650.0
+
+
+# ---------------------------------------------------------------- feed messages, round order, system raw
+
+from unittest.mock import ANY  # noqa: E402
+
+from seplos_mqtt import feed, topics  # noqa: E402
+from seplos_mqtt.monitoring.model import ParallelSet  # noqa: E402
+
+
+def test_feed_topics():
+    assert topics.feed_pack("seplos", 3) == "seplos/openbms/v1/pack/3"
+    assert topics.feed_system("seplos") == "seplos/openbms/v1/system"
+    assert topics.feed_meta("seplos") == "seplos/openbms/v1/meta"
+
+
+def test_round_order_sets_first_ends():
+    s = ParallelSet(id=1, name="A", packs=(2, 3, 4), wiring="diagonal", plus=4, minus=2)
+    assert feed.round_order(6, [s]) == [[0], [1], [4, 2, 3], [5]]
+
+
+def test_round_order_no_sets():
+    assert feed.round_order(3, []) == [[0], [1], [2]]
+
+
+def test_round_order_ignores_missing_pack():
+    assert feed.round_order(2, [ParallelSet(id=1, name="A", packs=(1, 5))]) == [[0], [1]]
+
+
+def test_round_order_pair_without_ends():
+    assert feed.round_order(4, [ParallelSet(id=1, name="A", packs=(3, 1))]) == [[0], [3, 1], [2]]
+
+
+def test_pack_message_shape():
+    fd = feed.Feed(boot="ab")
+    m = fd.pack_message(0, {"r42": {"t": 1, "hex": "00"}}, None)
+    assert m == {"v": 1, "boot": "ab", "seq": 1, "sent_at": ANY, "addr": 0, "r42": {"t": 1, "hex": "00"}}
+    m = fd.pack_message(1, {"r42": {"t": 2, "err": "failed"}}, {"t": 0, "hex": "11"})
+    assert m["seq"] == 2 and m["r47"] == {"t": 0, "hex": "11"}
+
+
+def test_seq_is_global():
+    fd = feed.Feed(boot="ab")
+    seqs = [fd.pack_message(0, {}, None)["seq"], fd.system_message({})["seq"], fd.pack_message(1, {}, None)["seq"]]
+    assert seqs == [1, 2, 3]
+
+
+def test_boot_is_random_hex():
+    a, b = feed.Feed(), feed.Feed()
+    assert a.boot != b.boot and len(a.boot) == 16 and int(a.boot, 16) >= 0
+
+
+def test_meta_contains_sets_and_cache(monkeypatch):
+    monkeypatch.setenv("ADDON_VERSION", "2.0.0-test")
+    api.no_sleep(monkeypatch)
+    with api.mode(2):
+        pack = api.make_pack(0)
+        api.poll(pack, _multi_pack_bms())
+        s = ParallelSet(id=7, name="A", packs=(0, 1), wiring="diagonal", plus=0, minus=1)
+        fd = feed.Feed(boot="ab", on=True)
+        m = fd.meta_message(api.config(), [pack], [s])
+    assert set(m) == {"v", "on", "auto_off", "boot", "sent_at", "bus", "addon", "packs", "sets"}
+    assert (m["on"], m["auto_off"], m["bus"], m["addon"]) == (True, None, "uart1", "2.0.0-test")
+    assert m["packs"] == [{"addr": 0, **pack.raw_ids, "r47": pack.raw47}]
+    assert m["sets"] == [{"id": 7, "packs": [0, 1], "wiring": "diagonal", "plus": 0, "minus": 1}]
+
+
+def test_system_raw(monkeypatch):
+    api.no_sleep(monkeypatch)
+    monkeypatch.setattr(timeutil, "now_ms", lambda: 4242)
+    bms = _multi_pack_bms()
+    reader = api.new_system_reader()
+    api.read_system_with(reader, bms)
+    regs = f.system_registers()
+    assert reader.raw["r1000"] == {"t": 4242, "hex": b"".join(r.to_bytes(2, "big") for r in regs).hex()}
+    assert reader.raw["r0074"] == {"t": 4242, "hex": "00c0"}
+    del bms.modbus[(0x03, 0x0074, 1)]
+    api.read_system_with(reader, bms)
+    assert reader.raw["r0074"]["err"] == "failed" and "hex" in reader.raw["r1000"]
