@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from typing import Protocol
 
+from . import timeutil
 from .decoders import intrapack
 from .framing import ascii as af
 from .framing import binary as bf
@@ -62,6 +63,20 @@ class SerialBus:
         self._lock = threading.Lock()
         self._last_activity: float | None = None
         self._skipped = 0
+        # the last request: epoch ms right after its valid answer, and why it failed
+        # ("busy": nothing sent, "failed": no valid answer, "unsupported": the firmware refused it; None: ok)
+        self.last_at: int | None = None
+        self.last_failure: str | None = None
+
+    def set_gap(self, seconds: float) -> None:
+        """The quiet before each request from the next request on (OpenBMS Monitor feed: 0.2 s)."""
+        self.gap = seconds
+
+    def _answered(self) -> None:
+        self.last_at, self.last_failure = timeutil.now_ms(), None
+
+    def _failed(self, reason: str) -> None:
+        self.last_failure = reason
 
     @property
     def is_open(self) -> bool:
@@ -117,6 +132,14 @@ class SerialBus:
 
     def _mark_activity(self) -> None:
         self._last_activity = self._clock()
+
+    def _send_tracked(self, data: bytes, reset_input: bool = False) -> None:
+        """``_send`` for the requests that report ``last_failure``."""
+        try:
+            self._send(data, reset_input)
+        except BusBusy:
+            self._failed("busy")
+            raise
 
     def _send(self, data: bytes, reset_input: bool = False) -> None:
         # _wait_quiet() returns only with an empty input buffer (everything received was drained and
@@ -178,11 +201,13 @@ class SerialBus:
         logger.debug("Pack%s:%s_command: %s", address, label, command)
         with self._lock:
             for attempt in range(attempts):
-                self._send(command)
+                self._send_tracked(command)
                 payload = af.validate_response(self._receive_frame(), address, expected)
                 if payload is not None:
+                    self._answered()
                     return payload
                 logger.debug("Pack%s:%s attempt %s: no valid answer", address, label, attempt + 1)
+        self._failed("failed")
         if retries is None:
             logger.error("Pack%s:Failed to read %s after %s retries", address, label.lower(), attempts)
         else:
@@ -216,7 +241,7 @@ class SerialBus:
         command = af.encode(address, cid2, info)
         with self._lock:
             for _ in range(attempts):
-                self._send(command, reset_input=True)
+                self._send_tracked(command, reset_input=True)
                 raw = self._receive_frame()
                 if raw == command:             # gateway echo of the request
                     raw = self._receive_frame()
@@ -229,7 +254,9 @@ class SerialBus:
                     result = None
                     continue
                 if frame.address == address:
+                    self._answered()
                     return frame
+        self._failed("failed")
         return result
 
     def request_binary(self, address: int, command: int, data: bytes = b"") -> bytes | None:
@@ -239,7 +266,8 @@ class SerialBus:
         """
         request = bf.encode(address, command, data)
         with self._lock:
-            self._send(request, reset_input=True)
+            self._send_tracked(request, reset_input=True)
+            self._failed("failed")
             try:
                 for _ in range(2):
                     header = self.port.read(4)
@@ -249,12 +277,15 @@ class SerialBus:
                     if raw == request:
                         continue
                     try:
-                        return bf.parse(raw, address, command)
+                        answer = bf.parse(raw, address, command)
                     except bf.BinaryRejected:
+                        self._failed("unsupported")
                         raise
                     except bf.BinaryFrameError as e:
                         logger.debug("Pack%s:Binary 0x%02X: %s", address, command, e)
                         return None
+                    self._answered()
+                    return answer
                 return None
             finally:
                 self._mark_activity()
@@ -275,7 +306,7 @@ class SerialBus:
 
     def _modbus_exchange(self, request: bytes, response_length: int) -> bytes:
         with self._lock:
-            self._send(request, reset_input=True)
+            self._send_tracked(request, reset_input=True)
             try:
                 return self.port.read(response_length)
             finally:
@@ -283,12 +314,22 @@ class SerialBus:
 
     def read_modbus(self, function_code: int, register: int, count: int) -> tuple[modbus.Status | None, list[int] | None]:
         response = self._modbus_exchange(modbus.encode_read(function_code, register, count), modbus.response_length(count))
-        return modbus.parse_read(response, function_code, count)
+        return self._modbus_result(modbus.parse_read(response, function_code, count))
 
     def read_modbus_single_wide(self, function_code: int, register: int) -> tuple[modbus.Status | None, int | None]:
         """One register from a handler with the non-standard 16-bit byte count (8 byte answer)."""
         response = self._modbus_exchange(modbus.encode_read(function_code, register, 1), 8)
-        return modbus.parse_single_wide_count(response, function_code)
+        return self._modbus_result(modbus.parse_single_wide_count(response, function_code))
+
+    def _modbus_result(self, result):
+        status, value = result
+        if status is modbus.Status.OK:
+            self._answered()
+        elif status is modbus.Status.EXCEPTION and value in modbus.UNSUPPORTED_CODES:
+            self._failed("unsupported")
+        else:
+            self._failed("failed")
+        return result
 
     def probe_modbus(self, function_code: int, register: int, count: int) -> bool | None:
         """True for a valid response, False for an exception response, None for no/invalid answer."""

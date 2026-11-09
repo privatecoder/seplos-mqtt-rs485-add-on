@@ -1,6 +1,7 @@
 """Wall-clock helpers (patched in tests). Ages and deadlines use time.monotonic() instead."""
 from __future__ import annotations
 
+import time
 from datetime import datetime
 
 
@@ -12,3 +13,8 @@ def local_now() -> datetime:
 def now_iso() -> str:
     """Local time with UTC offset, for HA timestamp sensors."""
     return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def now_ms() -> int:
+    """UTC epoch milliseconds (the read times of the OpenBMS Monitor feed)."""
+    return int(time.time() * 1000)
