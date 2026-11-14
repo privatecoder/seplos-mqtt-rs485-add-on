@@ -233,6 +233,11 @@ MAINT: list[Entity] = [
     # configuration (Group0 bits 6/7 + image default), not proof that charging is currently stopped
     Entity("recharge_stop_mode", "Recharge Waiting Stop Mode", "maint", icon="mdi:battery-sync", category=DIAG,
            when=frozenset({"maint_hard_stop"})),
+    # Full 1.6.7 (capability 0x0010, 64/07), master only: the bank CCL falls by this value x online packs per aggregate
+    # update. Read-only setting, not a measured current: no current device class, no unit "A" (meaning in the name)
+    Entity("ccl_decrease_step", "EXT CCL Decrease Step (Master, A per Online Pack per Update)", "maint",
+           icon="mdi:arrow-down-bold-box-outline", category=DIAG, when=frozenset({"maint_ccl_step"}),
+           attributes="{{ value_json.get('maint', {}).get('attributes', {}).get('ccl_step', {}) | tojson }}"),
 ]
 
 # BMS real time clock (0x4D): OEM on RS485-1/2, with EMU1101-EXT also on the CAN port

@@ -1,7 +1,8 @@
 """
 Read-only answers of the EMU1101-EXT patched firmware (Light 1.5.x, Full 1.6.x; KB mod/docs/firmware:
 openbms-monitor.md, remote-diagnostics.md, storage-and-reset.md). ASCII CID2 0x64 with INFO:
-03 identity (EXT05), 04 storage diagnostics, 06 persisted capacity and live energy.
+03 identity (EXT05), 04 storage diagnostics, 06 persisted capacity and live energy, 07 the CCL decrease step
+(Full 1.6.7, configurable-ccl-ramp.md; only read here, 64/08 writes it and is never sent).
 """
 from __future__ import annotations
 
@@ -42,7 +43,8 @@ CAP_UART1_HISTORY = 0x0001
 CAP_CALIBRATION = 0x0002
 CAP_PERSISTED_SOC = 0x0004
 CAP_LIVE_ENERGY = 0x0008
-KNOWN_CAPS = 0x000F
+CAP_CCL_CONFIG = 0x0010            # Full 1.6.7: configurable CCL decrease step, 64/07 read (64/08 write)
+KNOWN_CAPS = 0x001F
 
 RECORD_CLASS = ("erased", "valid", "invalid")
 COMPARISON = ("not comparable", "identical", "different")
@@ -232,3 +234,25 @@ def decode_calibration_active(info: bytes) -> dict:
         "current_a_ma": int.from_bytes(info[64:68], "big", signed=True),
         "current_b_ma": int.from_bytes(info[68:72], "big", signed=True),
     }
+
+
+# --- Full 1.6.7: CCL decrease step (64/07) -------------------------------------------------------
+
+INFO_CCL_STEP = b"\x07"
+CCL_STEP_LEN = 5
+CCL_STEP_FORMAT = 1
+CCL_STEP_MIN, CCL_STEP_MAX = 1, 20
+CCL_STEP_UNIT = "A per online pack per update"
+
+
+def decode_ccl_step(info: bytes) -> dict:
+    """
+    64/07 format 01: [01, effective decrease step, fixed increase step 01, minimum 01, maximum 14]. Anything else
+    (other length, format, bounds, a step outside 1-20) raises: the value is then unavailable, never the default 1.
+    The step is a bank CCL reduction per aggregate update and online pack (12 online packs x 10 = 120 A per update),
+    not a measured current and not A/s.
+    """
+    if (len(info) != CCL_STEP_LEN or info[0] != CCL_STEP_FORMAT or info[2] != 1 or info[3] != CCL_STEP_MIN
+            or info[4] != CCL_STEP_MAX or not CCL_STEP_MIN <= info[1] <= CCL_STEP_MAX):
+        raise MaintFormatError(f"unknown CCL step answer: {info.hex()}")
+    return {"decrease_step": info[1], "increase_step": info[2], "min": info[3], "max": info[4], "unit": CCL_STEP_UNIT}

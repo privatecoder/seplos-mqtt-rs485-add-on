@@ -1906,6 +1906,12 @@
     "topic": "homeassistant/sensor/seplos-mqtt-pack-0/can_protocol/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "homeassistant/sensor/seplos-mqtt-pack-0/ccl_decrease_step/config"
+  },
+  {
     "payload": {
       "avty": [
         {

@@ -253,6 +253,11 @@ def maint_energy(charged=70001, discharged=69002, classes=(1, 1), comparison=1, 
     return out
 
 
+# KB configurable-ccl-ramp.md: 64/07 answer [format 01, effective decrease step, increase step 01, min 01, max 14]
+def maint_ccl_step(step=10, fmt=1, up=1, low=1, high=20) -> bytes:
+    return bytes([fmt, step, up, low, high])
+
+
 def binary_frame(adr: int, cmd: int, data: bytes = b"") -> bytes:
     import binascii
     body = bytes([adr, cmd, len(data)]) + data

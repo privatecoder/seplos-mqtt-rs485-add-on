@@ -796,7 +796,7 @@ def test_ext05_identity_decoded():
 def test_unsupported_identities_not_decoded():
     import pytest
     rejected = {
-        "unknown capability bit": f.maint_identity(caps=0x0010),
+        "unknown capability bit": f.maint_identity(caps=0x0020),
         "Light 1.5.3": f.maint_identity(patch=(1, 5, 3), flags=f.EXT_LIGHT_FLAGS),
         "Full 1.6.3": f.maint_identity(patch=(1, 6, 3)),
         "EXT format 06": f.maint_identity(info_format=6),
@@ -1299,7 +1299,7 @@ def test_unsupported_identity_keeps_wide_source(monkeypatch, tmp_path):
         bms.ascii[(0, 0x42)] = f.telemetry_info(energy_charged=6500)
         bms.ascii[(0, 0x64)] = _maint_responder()
         api.poll(api.make_pack(0, state_file=state_file), bms)
-        for answer in (_maint_responder(identity=f.maint_identity(caps=0x0010)),
+        for answer in (_maint_responder(identity=f.maint_identity(caps=0x0020)),
                        lambda req: f.ascii_frame(0, 0x04, b"\x01")):
             bms.ascii[(0, 0x64)] = answer
             pack = api.make_pack(0, state_file=state_file)
@@ -1482,3 +1482,186 @@ def test_health_age_follows_bus_quiet():
     from seplos_mqtt import health
     assert health.max_poll_age(12, 0, True, 2.0) > health.max_poll_age(12, 0, True, 1.0)
     assert health.max_poll_age(4, 60, True, 1.0) == (4 * 3 + 60 + 3) * 3 + 10
+
+
+# --- EMU1101-EXT Full 1.6.7: CCL decrease step (64/07, read-only) -----------------------------------------------
+
+EXT_READS = {b"\x02", b"\x03", b"\x04", b"\x05\x00", b"\x06", b"\x07"}     # 64/08 (write) is never sent
+FULL_167 = f.maint_identity(patch=(1, 6, 7), caps=0x001F)
+
+
+def _ccl_responder(identity=FULL_167, step=None):
+    """64/03-06 like _maint_responder; 64/07 answers `step` (INFO bytes, a callable or None for silence)."""
+    base = _maint_responder(identity=identity)
+    step = f.maint_ccl_step() if step is None else step
+
+    def respond(req):
+        if req.info == b"\x07":
+            if callable(step):
+                return step(req)
+            return f.ascii_frame(req.adr, 0x00, step) if step != b"silent" else b""
+        return base(req)
+    return respond
+
+
+def _ccl_requests(bms, adr=None):
+    return [r for r in bms.requests if r.cid2 == 0x64 and r.info == b"\x07" and (adr is None or r.adr == adr)]
+
+
+def _no_ext_write(bms):
+    assert {r.info for r in bms.requests if r.kind == "ascii" and r.cid2 == 0x64} <= EXT_READS
+    assert not any(r.kind == "ascii" and r.cid2 in (0xA1, 0xA3, 0xA5, 0x45, 0x4E) for r in bms.requests)
+
+
+def test_ext_current_builds_decoded():
+    """Full 1.6.7 (caps 001F, CCL configuration), Full 1.6.6 and Light 1.5.6 (caps 000F)."""
+    full7 = api.decode_maint_identity(FULL_167)
+    full6 = api.decode_maint_identity(f.maint_identity(patch=(1, 6, 6)))
+    light6 = api.decode_maint_identity(f.maint_identity(patch=(1, 5, 6), flags=f.EXT_LIGHT_FLAGS))
+    assert (full7.name, full7.capabilities, full7.image_flags) == ("EMU1101-EXT Full 1.6.7", 0x001F, 0xFE)
+    assert (full6.name, full6.capabilities) == ("EMU1101-EXT Full 1.6.6", 0x000F)
+    assert (light6.name, light6.capabilities, light6.image_flags) == ("EMU1101-EXT Light 1.5.6", 0x000F, 0x3A)
+    assert full7.has_capability(0x0010) and not full6.has_capability(0x0010) and not light6.has_capability(0x0010)
+    assert full7.as_dict()["capabilities"] == "0x001F"
+
+
+def test_ccl_step_decoder_is_strict():
+    import pytest
+    for step in (1, 10, 20):
+        assert api.decode_ccl_step(f.maint_ccl_step(step))["decrease_step"] == step
+    assert api.decode_ccl_step(f.maint_ccl_step(10)) == {"decrease_step": 10, "increase_step": 1, "min": 1, "max": 20,
+                                                            "unit": "A per online pack per update"}
+    bad = [f.maint_ccl_step(0), f.maint_ccl_step(21), f.maint_ccl_step(0xFF), f.maint_ccl_step(fmt=2),
+           f.maint_ccl_step(up=2), f.maint_ccl_step(low=0), f.maint_ccl_step(high=0x13), f.maint_ccl_step()[:4],
+           f.maint_ccl_step() + b"\x00", b""]
+    for info in bad:
+        with pytest.raises(ValueError):
+            api.decode_ccl_step(info)
+            pytest.fail(info.hex())
+
+
+def test_ccl_step_read_from_the_master_single_pack(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = _ccl_responder()
+        pack = api.make_pack(0)
+        data, ok = api.poll(pack, bms)
+    assert ok
+    [request] = _ccl_requests(bms)
+    assert request.raw == b"~20004664E00207FD2C\r"          # VER 20, ADR 00, CID1 46, CID2 64, LENGTH E002, INFO 07
+    assert data["maint"]["normal"]["ccl_decrease_step"] == 10
+    assert data["maint"]["attributes"]["ccl_step"] == {"decrease_step": 10, "increase_step": 1, "min": 1, "max": 20,
+                                                       "unit": "A per online pack per update", "read_at": api.FIXED_NOW}
+    assert "maint_ccl_step" in api.capabilities(pack)
+    _no_ext_write(bms)
+
+
+def test_ccl_step_only_on_the_master_of_a_bank(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _multi_pack_bms()
+        for adr in (0, 1):
+            bms.ascii[(adr, 0x64)] = _ccl_responder(step=f.maint_ccl_step(3))
+        master, slave = api.make_pack(0), api.make_pack(1)
+        m, ok0 = api.poll(master, bms)
+        s, ok1 = api.poll(slave, bms)
+    assert ok0 and ok1
+    assert m["maint"]["normal"]["ccl_decrease_step"] == 3 and "maint_ccl_step" in api.capabilities(master)
+    assert "ccl_decrease_step" not in s["maint"]["normal"] and "ccl_step" not in s["maint"]["attributes"]
+    assert "maint_ccl_step" not in api.capabilities(slave)
+    assert len(_ccl_requests(bms, 0)) == 1 and _ccl_requests(bms, 1) == []
+    _no_ext_write(bms)
+
+
+def test_no_ccl_step_without_the_capability(monkeypatch):
+    api.no_sleep(monkeypatch)
+    for identity in (f.maint_identity(patch=(1, 6, 6)), f.maint_identity(patch=(1, 5, 6), flags=f.EXT_LIGHT_FLAGS)):
+        with api.mode(1, MAINT_FIRMWARE=True):
+            bms = _single_pack_bms()
+            bms.ascii[(0, 0x64)] = _ccl_responder(identity=identity)
+            pack = api.make_pack(0)
+            data, ok = api.poll(pack, bms)
+        assert ok and data["maint"]["normal"]["maint_version"].startswith("EMU1101-EXT")
+        assert "ccl_decrease_step" not in data["maint"]["normal"] and "maint_ccl_step" not in api.capabilities(pack)
+        assert _ccl_requests(bms) == []
+
+
+def test_invalid_ccl_step_answers_are_unavailable(monkeypatch):
+    """RTN errors and wrong shapes never show a value (not the default 1) and never fail the poll."""
+    api.no_sleep(monkeypatch)
+    answers = {
+        "RTN 05": lambda req: f.ascii_frame(req.adr, 0x05, b""),
+        "RTN 04": lambda req: f.ascii_frame(req.adr, 0x04, b""),
+        "RTN 00 empty": lambda req: f.ascii_frame(req.adr, 0x00, b""),
+        "step 0": f.maint_ccl_step(0),
+        "step 21": f.maint_ccl_step(21),
+        "four bytes": f.maint_ccl_step()[:4],
+        "other format": f.maint_ccl_step(fmt=2),
+        "foreign address": lambda req: f.ascii_frame(5, 0x00, f.maint_ccl_step()),
+        "bad checksum": lambda req: f.ascii_frame(req.adr, 0x00, f.maint_ccl_step())[:-2] + b"0\r",
+        "silent": b"silent",
+    }
+    for case, answer in answers.items():
+        with api.mode(1, MAINT_FIRMWARE=True):
+            bms = _single_pack_bms()
+            bms.ascii[(0, 0x64)] = _ccl_responder(step=answer)
+            pack = api.make_pack(0)
+            data, ok = api.poll(pack, bms)
+        assert ok, case
+        assert data["maint"]["normal"]["ccl_decrease_step"] is None, case
+        assert "ccl_step" not in data["maint"]["attributes"], case
+        assert "maint_ccl_step" in api.capabilities(pack), case       # the entity stays, unavailable
+        _no_ext_write(bms)
+
+
+def test_ccl_step_interval_staleness_and_definitive_errors(monkeypatch):
+    api.no_sleep(monkeypatch)
+    clock = api.fake_monotonic(monkeypatch)
+    answer = {"step": f.maint_ccl_step(5)}
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = _ccl_responder(step=lambda req: answer["step"](req) if callable(answer["step"])
+                                              else (f.ascii_frame(req.adr, 0, answer["step"]) if answer["step"] else b""))
+        pack = api.make_pack(0)
+        data, _ = api.poll(pack, bms)
+        assert data["maint"]["normal"]["ccl_decrease_step"] == 5 and len(_ccl_requests(bms)) == 1
+        clock["t"] += 300
+        data, _ = api.poll(pack, bms)                          # not due yet: no new read, value kept
+        assert data["maint"]["normal"]["ccl_decrease_step"] == 5 and len(_ccl_requests(bms)) == 1
+        answer["step"] = f.maint_ccl_step(12)                  # written elsewhere
+        clock["t"] += 301
+        data, _ = api.poll(pack, bms)
+        assert data["maint"]["normal"]["ccl_decrease_step"] == 12 and len(_ccl_requests(bms)) == 2
+        answer["step"] = None                                  # silence: the confirmed value stays until stale
+        clock["t"] += 601
+        data, _ = api.poll(pack, bms)
+        assert data["maint"]["normal"]["ccl_decrease_step"] == 12
+        clock["t"] += 1300
+        data, ok = api.poll(pack, bms)
+        assert ok and data["maint"]["normal"]["ccl_decrease_step"] is None
+        answer["step"] = f.maint_ccl_step(7)
+        clock["t"] += 61
+        data, _ = api.poll(pack, bms)
+        assert data["maint"]["normal"]["ccl_decrease_step"] == 7
+        answer["step"] = lambda req: f.ascii_frame(req.adr, 0x05, b"")   # a definitive error clears at once
+        clock["t"] += 601
+        data, ok = api.poll(pack, bms)
+    assert ok and data["maint"]["normal"]["ccl_decrease_step"] is None
+    _no_ext_write(bms)
+
+
+def test_discovery_ccl_step_entity():
+    disc, client = api.discovery(maint_enabled=True)
+    api.discovery_startup(disc, 2)
+    client.published.clear()
+    api.set_capabilities(disc, 0, {"maint", "maint_uart1", "maint_ccl_step"}, pack_bus=False)
+    api.set_capabilities(disc, 1, {"maint", "maint_uart1"}, pack_bus=False)
+    configs = {(r["topic"].split("/")[2], r["topic"].split("/")[-2]): r["payload"] for r in client.as_records()}
+    config = configs[("seplos-mqtt-pack-0", "ccl_decrease_step")]
+    assert config["name"] == "EXT CCL Decrease Step (Master, A per Online Pack per Update)"
+    assert config["ent_cat"] == "diagnostic" and "dev_cla" not in config and "unit_of_meas" not in config
+    assert config["val_tpl"] == "{{ value_json.maint.normal.ccl_decrease_step }}"
+    assert config["json_attr_tpl"] == "{{ value_json.get('maint', {}).get('attributes', {}).get('ccl_step', {}) | tojson }}"
+    assert config["default_entity_id"] == "sensor.seplos_bms_pack_0_ccl_decrease_step"
+    assert configs[("seplos-mqtt-pack-1", "ccl_decrease_step")] == ""          # slave: removed

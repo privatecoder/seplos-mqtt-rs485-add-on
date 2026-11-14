@@ -3168,6 +3168,12 @@
     "topic": "ha/sensor/seplos-mqtt-pack-0/can_protocol/config"
   },
   {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/sensor/seplos-mqtt-pack-0/ccl_decrease_step/config"
+  },
+  {
     "payload": {
       "avty": [
         {
@@ -6232,6 +6238,12 @@
     "qos": 1,
     "retain": true,
     "topic": "ha/sensor/seplos-mqtt-pack-1/can_protocol/config"
+  },
+  {
+    "payload": "",
+    "qos": 1,
+    "retain": true,
+    "topic": "ha/sensor/seplos-mqtt-pack-1/ccl_decrease_step/config"
   },
   {
     "payload": {

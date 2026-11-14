@@ -3,7 +3,8 @@ Optional read-only support for the EMU1101-EXT patched firmware (Light from 1.5.
 
 Detection only via ASCII 64/03 (never from 0x51 or a version string). Each read is gated by the
 board's own identity: storage diagnostics by image flag 0x20, the full-width live energy by
-capability bit 3; the UART1 binary parameter/serial reads exist in both current profiles.
+capability bit 3; the UART1 binary parameter/serial reads exist in both current profiles. The CCL decrease step
+(capability 0x0010, 64/07) only from the master (address 0), the only board whose value the bank CCL uses.
 Failures of these optional reads never fail the regular poll. Nothing here writes to the BMS.
 """
 from __future__ import annotations
@@ -32,6 +33,9 @@ LOCK_PARAMETER_INTERVAL = 300  # TEMP(maint-1.6): no 64/04, the lock state comes
 MARKER_INTERVAL = 60
 CALIBRATION_INTERVAL = 600
 PARAMETER_INTERVAL = 3600
+# 64/07 changes only by a 64/08 write from another client (never sent here): read right after detection, then
+# every 10 min, so such a write shows up within minutes for one short answer of the master per 10 min
+CCL_STEP_INTERVAL = 600
 RETRY_INTERVAL = 60
 
 # binary UART1 commands
@@ -47,6 +51,7 @@ CAP_LOCK = "maint_lock"
 CAP_MARKER = "maint_marker"
 CAP_HARD_STOP = "maint_hard_stop"
 CAP_RTC = "maint_rtc"
+CAP_CCL_STEP = "maint_ccl_step"
 
 
 @dataclass
@@ -75,6 +80,7 @@ class MaintSupport:
     serial_attempts: int = 0
     marker: Timed = field(default_factory=Timed)
     calibration: Timed = field(default_factory=Timed)
+    ccl_step: Timed = field(default_factory=Timed)
     group0: int | None = None           # BitGroup0 from the latest parameter read (ASCII or binary 47)
     # answers as received, for the OpenBMS Monitor feed: maint (64/03), a2/a4 (binary serial DATA), r47 (the binary
     # parameter block as the 169-byte ASCII layout: address byte + 168 data bytes); {"t": epoch ms, "hex"}
@@ -136,6 +142,8 @@ class MaintSupport:
         if self._marker_readable:
             caps.add(CAP_MARKER)
         caps.add(CAP_HARD_STOP)
+        if self._ccl_step_readable:
+            caps.add(CAP_CCL_STEP)
         return caps
 
     @property
@@ -158,6 +166,11 @@ class MaintSupport:
         if self.identity is None:
             return False
         return self.address == 0 if self.can_bus else self.identity.has_flag(md.FLAG_UART0_MARKER)
+
+    @property
+    def _ccl_step_readable(self) -> bool:
+        """64/07: capability 0x0010 on the master (address 0); a slave's stored value is dormant, so it isn't read."""
+        return self.identity is not None and self.address == 0 and self.identity.has_capability(md.CAP_CCL_CONFIG)
 
     # --- periodic reads ----------------------------------------------------------------------
 
@@ -197,6 +210,8 @@ class MaintSupport:
         if self.identity.has_capability(md.CAP_CALIBRATION):
             self._due(self.calibration, now, CALIBRATION_INTERVAL,
                       lambda: self._decode(bus, md.INFO_CALIBRATION_ACTIVE, md.CALIBRATION_ACTIVE_LEN, md.decode_calibration_active))
+        if self._ccl_step_readable:
+            self._read_ccl_step(bus, now)
         if self.can_bus:
             self._due(self.parameters, now, self._parameter_interval, lambda: self._read_parameters(bus))
             if not self.serials_done:
@@ -205,6 +220,28 @@ class MaintSupport:
     def _decode(self, bus: SerialBus, info: bytes, length: int, decoder):
         raw = self._ascii(bus, info, length)
         return decoder(raw) if raw is not None else None
+
+    def _read_ccl_step(self, bus: SerialBus, now: float) -> None:
+        """
+        Silence or a corrupt frame keeps the last confirmed value until it is stale; a definitive answer that isn't
+        RTN 00 with the exact five bytes clears it at once (unavailable, never the default 1).
+        """
+        item = self.ccl_step
+        if now < item.next_due:
+            return
+        item.next_due = now + RETRY_INTERVAL
+        answer = bus.query(self.address, md.CID2, md.INFO_CCL_STEP)
+        if isinstance(answer, int) or answer is None:
+            return
+        try:
+            if answer.code != 0x00:
+                raise md.MaintFormatError(f"RTN {answer.code:02X}")
+            value = md.decode_ccl_step(answer.info)
+        except md.MaintFormatError as e:
+            logger.warning("Pack%s:Invalid EMU1101-EXT CCL step answer: %s", self.address, e)
+            item.value = None
+            return
+        item.value, item.ts, item.next_due, item.read_at = value, now, now + CCL_STEP_INTERVAL, timeutil.now_iso()
 
     def _read_parameters(self, bus: SerialBus) -> dict | None:
         data = bus.request_binary(self.address, BIN_PARAMETERS)
@@ -276,6 +313,11 @@ class MaintSupport:
             active = marker["maintenance_active"] if marker else None
             binary["maintenance_mode"] = None if active is None else ("ON" if active else "OFF")
             normal["effective_slave_count"] = marker["effective_slave_count"] if marker else None
+        if self._ccl_step_readable:
+            step = self.ccl_step.value if self.ccl_step.fresh(now, 3 * CCL_STEP_INTERVAL) else None
+            normal["ccl_decrease_step"] = step["decrease_step"] if step else None
+            if step:
+                attributes["ccl_step"] = {**step, "read_at": self.ccl_step.read_at}
         if self.calibration.value is not None:
             attributes["calibration"] = {**self.calibration.value, "read_at": self.calibration.read_at}
         if self.group0 is not None:

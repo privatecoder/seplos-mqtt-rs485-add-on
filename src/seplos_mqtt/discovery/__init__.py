@@ -39,7 +39,8 @@ _OPTIONAL = {
 }
 
 SYSTEM_SCOPE = "system"
-MAINT_CONDITIONS = frozenset({"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc"})
+MAINT_CONDITIONS = frozenset({"maint", "maint_storage", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc",
+                              "maint_ccl_step"})
 
 
 def _is_set(scope: Any) -> bool:

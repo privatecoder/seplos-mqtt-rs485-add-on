@@ -57,7 +57,7 @@ configuration:
   
   maint_firmware:
     name: "EMU1101-EXT Firmware"
-    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Also read the extra data of the EMU1101-EXT patched firmware (Light from 1.5.4, Full from 1.6.4) where a pack reports it (full-width energy counters, flash storage diagnostics, on the CAN port: parameters and serial numbers of every pack). Read-only. Packs with OEM firmware are not affected."
+    description: "Only used once to create the initial settings; afterwards change it in the Seplos BMS app in the sidebar. Also read the extra data of the EMU1101-EXT patched firmware (Light from 1.5.4, Full from 1.6.4) where a pack reports it (full-width energy counters, flash storage diagnostics, from Full 1.6.7 the master's CCL decrease step, on the CAN port: parameters and serial numbers of every pack). Read-only. Packs with OEM firmware are not affected."
 
   # System Settings
   logging_level:

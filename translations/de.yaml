@@ -59,7 +59,7 @@ configuration:
 
   maint_firmware:
     name: "EMU1101-EXT-Firmware"
-    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Zusätzlich die Daten der gepatchten Firmware EMU1101-EXT (Light ab 1.5.4, Full ab 1.6.4) lesen, wo ein Pack sie meldet (Energiezähler in voller Breite, Flash-Speicherdiagnose, am CAN-Port: Parameter und Seriennummern jedes Packs). Nur lesend. Packs mit OEM-Firmware sind nicht betroffen."
+    description: "Wird nur einmal für die Ersteinrichtung übernommen; danach in der Seplos-BMS-App in der Seitenleiste ändern. Zusätzlich die Daten der gepatchten Firmware EMU1101-EXT (Light ab 1.5.4, Full ab 1.6.4) lesen, wo ein Pack sie meldet (Energiezähler in voller Breite, Flash-Speicherdiagnose, ab Full 1.6.7 die CCL-Absenkstufe des Masters, am CAN-Port: Parameter und Seriennummern jedes Packs). Nur lesend. Packs mit OEM-Firmware sind nicht betroffen."
   logging_level:
     name: "Log-Level"
     description: "Detailgrad der Logs (debug zeigt die meisten Details)"

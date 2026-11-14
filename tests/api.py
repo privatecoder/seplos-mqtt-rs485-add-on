@@ -584,6 +584,11 @@ def parse_frame(raw: bytes):
     return af.parse(raw)
 
 
+def decode_ccl_step(info: bytes) -> dict:
+    from seplos_mqtt.decoders import maint
+    return maint.decode_ccl_step(info)
+
+
 def decode_storage(info: bytes) -> dict:
     from seplos_mqtt.decoders import maint
     return maint.decode_storage(info)
