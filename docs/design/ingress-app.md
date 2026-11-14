@@ -171,7 +171,7 @@ balancer, **3d** UI. Research: `.orch/codex-stage3-cells-proposal.md` (local).
     catalog update never changes an assignment's limits); on load, `entry.id`/`entry_version` must equal the
     reference, else that assignment is treated as invalid (checks not evaluated, shown for re-assignment).
   - **Identity guard**: `bms_serial` = BMS serial (0xA4 string 2, trimmed; never the 0xA2 battery serial) read
-    when the assignment was saved or confirmed. Readable only on RS485-1/2 (single pack) or with MAINT UART1; else
+    when the assignment was saved or confirmed. Readable only on RS485-1/2 (single pack) or with EMU1101-EXT UART1; else
     null and the pack is shown "identity not verifiable" (checks still run). When a readable serial differs from the
     stored one, `serial_mismatch` is set: checks of that pack are not evaluated, its balancer state goes unknown,
     and the user confirms (`POST /api/packs/confirm-identity`, stores the new serial) or reassigns.
@@ -205,7 +205,7 @@ balancer, **3d** UI. Research: `.orch/codex-stage3-cells-proposal.md` (local).
 
 - Inputs per pack: the latest valid 0x42 sample (cell voltages, the four cell probes, current with charging
   positive before the HA inversion, SOC, rated capacity) with its receive time, independent of MQTT change
-  suppression and of a failed 0x44; parameters from 0x47 (single pack) or MAINT binary 47 with their read time.
+  suppression and of a failed 0x44; parameters from 0x47 (single pack) or EMU1101-EXT binary 47 with their read time.
 - **Live checks** (OpenBMS rules and margins, shared test vectors):
   - cell voltage vs `charge_cutoff_v` / `discharge_cutoff_v`: over beyond, near within 50 mV / 200 mV (equality =
     near);

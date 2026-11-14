@@ -180,9 +180,9 @@ class DetectScan:
 
 
 def probe_maint(bus: SerialBus, address: int) -> tuple[str | None, str | None]:
-    """Read-only MAINT identity request (ASCII 64/03, single attempt) for the detection:
-    (exact base firmware or None, MAINT version or None). OEM firmware, silence, a busy bus or an
-    unknown identity format all give (None, None)."""
+    """Read-only EMU1101-EXT identity request (ASCII 64/03, single attempt) for the detection:
+    (exact base firmware or None, display name or None). OEM firmware, silence, a busy bus or an
+    unsupported identity all give (None, None)."""
     try:
         answer = bus.query(address, md.CID2, md.INFO_IDENTITY, attempts=1)
     except BusBusy:
@@ -194,12 +194,12 @@ def probe_maint(bus: SerialBus, address: int) -> tuple[str | None, str | None]:
     except md.MaintFormatError:
         return None, None
     base = None if ident.base_version.endswith(".?") else ident.base_version
-    return base, ident.patch_version
+    return base, ident.name
 
 
 def step_detect(bus: SerialBus, job: Job, *, addresses: Any = ADDRESSES, maint: bool = False) -> bool:
     """One step of the read-only pack detection: one ASCII 0x51 request (single attempt) for the
-    next DIP address, plus, with ``maint``, one MAINT identity request to a pack that answered.
+    next DIP address, plus, with ``maint``, one EMU1101-EXT identity request to a pack that answered.
     Returns True when the job is finished (``job.scan.final`` says how).
 
     A cancel request is honoured before the step. The loop calls this once per iteration, so the

@@ -42,6 +42,7 @@
         "capabilities": "0x000F",
         "image_flags": "0xFE",
         "info_format": 5,
+        "name": "EMU1101-EXT Full 1.6.4",
         "patch_version": "1.6.4"
       },
       "live_snapshot": {
@@ -77,7 +78,7 @@
     },
     "normal": {
       "effective_slave_count": null,
-      "maint_version": "1.6.4",
+      "maint_version": "EMU1101-EXT Full 1.6.4",
       "recharge_stop_mode": null
     }
   },

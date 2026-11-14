@@ -17,7 +17,7 @@
     },
     "info": {
       "normal": {
-        "bms_serial_number": "SEPLOS-2302270260",
+        "bms_serial_number": "SEPLOS-0000000001",
         "can_protocol": "Pylon",
         "device_name": "SP16S020",
         "firmware_patch": "16.06.13",
@@ -33,6 +33,7 @@
           "capabilities": "0x0000",
           "image_flags": "0x06",
           "info_format": 3,
+          "name": "MAINT 1.6",
           "patch_version": "1.6"
         },
         "settings": {
@@ -51,7 +52,7 @@
       },
       "normal": {
         "effective_slave_count": 11,
-        "maint_version": "1.6",
+        "maint_version": "MAINT 1.6",
         "recharge_stop_mode": "soft stop"
       }
     },
@@ -333,7 +334,7 @@
     },
     "info": {
       "normal": {
-        "bms_serial_number": "SEPLOS-2302270109",
+        "bms_serial_number": "SEPLOS-0000000002",
         "can_protocol": "Pylon",
         "device_name": "SP16S020",
         "firmware_patch": "16.06.13",
@@ -349,6 +350,7 @@
           "capabilities": "0x0000",
           "image_flags": "0x06",
           "info_format": 3,
+          "name": "MAINT 1.6",
           "patch_version": "1.6"
         },
         "settings": {
@@ -365,7 +367,7 @@
         "pack_lock_active": "ON"
       },
       "normal": {
-        "maint_version": "1.6",
+        "maint_version": "MAINT 1.6",
         "recharge_stop_mode": "soft stop"
       }
     },

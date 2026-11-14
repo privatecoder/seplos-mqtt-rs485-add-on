@@ -175,8 +175,8 @@ def test_bridge_and_maint_fields():
         pack.maint.state = maint_state
         assert build_status(state, 0.0, "t")["packs"][0]["maint"] == expected
     pack.maint.state = "present"
-    pack.maint.identity = type("I", (), {"patch_version": "1.6.4"})()
-    assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] == "1.6.4"
+    pack.maint.identity = type("I", (), {"name": "EMU1101-EXT Full 1.6.4"})()
+    assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] == "EMU1101-EXT Full 1.6.4"
     pack.maint.state = "absent"
     assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] is None
 

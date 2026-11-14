@@ -155,15 +155,15 @@ def run_maint(bms: FakeBms):
 
 def test_detect_reads_the_maint_identity_of_responding_packs():
     bms = bms_with(0, 1, 2)
-    bms.ascii[(0, 0x64)] = f.maint_identity()                       # MAINT 1.6.4 on 16.06.13
+    bms.ascii[(0, 0x64)] = f.maint_identity()                       # EMU1101-EXT Full 1.6.4 on 16.06.13
     bms.ascii[(1, 0x64)] = ("rtn", 0x04)                            # OEM firmware
     bms.ascii[(2, 0x64)] = f.maint_identity(base=(16, 6, 0xFF))     # revision unknown
     final, result = run_maint(bms)
     assert final == "done"
     assert [(e["firmware_patch"], e["maint_version"]) for e in result["responding"]] == [
-        ("16.06.13", "1.6.4"), (None, None), (None, "1.6.4"),
+        ("16.06.13", "EMU1101-EXT Full 1.6.4"), (None, None), (None, "EMU1101-EXT Full 1.6.4"),
     ]
-    # one MAINT identity request per responding pack, single attempt, none to silent addresses
+    # one EMU1101-EXT identity request per responding pack, single attempt, none to silent addresses
     assert [(r.adr, r.cid2) for r in bms.requests if r.cid2 == 0x64] == [(0, 0x64), (1, 0x64), (2, 0x64)]
     assert all(r.info == b"\x03" for r in bms.requests if r.cid2 == 0x64)
     assert not bms.protocol_errors

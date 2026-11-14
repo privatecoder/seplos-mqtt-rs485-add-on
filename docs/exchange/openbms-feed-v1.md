@@ -22,7 +22,7 @@ When the Home Assistant add-on "Seplos BMS" polls the bank, OpenBMS Monitor can'
 - **Optional auto-off** after a chosen time (1 h, 4 h, 24 h); off by default. The end time is stored as well.
 - **While on:**
   - **Effective round pause 0.** Off restores the stored `update_interval`.
-  - **Bus quiet 200 ms** on both buses, since the last received byte, instead of the stored bus quiet (see "Bus quiet setting"). This applies to every request: ASCII, Modbus, binary MAINT services and retries.
+  - **Bus quiet 200 ms** on both buses, since the last received byte, instead of the stored bus quiet (see "Bus quiet setting"). This applies to every request: ASCII, Modbus, binary EMU1101-EXT services and retries.
     - The 200 ms include the processing time after an exchange; do not add a separate 100 ms gap. No pause inside a frame, no parallel requests.
     - Basis: UART1 ends a frame only after 100 character times (≈ 104 ms at 9600 Bd); the Monitor runs on 200 ms (`openbms-transport/src/timing.rs`).
     - The add-on's 1 s came from centralizing earlier scattered `sleep(1)` calls (`17233db`); it was never shown to be a minimum.
@@ -41,14 +41,14 @@ Feed on speeds up the shared poll and publishes raw data. It justifies **no extr
 | 0x44 | every pack, every round | same | 13.70 / 4.10 s |
 | 0x51 | once, limited retries | use cache, don't re-read at feed start | +13.25 / 3.65 s |
 | OEM patch probes | initial | don't repeat | variable |
-| MAINT 64/03 | initial, ≤ 3 tries | same; pass on known identity | +13.00 / 3.40 s |
-| MAINT A2/A4 | once (UART1) / with device info (UART0) | same, cached | +25.10 / 5.90 s |
-| MAINT 64/06 | 60 s (energy/SOC capability) | same (HA energy counters) | +14.18 / 4.58 s |
-| MAINT 64/04 | 600 s (1.5) / 60 s with pack-lock flag (1.6) | same | +12.73 / 3.13 s |
-| MAINT 64/02 | 60 s, UART1 address 0 only | same | once +1.05 / 0.25 s |
-| MAINT 64/05/00 | 600 s with calibration capability | same, after the core reads | +14.30 / 4.70 s |
+| EXT 64/03 | initial, ≤ 3 tries | same; pass on known identity | +13.00 / 3.40 s |
+| EXT A2/A4 | once (UART1) / with device info (UART0) | same, cached | +25.10 / 5.90 s |
+| EXT 64/06 | 60 s (energy/SOC capability) | same (HA energy counters) | +14.18 / 4.58 s |
+| EXT 64/04 | 600 s (Light) / 60 s with pack-lock flag (Full) | same | +12.73 / 3.13 s |
+| EXT 64/02 | 60 s, UART1 address 0 only | same | once +1.05 / 0.25 s |
+| EXT 64/05/00 | 600 s with calibration capability | same, after the core reads | +14.30 / 4.70 s |
 | Clock 0x4D | 600 s where supported | same (HA clock offset) | +12.63 / 3.03 s |
-| Parameters 0x47 / MAINT 47 | initial + hourly (old pack-lock fallback 300 s) | publish the cached raw bytes with their original read time; read only when due or no raw cache | binary +14.28 / 4.68 s |
+| Parameters 0x47 / EXT 47 | initial + hourly (old pack-lock fallback 300 s) | publish the cached raw bytes with their original read time; read only when due or no raw cache | binary +14.28 / 4.68 s |
 | 0x5A extended | UART0 single pack every round | same | n/a on UART1 |
 | FC03 0x1000 ×21 | once per round (multi-pack) | same; raw registers | once 1.06 / 0.26 s |
 | FC03 0x0074 ×1 | with each system read while supported | same; raw register | once 1.02 / 0.22 s |
@@ -68,7 +68,7 @@ Root `<mqtt_topic>/openbms/v1/`, QoS 0. A pack message is published after the ex
 - `pack/<DIP>` and `system` use unconditional publish, not state suppression or the state replay. They are not retained.
 - `seq` counts globally across both topics within one `boot`.
 - Each message carries `sent_at` (source clock, epoch ms).
-- A failed part has `{"t":…, "err":"busy|failed|unsupported"}`: `busy` = no quiet gap, nothing sent; `failed` = no valid answer after the retries; `unsupported` = the firmware rejects the read (Modbus exception 01/02, MAINT capability missing). A part that was not attempted (for example 0x44 after a failed 0x42) is simply absent.
+- A failed part has `{"t":…, "err":"busy|failed|unsupported"}`: `busy` = no quiet gap, nothing sent; `failed` = no valid answer after the retries; `unsupported` = the firmware rejects the read (Modbus exception 01/02, EMU1101-EXT capability missing). A part that was not attempted (for example 0x44 after a failed 0x42) is simply absent.
 - Raw bytes are taken at receipt, never recomputed from smoothed or energy-corrected HA values.
 
 **`pack/<DIP>`**
@@ -96,14 +96,14 @@ No Modbus header or CRC; the Monitor uses `SystemValues::from_registers`.
 
 ```json
 {"v":1,"on":true,"auto_off":<ms|null>,"boot":"…","sent_at":…,"bus":"uart1|uart0","addon":"<version>",
- "packs":[{"addr":0,"r51":{"t":…,"hex":"…"},"a2":…,"a4":…,"maint":{"version":"…"}|null,"r47":{"t":…,"hex":"…"}},…],
+ "packs":[{"addr":0,"r51":{"t":…,"hex":"…"},"a2":…,"a4":…,"maint":{"t":…,"hex":"…"}|null,"r47":{"t":…,"hex":"…"}},…],
  "sets":[{"id":"…","packs":[…],"wiring":"…","plus":<DIP>,"minus":<DIP>},…]}
 ```
 
 - `meta` describes the configured feed, not whether the add-on is reachable.
   - Reachability comes from the add-on's existing availability topic and last will; the add-on gets no second client.
   - When the feed is off, `meta` is republished with `"on":false`. It is resent after a restart or reconnect, never mixing an old `boot`'s data in.
-- `meta.packs[]` fields `r51`, `a2`, `a4`, `maint`, `r47` are each `null` or `{"t", "hex"}`. `a2`/`a4` are exactly 30 string bytes (60 hex characters) without frame, CRC or address byte; ASCII A2/A4 INFO and binary MAINT A2/A4 DATA share this layout. Nothing is invented: on OEM firmware over UART1 the add-on reads no A2, so it is `null`.
+- `meta.packs[]` fields `r51`, `a2`, `a4`, `maint` (the raw 64/03 identity; the field keeps its name), `r47` are each `null` or `{"t", "hex"}`. `a2`/`a4` are exactly 30 string bytes (60 hex characters) without frame, CRC or address byte; ASCII A2/A4 INFO and binary EMU1101-EXT A2/A4 DATA share this layout. Nothing is invented: on OEM firmware over UART1 the add-on reads no A2, so it is `null`.
 - `meta` caches the per-pack identity and the parameters with their original read times. Changes update the cache and are not new measurements. A Monitor that joins late thus has the parameters and serial numbers at once.
 - The sets are proposals for the chosen installation in the Monitor, never silent changes to its local settings.
 
@@ -135,7 +135,7 @@ No Modbus header or CRC; the Monitor uses `SystemValues::from_registers`.
   - one pack: RS485-1/2 (UART0, 19200 Bd) or CAN socket (UART1, 9600 Bd);
   - several packs: CAN socket only.
 
-  Before v1 the bus followed `number_of_packs`. A single pack on UART1 behaves like multi-pack mode: no 0x5A, and parameters only via MAINT.
+  Before v1 the bus followed `number_of_packs`. A single pack on UART1 behaves like multi-pack mode: no 0x5A, and parameters only via EMU1101-EXT.
 
 - **Bus quiet setting:** the quiet before each request becomes a connection setting `bus_quiet_ms`.
   - Range 200–2000 ms, default 1000 ms (the earlier fixed value).

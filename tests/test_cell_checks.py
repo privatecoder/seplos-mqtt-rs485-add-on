@@ -210,7 +210,7 @@ def test_parameters_are_sampled_with_their_read_time(monkeypatch):
         sample = pack_.parameter_sample()
         assert sample.values["cells_in_series"] == 16 and sample.max_age == 3 * 3600 and sample.at > 0
     with api.mode(2):
-        assert api.make_pack(0).parameter_sample() is None       # UART1 without MAINT: not readable
+        assert api.make_pack(0).parameter_sample() is None       # UART1 without EMU1101-EXT: not readable
 
 
 # --- assignments in the loop -----------------------------------------------------------------------------------

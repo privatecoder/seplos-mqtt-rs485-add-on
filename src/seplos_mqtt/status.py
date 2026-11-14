@@ -27,20 +27,20 @@ def _normal(data: dict | None, group: str | None = None) -> dict:
 def _maint(pack: Any) -> str:
     if pack.maint is None:
         return "disabled"
-    # unknown / unsupported (the MAINT query was inconclusive) count as not yet determined
+    # unknown / unsupported (the EMU1101-EXT query was inconclusive) count as not yet determined
     return pack.maint.state if pack.maint.state in ("present", "absent") else "pending"
 
 
 def _maint_version(pack: Any) -> str | None:
-    """The MAINT patch version (e.g. "1.6.4") once a MAINT board was identified."""
+    """The patch firmware's display name (e.g. "EMU1101-EXT Full 1.6.5") once a supported board was identified."""
     maint = pack.maint
     if maint is None or maint.state != "present" or maint.identity is None:
         return None
-    return maint.identity.patch_version
+    return maint.identity.name
 
 
 def bms_serial(pack_state: Any) -> str | None:
-    """The BMS serial (0xA4 string 2, trimmed) once it was read: RS485-1/2 or MAINT UART1; else None.
+    """The BMS serial (0xA4 string 2, trimmed) once it was read: RS485-1/2 or EMU1101-EXT UART1; else None.
     The battery serial (0xA2) is never used for identity."""
     pack = pack_state.pack
     info = _normal(pack.info) if pack.info else {}

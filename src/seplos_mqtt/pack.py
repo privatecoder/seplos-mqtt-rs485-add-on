@@ -162,7 +162,7 @@ class BatteryPack:
         features that only exist since a certain patch level.
         """
         if self.maint is not None and self.maint.identity is not None:
-            # reported by the MAINT image itself, no probing needed
+            # reported by the EMU1101-EXT image itself, no probing needed
             return self.maint.identity.base_version
         if firmware_version == "16.04":
             return "16.04.x"
@@ -261,14 +261,14 @@ class BatteryPack:
             # retry after a minute instead of waiting for the next regular refresh
             self.parameters_next = time.monotonic() + 60
 
-    # --- MAINT custom firmware (optional, read-only) ----------------------------------------------
+    # --- EMU1101-EXT patched firmware (optional, read-only) ----------------------------------------
 
     def _guarded(self, step) -> None:
-        """Optional MAINT reads never fail the regular poll."""
+        """Optional EMU1101-EXT reads never fail the regular poll."""
         try:
             step(self.bus)
         except Exception as e:
-            logger.warning("Pack%s:MAINT read failed: %s", self.address, e)
+            logger.warning("Pack%s:EMU1101-EXT read failed: %s", self.address, e)
 
     def _energy_source_key(self) -> str:
         return f"pack{self.address}.energy_source"
@@ -280,7 +280,7 @@ class BatteryPack:
             store.set_durable(self._energy_source_key(), None)   # confirmed OEM now (e.g. replaced pack)
         if maint.identity is None:
             if store.get(self._energy_source_key()) == "maint":
-                # the totals came from the wide MAINT counters before: never fall back to the narrow
+                # the totals came from the wide EMU1101-EXT counters before: never fall back to the narrow
                 # 0x42 values on the same entities while the identity is unknown
                 data["telemetry"]["normal"].update(energy_charged=None, energy_discharged=None)
             return
@@ -302,7 +302,7 @@ class BatteryPack:
                 # full-width counters replace the 0x42 values with their 6500 kWh fallback
                 data["telemetry"]["normal"].update(energy)
             else:
-                logger.warning("Pack%s:Could not persist the MAINT energy source, energy unknown until it is", self.address)
+                logger.warning("Pack%s:Could not persist the EMU1101-EXT energy source, energy unknown until it is", self.address)
                 data["telemetry"]["normal"].update(energy_charged=None, energy_discharged=None)
         if self.config.can_bus:
             if maint.parameters.value is not None:
@@ -313,7 +313,7 @@ class BatteryPack:
             if maint.serials and "info" in data:
                 data["info"] = {"normal": {**data["info"]["normal"], **{k: v for k, v in maint.serials.items() if v}}}
 
-    # --- BMS clock (0x4D): OEM on RS485-1/2, with MAINT also on UART1 --------------------------------
+    # --- BMS clock (0x4D): OEM on RS485-1/2, with EMU1101-EXT also on UART1 --------------------------
 
     CLOCK_INTERVAL = 600
 
@@ -346,7 +346,7 @@ class BatteryPack:
         return {"normal": self.clock_value if fresh else {"bms_time": None, "clock_offset": None}}
 
     def parameter_sample(self) -> Sample | None:
-        """The readable parameters with their read time: 0x47 on RS485-1/2, MAINT binary 47 on UART1. Stale after
+        """The readable parameters with their read time: 0x47 on RS485-1/2, EMU1101-EXT binary 47 on UART1. Stale after
         two missed refreshes of the cadence."""
         if not self.config.can_bus:
             if self.parameters is None:
@@ -363,7 +363,7 @@ class BatteryPack:
 
     @property
     def capabilities_resolved(self) -> bool:
-        """MAINT detected or confirmed absent; pending/silent leaves the discovery catalog untouched."""
+        """EMU1101-EXT detected or confirmed absent; pending/silent leaves the discovery catalog untouched."""
         return self.maint is not None and self.maint.state in ("present", "absent")
 
     # --- poll -----------------------------------------------------------------------------------
@@ -380,7 +380,7 @@ class BatteryPack:
     @property
     def raw_ids(self) -> dict[str, dict | None]:
         """The identity reads as received, ``None`` while not read: r51 (0x51), a2/a4 (30 string bytes, ASCII or
-        MAINT binary), maint (the MAINT identity 64/03)."""
+        EMU1101-EXT binary), maint (the EMU1101-EXT identity 64/03)."""
         maint_raw = self.maint.raw if self.maint is not None else {}
         return {
             "r51": self._raw_ascii_ids["r51"],
@@ -453,7 +453,7 @@ class BatteryPack:
         return data, True
 
     def read_extras(self, data: BatteryData) -> None:
-        """Everything after the core reads (MAINT, device info, clock, 0x5A, parameters, alarm summary), added to
+        """Everything after the core reads (EMU1101-EXT, device info, clock, 0x5A, parameters, alarm summary), added to
         ``data``. Runs whenever the telemetry is valid, also after a failed 0x44."""
         if self.maint is not None:
             self._guarded(self.maint.detect)

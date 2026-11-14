@@ -164,7 +164,7 @@ SEVERITY: dict[str, str | None] = {
     # alarm event 8
     "eep_storage_failure": FAULT, "rtc_clock_failure": FAULT, "no_calibration_of_voltage": ALARM,
     "no_calibration_of_current": ALARM, "no_calibration_of_null_point": ALARM, "rtc_time_invalid": ALARM,
-    # MAINT (maint.binary): flash storage fault counts, the manual pack lock is an operating state
+    # EMU1101-EXT (maint.binary): flash storage fault counts, the manual pack lock is an operating state
     "storage_problem": FAULT, "pack_lock_active": None, "maintenance_mode": None,
 }
 TIER_BY_STATE = {"Alarm": ALARM, "Protection": PROTECTION, "Lockout": PROTECTION}
@@ -183,7 +183,7 @@ def _severity(key: str, state: object) -> str | None:
 
 
 def summarize(telesignalization: dict | None, maint_binary: dict | None = None) -> dict:
-    """The aggregate alarm of a pack from its decoded 0x44 groups (and the MAINT binaries): ``normal.bms_alarm`` is
+    """The aggregate alarm of a pack from its decoded 0x44 groups (and the EMU1101-EXT binaries): ``normal.bms_alarm`` is
     ``ok | alarm | protection | fault``, or ``unknown`` without valid alarm data (never ``ok``). The attributes list
     every contributing condition as ``{key, state}`` sorted by key, with no timestamps or measurements."""
     groups = telesignalization if isinstance(telesignalization, dict) else {}

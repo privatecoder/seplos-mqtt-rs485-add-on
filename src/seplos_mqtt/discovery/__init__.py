@@ -56,11 +56,11 @@ class Discovery:
         self.invert = invert
         # firmware version shown in the device info, per pack number
         self._sw: dict = {}
-        # battery serial (0xA2 / MAINT UART1) shown in the device info, per pack number
+        # battery serial (0xA2 / EMU1101-EXT UART1) shown in the device info, per pack number
         self._sn: dict = {}
         # cell count per pack once known
         self._cells: dict[int, int] = {}
-        # MAINT capabilities per pack (discovery conditions)
+        # EMU1101-EXT capabilities per pack (discovery conditions)
         self._caps: dict[int, set[str]] = {}
         self._system_active = False
         # names of the published parallel sets (device name)
@@ -203,7 +203,7 @@ class Discovery:
         for entity in PACK_ENTITIES:
             for index, item in enumerate(entity.expand(), start=1):
                 if not item.when & conditions and not known and item.when & MAINT_CONDITIONS:
-                    continue          # MAINT detection pending: keep whatever HA has (no delete/recreate)
+                    continue          # EMU1101-EXT detection pending: keep whatever HA has (no delete/recreate)
                 if entity.key in cell_keys and index > cells or not item.when & conditions:
                     removed.append(item)
                 else:
@@ -250,7 +250,7 @@ class Discovery:
 
     def set_capabilities(self, pack_no: int, caps: set[str], pack_bus: bool) -> bool:
         """
-        The pack's capabilities are known (MAINT detected or confirmed absent): republish its configs with
+        The pack's capabilities are known (EMU1101-EXT detected or confirmed absent): republish its configs with
         the matching entities. True if anything changed.
         """
         if self._caps.get(pack_no) == caps:
@@ -276,7 +276,7 @@ class Discovery:
 
     def update_firmware(self, pack_no: int, firmware: str, serial: str | None = None) -> None:
         """
-        Show the real firmware and the battery serial (0xA2 or MAINT UART1, never the BMS serial 0xA4)
+        Show the real firmware and the battery serial (0xA2 or EMU1101-EXT UART1, never the BMS serial 0xA4)
         in the device info, trimmed but otherwise exactly as reported (placeholders included). The
         configs are sent before the device info is read, so the device block is republished when either
         becomes known or changes: in the same anchor config ``publish_pack`` uses, never in another one.

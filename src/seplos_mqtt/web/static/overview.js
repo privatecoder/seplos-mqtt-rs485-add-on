@@ -30,8 +30,8 @@ function availabilityChip(value) {
   return chip(t(`avail.${known ? value : 'unknown'}`), known ? `avail-${value}` : 'avail-unknown');
 }
 
-// MAINT row: the version when present, "being determined" while pending; no row for OEM firmware
-// or with MAINT reads switched off.
+// EMU1101-EXT row: the display name when present, "being determined" while pending; no row for OEM firmware
+// or with EMU1101-EXT reads switched off.
 function maintRow(pack) {
   if (pack.maint === 'present') return kv(t('pack.maint'), orDash(pack.maint_version));
   if (pack.maint === 'pending') return kv(t('pack.maint'), t('maint.pending'));

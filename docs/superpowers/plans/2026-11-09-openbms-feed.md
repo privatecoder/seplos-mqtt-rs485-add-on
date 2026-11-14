@@ -65,7 +65,7 @@
   - `Config.baudrate`: 9600 if `can_bus` else 19200 (unless set).
 
 Rule for each `multi_pack` use:
-- Which requests are sent (0x5A, 0x47 ASCII, 0xA2/A4 ASCII, MAINT UART1 paths, Modbus system read), discovery `pack_bus`/system device, baud, health timing → `can_bus`.
+- Which requests are sent (0x5A, 0x47 ASCII, 0xA2/A4 ASCII, EMU1101-EXT UART1 paths, Modbus system read), discovery `pack_bus`/system device, baud, health timing → `can_bus`.
 - Parallel sets and anything that needs more than one pack → `multi_pack`.
 
 - [ ] **Step 1: Write failing tests**
@@ -86,7 +86,7 @@ def test_bus_quiet_range(ms, ok): ...
 
 def test_single_pack_on_uart1_polls_like_the_can_socket():
     # api.mode(1, BUS="uart1"): 9600 Bd, no 0x5A request, no ASCII 0x47; FakeBms sees only 0x42/0x44 (+ Modbus)
-    # with MAINT_FIRMWARE=True the MAINT UART1 paths run, and discovery has no pack_bus entities but the system device
+    # with MAINT_FIRMWARE=True the EMU1101-EXT UART1 paths run, and discovery has no pack_bus entities but the system device
 
 def test_health_age_follows_bus_quiet():
     assert health.max_poll_age(12, 0, True, 2.0) > health.max_poll_age(12, 0, True, 1.0)
@@ -120,7 +120,7 @@ def test_health_age_follows_bus_quiet():
     - `None` on success;
   - `SerialBus.last_at: int | None` = `now_ms()` right after the last valid answer frame;
   - `SerialBus.set_gap(seconds: float) -> None`, which takes effect at the next request.
-  - `request_binary` and `query` also set `last_at`, so identity reads (0x51, A2/A4 ASCII and binary, MAINT 64/03) get their read time.
+  - `request_binary` and `query` also set `last_at`, so identity reads (0x51, A2/A4 ASCII and binary, EMU1101-EXT 64/03) get their read time.
 
 - [ ] **Step 1: Write failing tests**
   - `test_last_failure_busy`: noise keeps the bus busy; `request` raises `BusBusy`; `last_failure == "busy"`.
@@ -143,12 +143,12 @@ def test_health_age_follows_bus_quiet():
   - `BatteryPack.read_core() -> tuple[BatteryData | None, bool]`: only 0x42 and 0x44.
     - 0x42 fails: `(None, False)`.
     - 0x44 fails: `(data_without_"telesignalization", False)`.
-  - `BatteryPack.read_extras(data: BatteryData) -> None`: everything else `read()` did, in the same order, adding to `data`. That covers MAINT detect/poll/merge, device info, clock, 0x5A, parameters and `alarm_summary`.
+  - `BatteryPack.read_extras(data: BatteryData) -> None`: everything else `read()` did, in the same order, adding to `data`. That covers EMU1101-EXT detect/poll/merge, device info, clock, 0x5A, parameters and `alarm_summary`.
     - `alarm_summary` is computed only when `telesignalization` is present; otherwise the HA alarm state is unknown.
   - `BatteryPack.read() -> tuple[BatteryData | None, bool]`: `read_core()` then, whenever `data is not None` (also with `success=False`), `read_extras()`. The behaviour is unchanged except for the bug fix. Only heartbeat and complete-success bookkeeping depend on `success`.
   - `BatteryPack.raw_ids: dict[str, dict | None]`, the identity reads kept raw with their read time, filled where `pack.py`/`maint.py` read them today:
     - `"r51"`: `{"t", "hex"}` of the 0x51 INFO;
-    - `"a2"`, `"a4"`: `{"t", "hex"}` with exactly 60 hex characters, the 30 string bytes without frame, CRC or address byte (ASCII A2/A4 INFO and binary MAINT A2/A4 DATA have the same layout);
+    - `"a2"`, `"a4"`: `{"t", "hex"}` with exactly 60 hex characters, the 30 string bytes without frame, CRC or address byte (ASCII A2/A4 INFO and binary EMU1101-EXT A2/A4 DATA have the same layout);
     - `"maint"`: `{"t", "hex"}` of the 64/03 answer;
     - `None` while not read. No A2 is invented: on OEM firmware on UART1 the add-on reads no A2 today, so it stays `None`.
   - `BatteryPack.raw: dict[str, dict]`, rebuilt by every `read_core()`:
@@ -166,8 +166,8 @@ def test_health_age_follows_bus_quiet():
   - `test_raw_parts`:
     - 0x42 ok and 0x44 ok: `raw["r42"]["hex"]` equals the INFO hex built by `frames.py`, and `raw["r42"]["t"]` equals the patched `now_ms`;
     - 0x42 silent: `raw == {"r42": {"t": …, "err": "failed"}}`.
-  - `test_raw47_uart1_is_canonical`: the MAINT binary 47 answer from `frames.py` gives `raw47["hex"]` of length 338, starting with the address byte.
-  - `test_status_failure_keeps_maint_energy_source`: MAINT energy source already chosen (state file), then a 0x44 timeout. The published telemetry carries the MAINT energy totals (or unknown), never the narrow 0x42 values.
+  - `test_raw47_uart1_is_canonical`: the EMU1101-EXT binary 47 answer from `frames.py` gives `raw47["hex"]` of length 338, starting with the address byte.
+  - `test_status_failure_keeps_maint_energy_source`: EMU1101-EXT energy source already chosen (state file), then a 0x44 timeout. The published telemetry carries the EMU1101-EXT energy totals (or unknown), never the narrow 0x42 values.
   - `test_raw_ids_a2_is_30_bytes`: ASCII A2 on UART0 and binary A2 on UART1 both give 60 hex characters.
 - [ ] **Step 2:** Run. Expected: FAIL.
 - [ ] **Step 3:** Implement. The HA output of a fully successful poll stays byte-identical, and the golden files do not change.
@@ -252,7 +252,7 @@ def test_meta_contains_sets_and_cache():
   - `test_feed_on_publishes_pack_and_system`: feed on, 2 packs, one round. The fake MQTT sees `seplos/openbms/v1/pack/0`, `…/pack/1`, `…/system` (retain False) and `…/meta` (retain True); `seq` is 1, 2, 3.
   - `test_feed_on_sets_gap_and_no_round_pause`: `mqtt_update_interval=30`, feed on: no wait after the round and `bus.gap == 0.2`. After switching off: the gap is back to the stored value and the round pause is 30.
   - `test_core_reads_of_a_set_back_to_back`: set (0, 1) and a due clock read on pack 0. The FakeBms request log is `0x42@0, 0x44@0, 0x42@1, 0x44@1, 0x4D@0`.
-  - `test_group_keeps_maint_energy_on_status_timeout`: the Task 4 MAINT-energy case run through `poll_group` (set of 2).
+  - `test_group_keeps_maint_energy_on_status_timeout`: the Task 4 EMU1101-EXT-energy case run through `poll_group` (set of 2).
   - `test_meta_republished_after_first_identity_reads`: first round reads 0x51/A2/parameters; a subscriber that joins afterwards (retained only) gets them from `meta`.
   - `test_due_parameters_are_in_the_same_pack_message`: parameters due on pack 0; its `pack/0` message carries `r42`, `r44` and `r47`, and `r42.t` is earlier than `r47.t`.
   - `test_feed_off_republishes_meta_off`: `meta` is republished with `"on": False`; no further `pack/*`.

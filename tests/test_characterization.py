@@ -762,7 +762,7 @@ def test_health_decision():
     assert not health.is_healthy(False, True, 5, 30) and not health.is_healthy(True, False, 5, 30)
 
 
-# --- MAINT stage 1 ------------------------------------------------------------------------------------
+# --- EMU1101-EXT stage 1 ------------------------------------------------------------------------------------
 
 def _maint_responder(identity=None, storage=None, energy=None):
     identity = f.MAINT_FULL_IDENTITY if identity is None else identity
@@ -782,15 +782,47 @@ def test_binary_frame_kb_literals():
     assert api.binary_encode(11, 0xA4) == bytes.fromhex("550BA400214BAA")
 
 
-def test_maint_identity_release_metadata():
+def test_ext05_identity_decoded():
     ident = api.decode_maint_identity(f.MAINT_FULL_IDENTITY)
-    assert ident.base_version == "16.06.13" and ident.patch_version == "1.6.4"
+    assert len(f.MAINT_FULL_IDENTITY) == 21 and f.MAINT_FULL_IDENTITY[:4] == b"EXT\x05"
+    assert (ident.info_format, ident.base_version, ident.patch_version) == (5, "16.06.13", "1.6.4")
     assert ident.build_id == "a8676b52bae281ff" and ident.image_flags == 0xFE and ident.capabilities == 0x000F
+    assert ident.name == "EMU1101-EXT Full 1.6.4"
+    light = api.decode_maint_identity(f.maint_identity(patch=(1, 5, 5), base=(16, 6, 0xFF), flags=f.EXT_LIGHT_FLAGS))
+    assert (light.name, light.base_version, light.image_flags) == ("EMU1101-EXT Light 1.5.5", "16.06.?", 0x3A)
+    assert api.decode_maint_identity(f.maint_identity(patch=(1, 7, 0))).name == "EMU1101-EXT 1.7.0"   # a later line
+
+
+def test_unsupported_identities_not_decoded():
     import pytest
-    with pytest.raises(ValueError):
-        api.decode_maint_identity(f.maint_identity(caps=0x0010))    # unknown capability bit
-    with pytest.raises(ValueError):
-        api.decode_maint_identity(b"MNT\x06" + bytes(17))
+    rejected = {
+        "unknown capability bit": f.maint_identity(caps=0x0010),
+        "Light 1.5.3": f.maint_identity(patch=(1, 5, 3), flags=f.EXT_LIGHT_FLAGS),
+        "Full 1.6.3": f.maint_identity(patch=(1, 6, 3)),
+        "EXT format 06": f.maint_identity(info_format=6),
+        "EXT05 too short": f.maint_identity()[:20],
+        "EXT05 too long": f.maint_identity() + b"\x00",
+        "MNT05": f.maint_identity(signature=b"MNT"),
+        "MNT04": b"MNT\x04" + bytes([16, 6, 13, 1, 5, 2]) + bytes(8) + b"\x08",
+        # TEMP(maint-1.6): only the one first MAINT 1.6 build, not another MNT format 3
+        "other MNT03 build": b"MNT\x03" + bytes([16, 6, 13, 1, 6]) + bytes(8) + b"\x06",
+    }
+    for case, info in rejected.items():
+        with pytest.raises(ValueError):
+            api.decode_maint_identity(info)
+            pytest.fail(case)
+
+
+def test_unsupported_ext_version_gets_no_ext_reads(monkeypatch):
+    """EXT05 below Light 1.5.4: unsupported patch firmware, the OEM reads stay, no EMU1101-EXT reads."""
+    api.no_sleep(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = _maint_responder(identity=f.maint_identity(patch=(1, 5, 3), flags=f.EXT_LIGHT_FLAGS))
+        pack = api.make_pack(0)
+        data, ok = api.poll(pack, bms)
+    assert ok and "maint" not in data and api.capabilities(pack) == set()
+    assert [r.info for r in bms.requests if r.cid2 == 0x64] == [b"\x03"]
 
 
 def test_maint_single_pack(monkeypatch, golden):
@@ -806,7 +838,7 @@ def test_maint_single_pack(monkeypatch, golden):
     assert t["energy_charged"] == 7000.1 and t["energy_discharged"] == 6900.2   # full width from 64/06
     assert data["info"]["normal"]["firmware_patch"] == "16.06.13"               # reported, not probed
     assert not any(r.cid2 == 0xAA for r in bms.requests if r.kind == "ascii")
-    assert data["maint"]["normal"]["maint_version"] == "1.6.4" and data["maint"]["binary"]["storage_problem"] == "OFF"
+    assert data["maint"]["normal"]["maint_version"] == "EMU1101-EXT Full 1.6.4" and data["maint"]["binary"]["storage_problem"] == "OFF"
     assert data["maint"]["binary"]["maintenance_mode"] is None     # 64/02 not answered: unknown
     assert data["maint"]["attributes"]["checkpoint"]["boot_choice"] == "primary"
     assert api.capabilities(pack) == {"maint", "maint_storage", "maint_lock", "maint_marker", "maint_hard_stop"}
@@ -871,7 +903,7 @@ def test_maint_energy_failure_does_not_fall_back_to_oem(monkeypatch):
 
 
 def test_maint_multi_pack_mixed_bank(monkeypatch, golden):
-    """UART1: pack 0 runs MAINT (binary 47/A2/A4), pack 1 is OEM."""
+    """UART1: pack 0 runs EMU1101-EXT (binary 47/A2/A4), pack 1 is OEM."""
     api.no_sleep(monkeypatch)
     with api.mode(2, MAINT_FIRMWARE=True):
         bms = _multi_pack_bms()
@@ -899,7 +931,7 @@ def test_maint_read_errors_do_not_fail_poll(monkeypatch):
         bms.ascii[(0, 0x64)] = _maint_responder(energy=bytes(68))      # unknown format
         bms.binary[(0, 0x47)] = ("rej", 0x81)
         data, ok = api.poll(api.make_pack(0), bms)
-    assert ok and data["maint"]["normal"]["maint_version"] == "1.6.4" and "parameters" not in data
+    assert ok and data["maint"]["normal"]["maint_version"] == "EMU1101-EXT Full 1.6.4" and "parameters" not in data
 
 
 def test_discovery_publishes_maint_entities_per_capability(golden):
@@ -1042,7 +1074,7 @@ def test_silence_after_skipped_traffic_is_inconclusive(monkeypatch):
     assert data["info"]["normal"]["firmware_patch"] == "16.06 (unknown)"
 
 
-# --- MAINT stage 2 ------------------------------------------------------------------------------------
+# --- EMU1101-EXT stage 2 ------------------------------------------------------------------------------------
 
 def test_maint_group0_settings():
     full = api.decode_maint_identity(f.MAINT_FULL_IDENTITY)                  # flags FE: lock, positive, hard stop config
@@ -1065,7 +1097,7 @@ def test_maint_marker_decoder():
 
 
 def test_maint_stage2_master(monkeypatch, golden):
-    """UART1 master with MAINT 1.6.4: lock state, maintenance marker, recharge stop mode, calibration, clock."""
+    """UART1 master with EMU1101-EXT Full 1.6.4: lock state, maintenance marker, recharge stop mode, calibration, clock."""
     api.no_sleep(monkeypatch)
     responder = _maint_responder(storage=f.maint_storage(locks=(1, 1), cache=0x07))
     calibration = bytes([1, 0, 0x08, 16]) + bytes(60) + (250).to_bytes(4, "big", signed=True) + (-12).to_bytes(4, "big", signed=True)
@@ -1117,10 +1149,10 @@ def test_oem_multi_pack_has_no_clock(monkeypatch):
     assert ok and "clock" not in data and not any(r.cid2 == 0x4D for r in bms.requests)
 
 
-# --- review step 3 + MAINT 1 (M01-M09) ----------------------------------------------------------------
+# --- review step 3 + EMU1101-EXT 1 (M01-M09) ----------------------------------------------------------------
 
 def test_wide_energy_source_survives_restart(monkeypatch, tmp_path):
-    """M01: after MAINT supplied the totals, a restart with failing identity yields unknown, not the 0x42 value."""
+    """M01: after EMU1101-EXT supplied the totals, a restart with failing identity yields unknown, not the 0x42 value."""
     api.no_sleep(monkeypatch)
     state_file = tmp_path / "state.json"
     with api.mode(1, MAINT_FIRMWARE=True):
@@ -1171,7 +1203,7 @@ def test_health_follows_core_progress_during_slow_first_poll(monkeypatch):
 
 
 def test_discovery_keeps_maint_entities_while_detection_pending():
-    """M05: unknown capabilities neither create nor delete MAINT-dependent configs."""
+    """M05: unknown capabilities neither create nor delete EMU1101-EXT-dependent configs."""
     disc, client = api.discovery(maint_enabled=True)
     api.discovery_startup(disc, 2)
     topics = {r["topic"].split("/")[-2] for r in client.as_records() if "seplos-mqtt-pack-0" in r["topic"]}
@@ -1193,7 +1225,7 @@ def test_strict_parser_rejects_whitespace_and_short_headers():
 
 
 def test_maint_transient_rtn_retried_and_late_identity_refreshes_firmware(monkeypatch):
-    """M08: RTN 02 is not 'no MAINT'; a late identity replaces the heuristic firmware patch."""
+    """M08: RTN 02 is not 'no EMU1101-EXT'; a late identity replaces the heuristic firmware patch."""
     api.no_sleep(monkeypatch)
     with api.mode(1, MAINT_FIRMWARE=True):
         bms = _single_pack_bms()
@@ -1259,7 +1291,7 @@ def test_energy_source_on_disk_before_first_wide_value(monkeypatch, tmp_path):
 
 
 def test_unsupported_identity_keeps_wide_source(monkeypatch, tmp_path):
-    """L02: an unknown MAINT format or a non-empty RTN 04 is not 'OEM'."""
+    """L02: an unknown patch identity format or a non-empty RTN 04 is not 'OEM'."""
     api.no_sleep(monkeypatch)
     state_file = tmp_path / "state.json"
     with api.mode(1, MAINT_FIRMWARE=True):
@@ -1311,12 +1343,12 @@ def test_bank_startup_keeps_successful_packs_online():
 
 
 def test_uart1_clock_needs_power_rtc_flag(monkeypatch):
-    """L07: MNT04 without image flag 0x02 -> no UART1 4D request, no clock entity."""
+    """L07: an EXT05 image without flag 0x02 -> no UART1 4D request, no clock entity."""
     api.no_sleep(monkeypatch)
     with api.mode(2, MAINT_FIRMWARE=True):
         bms = _multi_pack_bms()
-        mnt04 = b"MNT\x04" + bytes([16, 6, 13, 1, 5, 2]) + bytes(8) + b"\x00"
-        bms.ascii[(0, 0x64)] = _maint_responder(identity=mnt04)
+        no_power = f.maint_identity(patch=(1, 5, 5), flags=f.EXT_LIGHT_FLAGS & ~0x02)
+        bms.ascii[(0, 0x64)] = _maint_responder(identity=no_power)
         pack = api.make_pack(0)
         data, ok = api.poll(pack, bms)
     assert ok and "clock" not in data and "maint_rtc" not in api.capabilities(pack)
@@ -1372,18 +1404,21 @@ def test_durable_marker_unaffected_by_throttled_counters(tmp_path):
     assert store.set_durable("pack0.energy_source", "maint")
 
 
-# --- MAINT 1.6 (MNT03, inverse polarity), frames captured from a 12-pack bank ---------------------------
+# --- TEMP(maint-1.6): the first MAINT 1.6 (MNT format 3, 18 bytes, inverse polarity) ----------------------
 
-MNT03_LIVE = bytes.fromhex("4d4e540310060d010618daf61d8a93671d06")     # build 18daf61d8a93671d, flags 06
+MNT03_LIVE = bytes.fromhex("4d4e540310060d010618daf61d8a93671d06")     # TEMP(maint-1.6): build 18daf61d8a93671d, flags 06
 
 
 def test_mnt03_identity_live_frame():
+    """TEMP(maint-1.6)"""
     ident = api.decode_maint_identity(MNT03_LIVE)
+    assert len(MNT03_LIVE) == 18 and ident.name == "MAINT 1.6"
     assert (ident.info_format, ident.base_version, ident.patch_version) == (3, "16.06.13", "1.6")
     assert ident.build_id == "18daf61d8a93671d" and ident.image_flags == 0x06 and ident.capabilities == 0
 
 
 def test_inverse_polarity_group0():
+    """TEMP(maint-1.6)"""
     ident = api.decode_maint_identity(MNT03_LIVE)
     d = api.decode_group0(0xFF, ident)            # old FF parameters: power denied, extended off disabled, unlocked
     assert d["uart1_power_rtc_allowed"] is False and d["extended_off_enabled"] is False and d["pack_lock_recorded"] is False
@@ -1392,7 +1427,7 @@ def test_inverse_polarity_group0():
 
 
 def test_maint16_bank_master_and_slave(monkeypatch, golden):
-    """The live answers of the 12-pack bank: identity, marker (master only), clock, binary 47/A2/A4, no 64/04/06."""
+    """TEMP(maint-1.6): identity, marker (master only), clock, binary 47/A2/A4, no 64/04/06."""
     api.no_sleep(monkeypatch)
 
     def respond(req):
@@ -1403,7 +1438,7 @@ def test_maint16_bank_master_and_slave(monkeypatch, golden):
         return f.ascii_frame(req.adr, 0x05, b"") if req.adr == 0 else b""
     with api.mode(2, MAINT_FIRMWARE=True):
         bms = _multi_pack_bms()
-        for adr, clock, bms_sn in ((0, "07ea0b0415172e", "SEPLOS-2302270260"), (1, "07ea0b04150d2f", "SEPLOS-2302270109")):
+        for adr, clock, bms_sn in ((0, "07ea0b0415172e", "SEPLOS-0000000001"), (1, "07ea0b04150d2f", "SEPLOS-0000000002")):
             bms.ascii[(adr, 0x64)] = respond
             bms.ascii[(adr, 0x4D)] = bytes.fromhex(clock)
             group0 = 0xDF if adr else 0xFF                     # slave: bit 5 = 0, individual lock active
@@ -1413,12 +1448,12 @@ def test_maint16_bank_master_and_slave(monkeypatch, golden):
         master, slave = api.make_pack(0), api.make_pack(1)
         m, _ = api.poll(master, bms)
         s, _ = api.poll(slave, bms)
-    assert m["maint"]["normal"]["maint_version"] == "1.6" and m["info"]["normal"]["firmware_patch"] == "16.06.13"
+    assert m["maint"]["normal"]["maint_version"] == "MAINT 1.6" and m["info"]["normal"]["firmware_patch"] == "16.06.13"
     assert m["maint"]["binary"]["maintenance_mode"] == "OFF" and m["maint"]["normal"]["effective_slave_count"] == 11
     assert m["maint"]["binary"]["pack_lock_active"] == "OFF" and s["maint"]["binary"]["pack_lock_active"] == "ON"
     assert "maintenance_mode" not in s["maint"]["binary"] and "storage_problem" not in m["maint"]["binary"]
     assert m["clock"]["normal"]["bms_time"] == "2026-11-04T21:23:46" and m["clock"]["normal"]["clock_offset"] == 33826
-    assert s["info"]["normal"]["bms_serial_number"] == "SEPLOS-2302270109"
+    assert s["info"]["normal"]["bms_serial_number"] == "SEPLOS-0000000002"
     assert m["maint"]["normal"]["recharge_stop_mode"] == "soft stop"
     assert api.capabilities(master) == {"maint", "maint_uart1", "maint_lock", "maint_marker", "maint_hard_stop", "maint_rtc"}
     assert not any(r.cid2 == 0x64 and r.info in (b"\x04", b"\x06") for r in bms.requests)

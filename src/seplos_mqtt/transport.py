@@ -1,6 +1,6 @@
 """
 The serial bus: the single owner of the serial port. Every request (Seplos ASCII, Modbus RTU,
-later MAINT binary frames and gated commands) runs as one transaction under one lock, and every
+later EMU1101-EXT binary frames and gated commands) runs as one transaction under one lock, and every
 transmission waits for a quiet gap after the last bus activity. Without that gap the BMS answers
 get corrupted, so callers never sleep on their own.
 """
@@ -234,7 +234,7 @@ class SerialBus:
 
     def query(self, address: int, cid2: int, info: bytes, attempts: int = 2) -> af.Frame | int | None:
         """
-        Optional request (e.g. a MAINT extension): the answer frame whatever its RTN, NO_ANSWER if the
+        Optional request (e.g. an EMU1101-EXT extension): the answer frame whatever its RTN, NO_ANSWER if the
         pack stayed silent, None for invalid answers. Fewer retries than regular polls.
         """
         result: af.Frame | int | None = None
@@ -261,7 +261,7 @@ class SerialBus:
 
     def request_binary(self, address: int, command: int, data: bytes = b"") -> bytes | None:
         """
-        MAINT binary frame on UART1; returns DATA, None if there's no valid answer. Raises
+        EMU1101-EXT binary frame on UART1; returns DATA, None if there's no valid answer. Raises
         BinaryRejected for a valid rejection. A gateway echo of the request is skipped.
         """
         request = bf.encode(address, command, data)

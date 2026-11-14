@@ -3526,7 +3526,7 @@
       "ic": "mdi:chip",
       "json_attr_t": "seplos/pack-0/sensors",
       "json_attr_tpl": "{{ value_json.get('maint', {}).get('attributes', {}) | tojson }}",
-      "name": "MAINT Firmware",
+      "name": "EMU1101-EXT Firmware",
       "obj_id": "seplos_bms_pack_0_maint_version",
       "stat_t": "seplos/pack-0/sensors",
       "uniq_id": "seplos_bms_pack_0_maint_version",

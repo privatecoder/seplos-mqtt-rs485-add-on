@@ -1,7 +1,7 @@
 """
-Read-only answers of the MAINT 1.5.4 / 1.6.4 custom firmware (KB mod/docs/firmware:
-remote-diagnostics.md, storage-and-reset.md, openbms-monitor.md). ASCII CID2 0x64 with INFO:
-03 identity (MNT05), 04 storage diagnostics, 06 persisted capacity and live energy.
+Read-only answers of the EMU1101-EXT patched firmware (Light 1.5.x, Full 1.6.x; KB mod/docs/firmware:
+openbms-monitor.md, remote-diagnostics.md, storage-and-reset.md). ASCII CID2 0x64 with INFO:
+03 identity (EXT05), 04 storage diagnostics, 06 persisted capacity and live energy.
 """
 from __future__ import annotations
 
@@ -11,21 +11,33 @@ CID2 = 0x64
 INFO_IDENTITY = b"\x03"
 INFO_STORAGE = b"\x04"
 INFO_ENERGY = b"\x06"
-IDENTITY_LEN = 21      # MNT05
-IDENTITY_LEN_MNT04 = 19
-IDENTITY_LEN_MNT03 = 18
+SIGNATURE = b"EXT"
+IDENTITY_FORMAT = 5
+IDENTITY_LEN = 21      # EXT05
 STORAGE_LEN = 10
 ENERGY_LEN = 68
+# lowest supported patch versions per line (Light 1.5.x, Full 1.6.x and later)
+SUPPORTED_LIGHT = (1, 5, 4)
+SUPPORTED_FULL = (1, 6, 4)
+LINES = {(1, 5): "Light", (1, 6): "Full"}
 
-# image flags (identity byte 18)
+# TEMP(maint-1.6): the first MAINT 1.6 build (signature MNT, format 3, 18 bytes, no third patch byte, no capability
+# mask), accepted by its build ID only; remove with every TEMP(maint-1.6) mark once that board runs EMU1101-EXT.
+TEMP16_SIGNATURE = b"MNT"
+TEMP16_FORMAT = 3
+TEMP16_LEN = 18
+TEMP16_PATCH = (1, 6)
+TEMP16_BUILD = "18daf61d8a93671d"
+
+# image flags (EXT05 byte 18)
 FLAG_UART1_POWER_RTC = 0x02
 FLAG_PACK_LOCK = 0x04
-FLAG_POSITIVE_POLARITY = 0x08
+FLAG_POSITIVE_POLARITY = 0x08      # set in every EMU1101-EXT release; TEMP(maint-1.6): absent on the first MAINT 1.6
 FLAG_UART0_MARKER = 0x10
 FLAG_STORAGE_DIAGNOSTICS = 0x20
 FLAG_CHECKPOINT_BEFORE_RESET = 0x40
 FLAG_CONFIGURABLE_HARD_STOP = 0x80
-# MNT05 read-capability mask (bytes 19-20)
+# EXT05 read-capability mask (bytes 19-20)
 CAP_UART1_HISTORY = 0x0001
 CAP_CALIBRATION = 0x0002
 CAP_PERSISTED_SOC = 0x0004
@@ -45,10 +57,10 @@ class MaintFormatError(ValueError):
 class Identity:
     info_format: int
     base_version: str          # reported OEM base, revision "?" if unknown
-    patch_version: str         # e.g. "1.6.4"
+    patch_version: str         # e.g. "1.6.5"; TEMP(maint-1.6): "1.6"
     build_id: str
     image_flags: int
-    capabilities: int          # 0 for MNT04
+    capabilities: int          # TEMP(maint-1.6): 0 for the MNT format 3
 
     def has_flag(self, flag: int) -> bool:
         return bool(self.image_flags & flag)
@@ -56,8 +68,18 @@ class Identity:
     def has_capability(self, cap: int) -> bool:
         return bool(self.capabilities & cap)
 
+    @property
+    def name(self) -> str:
+        """Display name: "EMU1101-EXT Light 1.5.5", "EMU1101-EXT Full 1.6.5" (another line: "EMU1101-EXT 1.7.0");
+        the OEM base is shown separately. TEMP(maint-1.6): "MAINT 1.6"."""
+        if self.info_format == TEMP16_FORMAT:       # TEMP(maint-1.6)
+            return f"MAINT {self.patch_version}"
+        line = LINES.get(tuple(int(p) for p in self.patch_version.split(".")[:2]))
+        return f"EMU1101-EXT {line} {self.patch_version}" if line else f"EMU1101-EXT {self.patch_version}"
+
     def as_dict(self) -> dict:
         return {
+            "name": self.name,
             "info_format": self.info_format,
             "patch_version": self.patch_version,
             "base_version": self.base_version,
@@ -67,39 +89,49 @@ class Identity:
         }
 
 
+def supported_version(version: tuple[int, int, int]) -> bool:
+    """Light from 1.5.4, Full from 1.6.4 (and later lines); below, the patch is not used."""
+    return version >= SUPPORTED_FULL or SUPPORTED_LIGHT <= version < (1, 6, 0)
+
+
+def _base(info: bytes) -> str:
+    """OEM base from bytes 4-6, revision FF = unknown ("?")."""
+    revision = "?" if info[6] == 0xFF else f"{info[6]:02d}"
+    return f"{info[4]}.{info[5]:02d}.{revision}"
+
+
 def decode_identity(info: bytes) -> Identity:
     """
-    MNT05 (21 bytes, current releases), MNT04 (19 bytes, no capability mask) or MNT03 (18 bytes,
-    two-part patch version, e.g. the MAINT 1.5/1.6 builds of October 2026). MNT02 (no image flags)
-    is not supported. DEPRECATED: MNT03/MNT04 (builds before 1.5.4/1.6.4) will be removed in an
-    upcoming version; supported releases are MAINT 1.5.4 / 1.6.4 (MNT05) and newer.
+    EXT05 (21 bytes): only a supported version (Light from 1.5.4, Full from 1.6.4) and a capability mask with known
+    bits decode; anything else (other signatures, formats, lengths, older versions) raises, so the board gets no
+    EMU1101-EXT reads. TEMP(maint-1.6): also the 18-byte MNT format 3 of the first MAINT 1.6, by its build ID.
     """
-    formats = ((IDENTITY_LEN, b"\x05"), (IDENTITY_LEN_MNT04, b"\x04"), (IDENTITY_LEN_MNT03, b"\x03"))
-    if info[:3] != b"MNT" or (len(info), info[3:4]) not in formats:
-        raise MaintFormatError(f"unknown identity format: {info.hex()}")
-    capabilities = int.from_bytes(info[19:21], "big") if info[3] == 5 else 0
-    if capabilities & ~KNOWN_CAPS:
-        raise MaintFormatError(f"unknown capability bits 0x{capabilities:04X}")
-    revision = "?" if info[6] == 0xFF else f"{info[6]:02d}"
-    version_end = 9 if info[3] == 3 else 10
-    return Identity(
-        info_format=info[3],
-        base_version=f"{info[4]}.{info[5]:02d}.{revision}",
-        patch_version=".".join(str(b) for b in info[7:version_end]),
-        build_id=info[version_end:version_end + 8].hex(),
-        image_flags=info[version_end + 8],
-        capabilities=capabilities,
-    )
+    if info[:3] == SIGNATURE and len(info) == IDENTITY_LEN and info[3] == IDENTITY_FORMAT:
+        capabilities = int.from_bytes(info[19:21], "big")
+        if capabilities & ~KNOWN_CAPS:
+            raise MaintFormatError(f"unknown capability bits 0x{capabilities:04X}")
+        version = (info[7], info[8], info[9])
+        if not supported_version(version):
+            raise MaintFormatError("unsupported EMU1101-EXT {}.{}.{} (supported: Light from 1.5.4, Full from 1.6.4)"
+                                   .format(*version))
+        return Identity(info_format=info[3], base_version=_base(info), patch_version=".".join(str(b) for b in version),
+                        build_id=info[10:18].hex(), image_flags=info[18], capabilities=capabilities)
+    # TEMP(maint-1.6): the first MAINT 1.6 only
+    if (info[:3] == TEMP16_SIGNATURE and len(info) == TEMP16_LEN and info[3] == TEMP16_FORMAT
+            and tuple(info[7:9]) == TEMP16_PATCH and info[9:17].hex() == TEMP16_BUILD):
+        return Identity(info_format=info[3], base_version=_base(info), patch_version="1.6", build_id=TEMP16_BUILD,
+                        image_flags=info[17], capabilities=0)
+    raise MaintFormatError(f"unknown identity format: {info.hex()}")
 
 
 def decode_storage(info: bytes) -> dict:
-    """64/04 format 01: parameter and SOC flash mirrors, 1.6.4 lock state."""
+    """64/04 format 01: parameter and SOC flash mirrors, the lock state of the Full line."""
     if (len(info) != STORAGE_LEN or info[0] != 1 or any(info[i] > 2 for i in range(1, 7))
             or any(info[i] not in (0x00, 0x01, 0xFF) for i in (7, 8)) or info[9] & ~0x07):
         raise MaintFormatError(f"unknown storage diagnostics: {info.hex()}")
 
     def lock(value: int) -> bool | None:
-        return None if value == 0xFF else bool(value)   # FF: unavailable (1.5.4) or unknown, not unlocked
+        return None if value == 0xFF else bool(value)   # FF: unavailable (Light) or unknown, not unlocked
 
     cache_valid = bool(info[9] & 0x04)
     return {
@@ -162,10 +194,11 @@ def decode_marker(info: bytes) -> dict:
 
 def decode_group0(group0: int, ident: Identity) -> dict:
     """
-    MAINT meanings of function switch BitGroup0 (OEM: only bit 1 has a function). Configuration, not
+    EMU1101-EXT meanings of function switch BitGroup0 (OEM: only bit 1 has a function). Configuration, not
     live state: the lock state itself comes from 64/04, the recharge stop also needs Group5 bit 1.
     """
-    # bits 3/4: positive polarity with image flag 0x08 (1 = permitted/enabled), older images inverse (0 = ...)
+    # bits 3/4: 1 = permitted/enabled with image flag 0x08 (every EMU1101-EXT release);
+    # TEMP(maint-1.6): the first MAINT 1.6 has no flag 0x08 and the inverse meaning (0 = permitted/enabled)
     positive = ident.has_flag(FLAG_POSITIVE_POLARITY)
 
     def polar(bit: int) -> bool:
@@ -178,7 +211,7 @@ def decode_group0(group0: int, ident: Identity) -> dict:
     }
     if ident.has_flag(FLAG_PACK_LOCK):
         out["extended_off_enabled"] = polar(0x10)
-        out["pack_lock_recorded"] = not group0 & 0x20      # bit 5 = 0: individual lock active (both polarities)
+        out["pack_lock_recorded"] = not group0 & 0x20      # bit 5 = 0: individual lock active (in every image)
     if ident.has_flag(FLAG_CONFIGURABLE_HARD_STOP):
         selection = group0 & 0xC0
         if selection in (0x00, 0x40):

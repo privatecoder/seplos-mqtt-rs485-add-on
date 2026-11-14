@@ -72,7 +72,7 @@ class Config:
     enable_ha_discovery: bool = True
     ha_discovery_prefix: str = "homeassistant"
     invert_ha_dis_charge_measurements: bool = True
-    # read the extra data of the MAINT 1.5.4 / 1.6.4 custom firmware (read-only)
+    # read the extra data of the EMU1101-EXT patched firmware (Light from 1.5.4, Full from 1.6.4; read-only)
     maint_firmware: bool = False
     # "uart0" | "uart1" (several packs: always uart1)
     bus: str = "uart0"

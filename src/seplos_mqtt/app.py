@@ -557,7 +557,7 @@ def publish_poll(state: AppState, pack_state: PackState, data: dict | None, succ
             state.next_replay = now + REPLAY_DELAY_SECONDS
     if discovery and pack_state.pack.cell_count:
         discovery.update_cell_count(address, pack_state.pack.cell_count)
-    # show the real firmware version and the battery serial (0xA2 / MAINT UART1, as assembled into
+    # show the real firmware version and the battery serial (0xA2 / EMU1101-EXT UART1, as assembled into
     # info.normal.serial_number) in the HA device info; Discovery republishes only on a change
     if discovery and pack_state.pack.info:
         info = pack_state.pack.info

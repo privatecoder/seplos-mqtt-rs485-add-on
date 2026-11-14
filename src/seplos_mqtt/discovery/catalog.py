@@ -33,7 +33,7 @@ class Entity:
     payload_off: str | None = None
     count: int = 0                  # > 0: key_1..key_n, "name 1".."name n"
     # published if any of these conditions holds for the pack: "always", "pack_bus" (RS485-1/2, single
-    # pack mode) or a MAINT capability ("maint", "maint_storage", "maint_uart1"); removed otherwise
+    # pack mode) or an EMU1101-EXT capability ("maint", "maint_storage", "maint_uart1"); removed otherwise
     when: frozenset = ALWAYS
     attributes: str | None = None   # Jinja expression for json_attr_tpl
     options: tuple[str, ...] | None = None   # device_class enum: the possible states
@@ -215,10 +215,10 @@ TELESIGNALIZATION: list[Entity] = [
     _alarm_binary("heating_switch", "Heater", device_class="power"),
 ]
 
-# MAINT 1.5.4 / 1.6.4 custom firmware (option maint_firmware), published under "maint"
+# EMU1101-EXT patched firmware (option maint_firmware), published under "maint"
 MAINT_ATTRIBUTES = "{{ value_json.get('maint', {}).get('attributes', {}) | tojson }}"
 MAINT: list[Entity] = [
-    Entity("maint_version", "MAINT Firmware", "maint", icon="mdi:chip", category=DIAG, when=frozenset({"maint"}),
+    Entity("maint_version", "EMU1101-EXT Firmware", "maint", icon="mdi:chip", category=DIAG, when=frozenset({"maint"}),
            attributes=MAINT_ATTRIBUTES),
     Entity("storage_problem", "Flash Storage Problem", "maint", "binary_sensor", device_class="problem", category=DIAG,
            when=frozenset({"maint_storage"})),
@@ -235,7 +235,7 @@ MAINT: list[Entity] = [
            when=frozenset({"maint_hard_stop"})),
 ]
 
-# BMS real time clock (0x4D): OEM on RS485-1/2, with MAINT also on the CAN port
+# BMS real time clock (0x4D): OEM on RS485-1/2, with EMU1101-EXT also on the CAN port
 CLOCK: list[Entity] = [
     Entity("clock_offset", "BMS Clock Offset", "clock", device_class="duration", state_class="measurement", unit="s",
            icon="mdi:clock-alert-outline", category=DIAG, when=frozenset({"pack_bus", "maint_rtc"}),

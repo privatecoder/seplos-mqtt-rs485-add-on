@@ -1,4 +1,4 @@
-"""CID2 0x4D: BMS real time clock (OEM on RS485-1/2, with MAINT also on UART1)."""
+"""CID2 0x4D: BMS real time clock (OEM on RS485-1/2, with EMU1101-EXT also on UART1)."""
 from __future__ import annotations
 
 from datetime import datetime

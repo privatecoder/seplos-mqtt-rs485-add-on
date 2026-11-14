@@ -1,5 +1,5 @@
 """
-Optional read-only support for the MAINT 1.5.4 / 1.6.4 custom firmware, per board.
+Optional read-only support for the EMU1101-EXT patched firmware (Light from 1.5.4, Full from 1.6.4), per board.
 
 Detection only via ASCII 64/03 (never from 0x51 or a version string). Each read is gated by the
 board's own identity: storage diagnostics by image flag 0x20, the full-width live energy by
@@ -22,13 +22,13 @@ from .transport import NO_ANSWER, SerialBus
 logger = logging.getLogger("SeplosBMS.maint")
 
 DETECT_ATTEMPTS = 3
-# RTN 04 unknown command, RTN 05 unknown subcommand: the board has no MAINT identity read
+# RTN 04 unknown command, RTN 05 unknown subcommand: the board has no EMU1101-EXT identity read
 UNSUPPORTED_RTN = (0x04, 0x05)
 ENERGY_INTERVAL = 60
 ENERGY_MAX_AGE = 600
 STORAGE_INTERVAL = 600
-LOCK_INTERVAL = 60            # 64/04 on 1.6.4: carries the runtime lock state
-LOCK_PARAMETER_INTERVAL = 300  # older 1.6 without 64/04: the lock state comes from BitGroup0 of 0x47
+LOCK_INTERVAL = 60            # 64/04 on the Full line: carries the runtime lock state
+LOCK_PARAMETER_INTERVAL = 300  # TEMP(maint-1.6): no 64/04, the lock state comes from BitGroup0 of 0x47
 MARKER_INTERVAL = 60
 CALIBRATION_INTERVAL = 600
 PARAMETER_INTERVAL = 3600
@@ -90,17 +90,17 @@ class MaintSupport:
         if answer == NO_ANSWER or answer is None:
             if self.attempts >= DETECT_ATTEMPTS:
                 self.state = "unknown"
-                logger.info("Pack%s:No answer to the MAINT identity request, MAINT reads disabled", self.address)
+                logger.info("Pack%s:No answer to the EMU1101-EXT identity request, EMU1101-EXT reads disabled", self.address)
             return
         if answer.code in UNSUPPORTED_RTN and not answer.info:
             # OEM firmware: unknown command / subcommand
             self.state = "absent"
-            logger.info("Pack%s:No MAINT firmware (identity request answered with RTN %02X)", self.address, answer.code)
+            logger.info("Pack%s:No EMU1101-EXT firmware (identity request answered with RTN %02X)", self.address, answer.code)
             return
         if answer.code != 0x00:
             # checksum/device errors (RTN 02, 08, ...) or a rejection that isn't the exact empty form
             # say nothing about the firmware: try again
-            logger.debug("Pack%s:MAINT identity request: RTN %02X", self.address, answer.code)
+            logger.debug("Pack%s:EMU1101-EXT identity request: RTN %02X", self.address, answer.code)
             if self.attempts >= DETECT_ATTEMPTS:
                 self.state = "unknown"
             return
@@ -108,18 +108,14 @@ class MaintSupport:
         try:
             self.identity = md.decode_identity(answer.info)
         except md.MaintFormatError as e:
-            # a MAINT board we don't understand is not an OEM board: no reads, but nothing resolved
+            # a patched board we don't support (older build, unknown format) is not an OEM board either:
+            # no reads, but nothing resolved
             self.state = "unsupported"
-            logger.warning("Pack%s:Unsupported MAINT identity, MAINT reads disabled: %s", self.address, e)
+            logger.warning("Pack%s:Unsupported patch firmware identity, EMU1101-EXT reads disabled: %s", self.address, e)
             return
         self.state = "present"
-        if self.identity.info_format < 5:
-            logger.warning(
-                "Pack%s:MAINT %s reports the old identity format MNT%02d. Only MAINT 1.5.4 / 1.6.4 and newer are "
-                "supported; support for older builds is deprecated and will be removed in an upcoming version",
-                self.address, self.identity.patch_version, self.identity.info_format)
-        logger.info("Pack%s:MAINT %s on OEM %s (build %s, flags 0x%02X, capabilities 0x%04X)", self.address,
-                    self.identity.patch_version, self.identity.base_version, self.identity.build_id,
+        logger.info("Pack%s:%s on OEM %s (build %s, flags 0x%02X, capabilities 0x%04X)", self.address,
+                    self.identity.name, self.identity.base_version, self.identity.build_id,
                     self.identity.image_flags, self.identity.capabilities)
 
     @property
@@ -134,7 +130,7 @@ class MaintSupport:
             caps.add(CAP_UART1)
             if self.identity.has_flag(md.FLAG_UART1_POWER_RTC):
                 caps.add(CAP_RTC)
-        # lock state: from the 64/04 runtime cache, or (older images without 0x20) from BitGroup0 of 0x47
+        # lock state: from the 64/04 runtime cache, or (TEMP(maint-1.6): no flag 0x20) from BitGroup0 of 0x47
         if self.identity.has_flag(md.FLAG_PACK_LOCK) and (self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS) or self.can_bus):
             caps.add(CAP_LOCK)
         if self._marker_readable:
@@ -144,6 +140,7 @@ class MaintSupport:
 
     @property
     def _lock_from_group0(self) -> bool:
+        """TEMP(maint-1.6): pack lock without 64/04 (only the first MAINT 1.6 has flag 0x04 but not 0x20)."""
         return (self.identity is not None and self.identity.has_flag(md.FLAG_PACK_LOCK)
                 and not self.identity.has_flag(md.FLAG_STORAGE_DIAGNOSTICS))
 
@@ -176,7 +173,7 @@ class MaintSupport:
         try:
             value = read()
         except (md.MaintFormatError, bf.BinaryFrameError, ValueError) as e:
-            logger.warning("Pack%s:Invalid MAINT answer: %s", self.address, e)
+            logger.warning("Pack%s:Invalid EMU1101-EXT answer: %s", self.address, e)
             value = None
         if value is not None:
             item.value, item.ts, item.next_due, item.read_at = value, now, now + interval, timeutil.now_iso()
@@ -254,7 +251,7 @@ class MaintSupport:
         if self.identity is None:
             return None
         now = time.monotonic()
-        normal: dict = {"maint_version": self.identity.patch_version}
+        normal: dict = {"maint_version": self.identity.name}
         binary: dict = {}
         attributes: dict = {"identity": self.identity.as_dict()}
         if self.energy.value is not None and self.identity.has_capability(md.CAP_LIVE_ENERGY):
@@ -271,7 +268,7 @@ class MaintSupport:
                 lock_fresh = self.storage.fresh(now, 3 * LOCK_INTERVAL)
                 runtime = self.storage.value.get("lock_runtime") if lock_fresh else None
                 binary["pack_lock_active"] = None if runtime is None else ("ON" if runtime else "OFF")
-        elif self._lock_from_group0 and CAP_LOCK in self.capabilities:
+        elif self._lock_from_group0 and CAP_LOCK in self.capabilities:     # TEMP(maint-1.6)
             fresh = self.parameters.fresh(now, 3 * LOCK_PARAMETER_INTERVAL) and self.group0 is not None
             binary["pack_lock_active"] = ("OFF" if self.group0 & 0x20 else "ON") if fresh else None
         if self._marker_readable:

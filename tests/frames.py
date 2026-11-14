@@ -217,15 +217,21 @@ def system_registers() -> list[int]:
     ]
 
 
-# --- MAINT 1.5.4 / 1.6.4 ----------------------------------------------------------------------
+# --- EMU1101-EXT (identity EXT05) ---------------------------------------------------------------
 
-# release metadata maint-full.json "info_hex" (MNT05, 1.6.4 on 16.06.13)
-MAINT_FULL_IDENTITY = bytes.fromhex("4D4E540510060D010604A8676B52BAE281FFFE000F")
-MAINT_LIGHT_FLAGS = 0x3A
+# KB openbms-monitor.md "Firmware identity: ASCII 64/03": EXT, format 05, OEM base, patch version (3 bytes),
+# build ID, image flags, read-capability mask (u16 BE); synthetic build IDs
+EXT_FULL_FLAGS = 0xFE
+EXT_LIGHT_FLAGS = 0x3A
 
 
-def maint_identity(patch=(1, 6, 4), base=(16, 6, 13), flags=0xFE, caps=0x000F, build="a8676b52bae281ff") -> bytes:
-    return b"MNT\x05" + bytes(base) + bytes(patch) + bytes.fromhex(build) + u8(flags) + u16(caps)
+def maint_identity(patch=(1, 6, 4), base=(16, 6, 13), flags=EXT_FULL_FLAGS, caps=0x000F, build="a8676b52bae281ff",
+                   signature=b"EXT", info_format=5) -> bytes:
+    return signature + u8(info_format) + bytes(base) + bytes(patch) + bytes.fromhex(build) + u8(flags) + u16(caps)
+
+
+MAINT_FULL_IDENTITY = maint_identity()
+MAINT_LIGHT_FLAGS = EXT_LIGHT_FLAGS
 
 
 def maint_storage(classes=(1, 1, 1, 1, 1, 1), locks=(0, 0), cache=0x06) -> bytes:

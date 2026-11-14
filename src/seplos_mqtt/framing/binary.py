@@ -1,5 +1,5 @@
 """
-Binary frames of the MAINT firmware on UART1 (RS485 pair in the CAN socket):
+Binary frames of the EMU1101-EXT firmware on UART1 (RS485 pair in the CAN socket):
 
     55 ADR CMD LEN DATA[LEN] CRC_HI CRC_LO AA
 
