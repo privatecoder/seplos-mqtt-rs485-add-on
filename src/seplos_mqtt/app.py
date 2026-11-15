@@ -487,15 +487,17 @@ def publish_feed_meta(state: AppState) -> None:
     if state.publisher is None or not (state.feed.on or state.feed_meta_on):
         return
     packs = [p.pack for p in state.packs]
-    message = state.feed.meta_message(state.config, packs, active_sets(state))
+    # one snapshot for the message and its key: a CCL step expiring meanwhile is then still seen as a change
+    caches = feed_mod.pack_caches(packs)
+    message = state.feed.meta_message(state.config, packs, active_sets(state), caches)
     if state.publisher.publish(topics.feed_meta(state.config.mqtt_topic), message, retain=True):
-        state.feed_meta_sent = _feed_caches(packs)
+        state.feed_meta_sent = feed_mod.caches_key(caches)
         state.feed_meta_on = state.feed.on
 
 
 def _feed_caches(packs: list) -> str:
-    import json
-    return json.dumps([[p.raw_ids, p.raw47] for p in packs], sort_keys=True)
+    # raw_ccl is time-bound: its expiry changes the caches as well, so the retained meta drops it
+    return feed_mod.caches_key(feed_mod.pack_caches(packs))
 
 
 def round_groups(state: AppState) -> list[list[PackState]]:

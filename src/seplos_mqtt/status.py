@@ -39,6 +39,16 @@ def _maint_version(pack: Any) -> str | None:
     return maint.identity.name
 
 
+def _ccl_step(pack: Any, now_mono: float) -> dict[str, Any]:
+    """The master's CCL decrease step (EMU1101-EXT 64/07): ``{"ccl_step": {...} | None}`` for a pack whose step is
+    readable (None while no confirmed, fresh value exists), nothing for every other pack."""
+    maint = pack.maint
+    if maint is None or not maint.ccl_step_readable:
+        return {}
+    step = maint.ccl_step_current(now_mono)
+    return {"ccl_step": {"decrease_step": step["decrease_step"], "read_at": maint.ccl_step.read_at} if step else None}
+
+
 def bms_serial(pack_state: Any) -> str | None:
     """The BMS serial (0xA4 string 2, trimmed) once it was read: RS485-1/2 or EMU1101-EXT UART1; else None.
     The battery serial (0xA2) is never used for identity."""
@@ -100,6 +110,7 @@ def _pack_status(state: Any, pack_state: Any, now_mono: float) -> dict[str, Any]
         "bms_serial": bms_serial(pack_state),
         "maint": _maint(pack),
         "maint_version": _maint_version(pack),
+        **_ccl_step(pack, now_mono),
         **{key: values.get(key) for key in _PACK_VALUES},
         "cells": _cells_status(state, pack_state, now_mono),
         "balancer": cell_report.balancer_report(state, pack_state, now_mono),

@@ -96,7 +96,7 @@ No Modbus header or CRC; the Monitor uses `SystemValues::from_registers`.
 
 ```json
 {"v":1,"on":true,"auto_off":<ms|null>,"boot":"…","sent_at":…,"bus":"uart1|uart0","addon":"<version>",
- "packs":[{"addr":0,"r51":{"t":…,"hex":"…"},"a2":…,"a4":…,"maint":{"t":…,"hex":"…"}|null,"r47":{"t":…,"hex":"…"}},…],
+ "packs":[{"addr":0,"r51":{"t":…,"hex":"…"},"a2":…,"a4":…,"maint":{"t":…,"hex":"…"}|null,"ccl":{"t":…,"hex":"…"}|null,"r47":{"t":…,"hex":"…"}},…],
  "sets":[{"id":"…","packs":[…],"wiring":"…","plus":<DIP>,"minus":<DIP>},…]}
 ```
 
@@ -104,6 +104,7 @@ No Modbus header or CRC; the Monitor uses `SystemValues::from_registers`.
   - Reachability comes from the add-on's existing availability topic and last will; the add-on gets no second client.
   - When the feed is off, `meta` is republished with `"on":false`. It is resent after a restart or reconnect, never mixing an old `boot`'s data in.
 - `meta.packs[]` fields `r51`, `a2`, `a4`, `maint` (the raw 64/03 identity; the field keeps its name), `r47` are each `null` or `{"t", "hex"}`. `a2`/`a4` are exactly 30 string bytes (60 hex characters) without frame, CRC or address byte; ASCII A2/A4 INFO and binary EMU1101-EXT A2/A4 DATA share this layout. Nothing is invented: on OEM firmware over UART1 the add-on reads no A2, so it is `null`.
+- `ccl` is the master's CCL decrease step, the raw 64/07 INFO of EMU1101-EXT (5 bytes, 10 hex characters: format 01, decrease step 1–20, increase step 01, minimum 01, maximum 14) with the time right after the answer. It is present only while the add-on's own HA value `ccl_decrease_step` is: only on address 0 with read capability 0x0010, never older than 30 minutes (1800 s), and `null` at once after a definitive refusal or a malformed answer; silence keeps the last confirmed answer until it is that old. Every other pack has `null`. A new read, the expiry or the clearing republishes `meta`. It is read-only information: the Monitor shows it and never writes the step over MQTT.
 - `meta` caches the per-pack identity and the parameters with their original read times. Changes update the cache and are not new measurements. A Monitor that joins late thus has the parameters and serial numbers at once.
 - The sets are proposals for the chosen installation in the Monitor, never silent changes to its local settings.
 

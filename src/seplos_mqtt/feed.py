@@ -2,6 +2,7 @@
 Monitor's analysis over MQTT, and the read order that keeps the packs of a parallel set back to back."""
 from __future__ import annotations
 
+import json
 import os
 import secrets
 from collections.abc import Sequence
@@ -30,6 +31,16 @@ def round_order(pack_count: int, sets: Sequence[Any]) -> list[list[int]]:
     return sorted(groups, key=min)
 
 
+def pack_caches(packs: Sequence[Any]) -> list[dict]:
+    """One snapshot of every pack's cached raw answers for ``meta``. ``ccl`` is time-bound (it expires), so a message and
+    the key that records what was sent must come from the same snapshot."""
+    return [{"addr": p.address, **p.raw_ids, "ccl": p.raw_ccl, "r47": p.raw47} for p in packs]
+
+
+def caches_key(caches: list[dict]) -> str:
+    return json.dumps(caches, sort_keys=True)
+
+
 class Feed:
     """State of the feed within one add-on run: ``boot`` (random per start) and the global ``seq``."""
 
@@ -56,8 +67,9 @@ class Feed:
     def system_message(self, raw: dict) -> dict:
         return {**self._head(), **raw}
 
-    def meta_message(self, config: Any, packs: Sequence[Any], sets: Sequence[Any]) -> dict:
-        """The retained description of the feed with the identity and parameter caches of every pack."""
+    def meta_message(self, config: Any, packs: Sequence[Any], sets: Sequence[Any], caches: list[dict] | None = None) -> dict:
+        """The retained description of the feed with the identity, CCL step and parameter caches of every pack.
+        ``caches``: a snapshot from ``pack_caches`` (the caller keys what it sent by the same snapshot)."""
         return {
             "v": VERSION,
             "on": self.on,
@@ -66,7 +78,7 @@ class Feed:
             "sent_at": timeutil.now_ms(),
             "bus": "uart1" if config.can_bus else "uart0",
             "addon": os.environ.get("ADDON_VERSION", "unknown"),
-            "packs": [{"addr": p.address, **p.raw_ids, "r47": p.raw47} for p in packs],
+            "packs": pack_caches(packs) if caches is None else caches,
             "sets": [{"id": s.id, "packs": list(s.packs), "wiring": s.wiring, "plus": s.plus, "minus": s.minus}
                      for s in sets],
         }

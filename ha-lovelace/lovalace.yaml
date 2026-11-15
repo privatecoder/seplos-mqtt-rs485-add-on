@@ -4103,7 +4103,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "sensor.seplos_bms_pack_0_maint_version"
-            name: "MAINT"
+            name: "Patch firmware"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -4150,6 +4150,19 @@ views:
             visibility:
               - condition: "template"
                 value_template: "{{ states['sensor.seplos_bms_pack_0_effective_slave_count'] is not none }}"
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_0_ccl_decrease_step"
+            name: "CCL decrease step"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            visibility:
+              - condition: "template"
+                value_template: "{{ states['sensor.seplos_bms_pack_0_ccl_decrease_step'] is not none }}"
             grid_options:
               columns: 6
               rows: 1
@@ -7699,7 +7712,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "sensor.seplos_bms_pack_1_maint_version"
-            name: "MAINT"
+            name: "Patch firmware"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -7746,6 +7759,19 @@ views:
             visibility:
               - condition: "template"
                 value_template: "{{ states['sensor.seplos_bms_pack_1_effective_slave_count'] is not none }}"
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_1_ccl_decrease_step"
+            name: "CCL decrease step"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            visibility:
+              - condition: "template"
+                value_template: "{{ states['sensor.seplos_bms_pack_1_ccl_decrease_step'] is not none }}"
             grid_options:
               columns: 6
               rows: 1
@@ -11295,7 +11321,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "sensor.seplos_bms_pack_2_maint_version"
-            name: "MAINT"
+            name: "Patch firmware"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -11342,6 +11368,19 @@ views:
             visibility:
               - condition: "template"
                 value_template: "{{ states['sensor.seplos_bms_pack_2_effective_slave_count'] is not none }}"
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_2_ccl_decrease_step"
+            name: "CCL decrease step"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            visibility:
+              - condition: "template"
+                value_template: "{{ states['sensor.seplos_bms_pack_2_ccl_decrease_step'] is not none }}"
             grid_options:
               columns: 6
               rows: 1
@@ -14891,7 +14930,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "sensor.seplos_bms_pack_3_maint_version"
-            name: "MAINT"
+            name: "Patch firmware"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -14938,6 +14977,19 @@ views:
             visibility:
               - condition: "template"
                 value_template: "{{ states['sensor.seplos_bms_pack_3_effective_slave_count'] is not none }}"
+            grid_options:
+              columns: 6
+              rows: 1
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_3_ccl_decrease_step"
+            name: "CCL decrease step"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            visibility:
+              - condition: "template"
+                value_template: "{{ states['sensor.seplos_bms_pack_3_ccl_decrease_step'] is not none }}"
             grid_options:
               columns: 6
               rows: 1

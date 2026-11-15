@@ -237,7 +237,7 @@ def test_meta_contains_sets_and_cache(monkeypatch):
         m = fd.meta_message(api.config(), [pack], [s])
     assert set(m) == {"v", "on", "auto_off", "boot", "sent_at", "bus", "addon", "packs", "sets"}
     assert (m["on"], m["auto_off"], m["bus"], m["addon"]) == (True, None, "uart1", "2.0.0-test")
-    assert m["packs"] == [{"addr": 0, **pack.raw_ids, "r47": pack.raw47}]
+    assert m["packs"] == [{"addr": 0, **pack.raw_ids, "ccl": None, "r47": pack.raw47}]
     assert m["sets"] == [{"id": 7, "packs": [0, 1], "wiring": "diagonal", "plus": 0, "minus": 1}]
 
 
@@ -437,3 +437,135 @@ def test_an_auto_off_due_while_stopped_republishes_meta_off(monkeypatch, tmp_pat
     metas = _feed_msgs(client, "meta")
     assert metas and metas[-1].payload["on"] is False
     assert not _feed_msgs(client, "pack/")
+
+
+# ---------------------------------------------------------------- the master's CCL decrease step (64/07) in meta
+
+from test_characterization import FULL_167, _ccl_responder  # noqa: E402
+
+
+def _ccl_bank(identity=FULL_167, step=None):
+    bms = _maint_bank()
+    for adr in (0, 1):
+        bms.ascii[(adr, 0x64)] = _ccl_responder(identity=identity, step=step)
+    return bms
+
+
+def test_meta_carries_the_masters_ccl_step(monkeypatch):
+    api.no_sleep(monkeypatch)
+    monkeypatch.setattr(timeutil, "now_ms", lambda: 5000)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _ccl_bank(step=f.maint_ccl_step(10))
+        master, slave = api.make_pack(0), api.make_pack(1)
+        api.poll(master, bms)
+        api.poll(slave, bms)
+        m = feed.Feed(boot="ab", on=True).meta_message(api.config(), [master, slave], [])
+    assert m["packs"][0]["ccl"] == {"t": 5000, "hex": "010a010114"}
+    assert m["packs"][1]["ccl"] is None                         # a slave's step is never read
+    assert m["packs"][0]["maint"]["hex"] == FULL_167.hex()
+
+
+def test_meta_has_no_ccl_step_without_the_capability(monkeypatch):
+    api.no_sleep(monkeypatch)
+    with api.mode(2, MAINT_FIRMWARE=True):
+        bms = _ccl_bank(identity=f.maint_identity(patch=(1, 6, 6)))
+        master = api.make_pack(0)
+        api.poll(master, bms)
+        m = feed.Feed(boot="ab", on=True).meta_message(api.config(), [master], [])
+    assert m["packs"][0]["ccl"] is None and m["packs"][0]["maint"] is not None
+
+
+def test_meta_ccl_step_follows_the_ha_freshness(monkeypatch):
+    api.no_sleep(monkeypatch)
+    clock = api.fake_monotonic(monkeypatch)
+    answer = {"step": f.maint_ccl_step(5)}
+
+    def respond(req):
+        step = answer["step"]
+        return step(req) if callable(step) else (f.ascii_frame(req.adr, 0, step) if step else b"")
+
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = _ccl_responder(step=respond)
+        pack = api.make_pack(0)
+        data, _ = api.poll(pack, bms)
+        assert pack.raw_ccl["hex"] == "0105010114" and data["maint"]["normal"]["ccl_decrease_step"] == 5
+        answer["step"] = None                                   # silence: kept while the HA value is kept
+        clock["t"] += 1700
+        data, _ = api.poll(pack, bms)
+        assert pack.raw_ccl["hex"] == "0105010114" and data["maint"]["normal"]["ccl_decrease_step"] == 5
+        clock["t"] += 200                                       # older than 1800 s: gone without a new read
+        assert pack.raw_ccl is None
+        data, _ = api.poll(pack, bms)
+        assert data["maint"]["normal"]["ccl_decrease_step"] is None
+        answer["step"] = f.maint_ccl_step(7)
+        clock["t"] += 61
+        api.poll(pack, bms)
+        assert pack.raw_ccl["hex"] == "0107010114"
+        answer["step"] = lambda req: f.ascii_frame(req.adr, 0x05, b"")   # a definitive refusal clears at once
+        clock["t"] += 601
+        api.poll(pack, bms)
+        assert pack.raw_ccl is None
+        clock["t"] -= 601                                       # not even a fresh timestamp brings it back
+        assert pack.raw_ccl is None
+        answer["step"] = f.maint_ccl_step(9)
+        clock["t"] += 700
+        api.poll(pack, bms)
+        assert pack.raw_ccl["hex"] == "0109010114"
+        answer["step"] = f.maint_ccl_step(fmt=2)                # malformed: cleared as well
+        clock["t"] += 601
+        api.poll(pack, bms)
+        assert pack.raw_ccl is None
+
+
+def test_meta_republished_when_the_ccl_step_expires(monkeypatch):
+    # the master answers 64/07 once, then stays silent: with time running fast the step expires and the retained
+    # meta drops it
+    calls = {"n": 0}
+
+    def once(req):
+        calls["n"] += 1
+        return f.ascii_frame(req.adr, 0x00, f.maint_ccl_step(10)) if calls["n"] <= 2 else b""
+
+    client, _ = api.run_main(monkeypatch, _ccl_bank(step=once), 2, telemetry_polls=40, seconds_per_tick=5.0,
+                             maint_firmware=True, feed_after_polls=[(0, (True, None))])
+    cc = [m.payload["packs"][0]["ccl"] for m in _feed_msgs(client, "meta") if m.payload["on"]]
+    first = next(i for i, c in enumerate(cc) if c is not None)
+    assert cc[first]["hex"] == "010a010114"
+    assert any(c is None for c in cc[first:])
+    assert all(m.payload["packs"][1]["ccl"] is None for m in _feed_msgs(client, "meta"))
+
+
+def test_meta_key_is_what_was_sent_when_the_ccl_step_expires_during_the_publish(monkeypatch):
+    import dataclasses
+
+    from seplos_mqtt import app
+    api.no_sleep(monkeypatch)
+    clock = api.fake_monotonic(monkeypatch)
+    with api.mode(1, MAINT_FIRMWARE=True):
+        bms = _single_pack_bms()
+        bms.ascii[(0, 0x64)] = _ccl_responder(step=f.maint_ccl_step(10))
+        pack = api.make_pack(0)
+        api.poll(pack, bms)
+        read_at = clock["t"]
+        cfg = dataclasses.replace(api.config(), maint_firmware=True)
+    clock["t"] = read_at + 1799.99
+
+    class Publisher:
+        sent: list = []
+
+        def publish(self, topic, message, retain=False):
+            self.sent.append(message)
+            clock["t"] = read_at + 1801            # the step expires while the client takes the message
+            return True
+
+    state = app.AppState(config=cfg)
+    state.packs = [app.PackState(pack, 0)]
+    state.publisher, state.feed = Publisher(), feed.Feed(boot="ab", on=True)
+    app.publish_feed_meta(state)
+    assert Publisher.sent[-1]["packs"][0]["ccl"]["hex"] == "010a010114"
+    # the key records the step as sent, so the next poll sees its expiry and republishes
+    assert app._feed_caches([pack]) != state.feed_meta_sent
+    app.publish_feed_meta(state)
+    assert Publisher.sent[-1]["packs"][0]["ccl"] is None
+    assert app._feed_caches([pack]) == state.feed_meta_sent

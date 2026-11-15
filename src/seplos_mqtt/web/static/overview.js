@@ -38,6 +38,14 @@ function maintRow(pack) {
   return null;
 }
 
+// The master's CCL decrease step (EMU1101-EXT 64/07, read only): only for a pack whose step is readable, a dash
+// while no confirmed value is fresh.
+function cclStepRow(pack) {
+  if (!('ccl_step' in pack)) return null;
+  const step = pack.ccl_step && pack.ccl_step.decrease_step;
+  return kv(t('pack.ccl_step'), typeof step === 'number' ? t('pack.ccl_step.value', { n: step }) : orDash(null));
+}
+
 // The most precise known base firmware: the derived patch level, else major.minor.
 function firmware(pack) {
   return orDash(pack.firmware_patch || pack.firmware_version || null);
@@ -142,6 +150,7 @@ function packCard(pack, multi, snapshotSeconds) {
       kv(t('pack.firmware'), firmware(pack)),
       kv(t('pack.cells'), orDash(pack.cell_count)),
       maintRow(pack),
+      cclStepRow(pack),
       kv(t('pack.soc'), fmt(pack.state_of_charge, '%', 1)),
       kv(t('pack.voltage'), fmt(pack.total_pack_voltage, 'V', 2)),
       kv(t('pack.current'), fmt(pack.current, 'A', 2)),

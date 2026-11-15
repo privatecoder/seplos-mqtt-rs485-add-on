@@ -175,7 +175,7 @@ def test_bridge_and_maint_fields():
         pack.maint.state = maint_state
         assert build_status(state, 0.0, "t")["packs"][0]["maint"] == expected
     pack.maint.state = "present"
-    pack.maint.identity = type("I", (), {"name": "EMU1101-EXT Full 1.6.4"})()
+    pack.maint.identity = type("I", (), {"name": "EMU1101-EXT Full 1.6.4", "has_capability": lambda self, cap: False})()
     assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] == "EMU1101-EXT Full 1.6.4"
     pack.maint.state = "absent"
     assert build_status(state, 0.0, "t")["packs"][0]["maint_version"] is None
@@ -223,3 +223,26 @@ def test_api_status_is_not_a_mutation_route():
     # reading needs no identity: the status carries no secrets
     status, body, _ = _get_status(lambda: None)
     assert status == 200 and body["status"] is None
+
+
+def test_ccl_step_only_for_a_pack_whose_step_is_readable(monkeypatch):
+    cfg = dataclasses.replace(api.config(), maint_firmware=True, number_of_packs=2)
+    state = app.AppState(config=cfg)
+    master, slave = BatteryPack(0, None, cfg), BatteryPack(1, None, cfg)
+    state.packs = [app.PackState(master, 0), app.PackState(slave, 1)]
+    full167 = api.decode_maint_identity(f.maint_identity(patch=(1, 6, 7), caps=0x001F))
+    status = build_status(state, 100.0, "t")
+    assert all("ccl_step" not in p for p in status["packs"])              # not identified yet
+    for pack in (master, slave):
+        pack.maint.state, pack.maint.identity = "present", full167
+    status = build_status(state, 100.0, "t")
+    assert status["packs"][0]["ccl_step"] is None                          # readable, no confirmed value yet
+    assert "ccl_step" not in status["packs"][1]                            # a slave's step is never read
+    master.maint.ccl_step.value = api.decode_ccl_step(f.maint_ccl_step(10))
+    master.maint.ccl_step.ts, master.maint.ccl_step.read_at = 100.0, "2026-01-01T00:00:00+00:00"
+    assert build_status(state, 200.0, "t")["packs"][0]["ccl_step"] == {"decrease_step": 10,
+                                                                     "read_at": "2026-01-01T00:00:00+00:00"}
+    assert build_status(state, 100.0 + 1801, "t")["packs"][0]["ccl_step"] is None     # stale, like the HA value
+    master.maint.identity = api.decode_maint_identity(f.maint_identity(patch=(1, 6, 6)))
+    assert "ccl_step" not in build_status(state, 200.0, "t")["packs"][0]
+    json.dumps(status)

@@ -36,6 +36,7 @@ PARAMETER_INTERVAL = 3600
 # 64/07 changes only by a 64/08 write from another client (never sent here): read right after detection, then
 # every 10 min, so such a write shows up within minutes for one short answer of the master per 10 min
 CCL_STEP_INTERVAL = 600
+CCL_STEP_MAX_AGE = 3 * CCL_STEP_INTERVAL   # the HA value and the feed's raw answer: never older than this
 RETRY_INTERVAL = 60
 
 # binary UART1 commands
@@ -83,7 +84,8 @@ class MaintSupport:
     ccl_step: Timed = field(default_factory=Timed)
     group0: int | None = None           # BitGroup0 from the latest parameter read (ASCII or binary 47)
     # answers as received, for the OpenBMS Monitor feed: maint (64/03), a2/a4 (binary serial DATA), r47 (the binary
-    # parameter block as the 169-byte ASCII layout: address byte + 168 data bytes); {"t": epoch ms, "hex"}
+    # parameter block as the 169-byte ASCII layout: address byte + 168 data bytes), ccl (64/07, see raw_ccl);
+    # {"t": epoch ms, "hex"}
     raw: dict = field(default_factory=dict)
 
     # --- detection -------------------------------------------------------------------------
@@ -172,6 +174,20 @@ class MaintSupport:
         """64/07: capability 0x0010 on the master (address 0); a slave's stored value is dormant, so it isn't read."""
         return self.identity is not None and self.address == 0 and self.identity.has_capability(md.CAP_CCL_CONFIG)
 
+    @property
+    def ccl_step_readable(self) -> bool:
+        return self._ccl_step_readable
+
+    def ccl_step_current(self, now: float) -> dict | None:
+        """The decoded 64/07 answer while it is confirmed and fresh, else None (the HA value, the status, the feed)."""
+        if not self._ccl_step_readable or not self.ccl_step.fresh(now, CCL_STEP_MAX_AGE):
+            return None
+        return self.ccl_step.value
+
+    def raw_ccl(self, now: float) -> dict | None:
+        """The raw 64/07 INFO with its read time under the same rule as the decoded value."""
+        return self.raw.get("ccl") if self.ccl_step_current(now) is not None else None
+
     # --- periodic reads ----------------------------------------------------------------------
 
     def _ascii(self, bus: SerialBus, info: bytes, length: int) -> bytes | None:
@@ -240,8 +256,10 @@ class MaintSupport:
         except md.MaintFormatError as e:
             logger.warning("Pack%s:Invalid EMU1101-EXT CCL step answer: %s", self.address, e)
             item.value = None
+            self.raw.pop("ccl", None)
             return
         item.value, item.ts, item.next_due, item.read_at = value, now, now + CCL_STEP_INTERVAL, timeutil.now_iso()
+        self.raw["ccl"] = {"t": bus.last_at, "hex": answer.info.hex()}
 
     def _read_parameters(self, bus: SerialBus) -> dict | None:
         data = bus.request_binary(self.address, BIN_PARAMETERS)
@@ -314,7 +332,7 @@ class MaintSupport:
             binary["maintenance_mode"] = None if active is None else ("ON" if active else "OFF")
             normal["effective_slave_count"] = marker["effective_slave_count"] if marker else None
         if self._ccl_step_readable:
-            step = self.ccl_step.value if self.ccl_step.fresh(now, 3 * CCL_STEP_INTERVAL) else None
+            step = self.ccl_step_current(now)
             normal["ccl_decrease_step"] = step["decrease_step"] if step else None
             if step:
                 attributes["ccl_step"] = {**step, "read_at": self.ccl_step.read_at}

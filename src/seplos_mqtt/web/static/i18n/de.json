@@ -64,6 +64,8 @@
   "avail.online": "online",
   "avail.offline": "offline",
   "avail.unknown": "unbekannt",
+  "pack.ccl_step": "CCL-Abbaustufe",
+  "pack.ccl_step.value": "{n} A pro Pack und Schritt",
   "maint.pending": "wird ermittelt",
 
   "settings.group.connection": "Verbindung",

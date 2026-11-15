@@ -390,6 +390,11 @@ class BatteryPack:
         }
 
     @property
+    def raw_ccl(self) -> dict | None:
+        """The master's CCL decrease step (EMU1101-EXT 64/07) as received, while the HA value shows it; else None."""
+        return self.maint.raw_ccl(time.monotonic()) if self.maint is not None else None
+
+    @property
     def raw47(self) -> dict | None:
         """The latest parameter block as the 169-byte ASCII 0x47 INFO (a binary UART1 read: address byte + 168 data
         bytes), with its read time."""

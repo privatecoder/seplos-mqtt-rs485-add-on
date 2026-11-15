@@ -64,6 +64,8 @@
   "avail.online": "online",
   "avail.offline": "offline",
   "avail.unknown": "unknown",
+  "pack.ccl_step": "CCL decrease step",
+  "pack.ccl_step.value": "{n} A per pack and step",
   "maint.pending": "being determined",
 
   "settings.group.connection": "Connection",
