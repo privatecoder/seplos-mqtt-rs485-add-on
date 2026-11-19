@@ -784,7 +784,7 @@ views:
         column_span: 2
         cards:
           - type: "markdown"
-            content: "{% set st = states('sensor.seplos_bms_pack_0_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_0_last_publish'), none) %}<h2>Pack 00&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }} ({{ d ~ ' s' if d < 60 else (d // 60) ~ ' m' if d < 3600 else (d // 3600) ~ ' h' }} ago){% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
+            content: "{% set st = states('sensor.seplos_bms_pack_0_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_0_last_publish'), none) %}<h2>Pack 00&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }}{% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
             grid_options:
               columns: "full"
             text_only: true
@@ -2949,75 +2949,119 @@ views:
             grid_options:
               columns: 10
             cards:
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                icon: "mdi:check-circle-outline"
-                color: "green"
-                visibility:
-                  - condition: "state"
+              - type: "grid"
+                columns: 2
+                square: false
+                cards:
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                    state: "ok"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                icon: "mdi:alert-circle-outline"
-                color: "amber"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                    icon: "mdi:check-circle-outline"
+                    color: "green"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                        state: "ok"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                    state: "alarm"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                icon: "mdi:shield-alert-outline"
-                color: "orange"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                    icon: "mdi:alert-circle-outline"
+                    color: "amber"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                        state: "alarm"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                    state: "protection"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                icon: "mdi:alert-octagon-outline"
-                color: "red"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                    icon: "mdi:shield-alert-outline"
+                    color: "orange"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                        state: "protection"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                    state: "fault"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_0_bms_alarm"
-                icon: "mdi:help-circle-outline"
-                color: "grey"
-                visibility:
-                  - condition: "template"
-                    value_template: "{{ states('sensor.seplos_bms_pack_0_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                    icon: "mdi:alert-octagon-outline"
+                    color: "red"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                        state: "fault"
+                  - type: "tile"
+                    entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_0_bms_alarm"
+                    icon: "mdi:help-circle-outline"
+                    color: "grey"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states('sensor.seplos_bms_pack_0_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_0_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_0_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_0_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
+                    color: "orange"
+                    icon: "mdi:lock"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_0_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_0_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_0_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
+                    icon: "mdi:lock-open-variant-outline"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_0_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_0_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_0_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
+                    color: "grey"
               - type: "markdown"
                 content: |-
                   {% set severity = states('sensor.seplos_bms_pack_0_bms_alarm') %}
@@ -3275,45 +3319,13 @@ views:
                       - condition: "template"
                         value_template: "{% set v = states('sensor.seplos_bms_pack_0_delta_cell_voltage') %}{% set bs = [state_attr('sensor.seplos_bms_pack_0_parameters', 'balancing_start_difference_v')] | select('number') | list %}{% set df = [state_attr('sensor.seplos_bms_pack_0_parameters', 'cell_difference_fault_v')] | select('number') | list %}{% if not is_number(v) %}{% set b = 'unknown' %}{% elif bs or df %}{% set b = 'red' if df and (v | float) >= df[0] else 'amber' if bs and (v | float) >= bs[0] else 'green' %}{% else %}{% set b = 'spread' if (v | float) >= 0.03 else 'amber' if (v | float) >= 0.01 else 'green' %}{% endif %}{{ b == 'unknown' }}"
                   - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_0_pack_lock_active"
-                    name: "Pack lock"
+                    entity: "sensor.seplos_bms_pack_0_delta_cell_temperature"
+                    name: "Δ Temperature"
                     tap_action:
                       action: "more-info"
                     icon_tap_action:
                       action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_0_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_0_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
-                    color: "orange"
-                    icon: "mdi:lock"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_0_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_0_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_0_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
-                    icon: "mdi:lock-open-variant-outline"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_0_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_0_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_0_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
-                    color: "grey"
+                    icon: "mdi:delta"
       - type: "grid"
         cards:
           - type: "heading"
@@ -3323,8 +3335,6 @@ views:
           - type: "entities"
             show_header_toggle: false
             entities:
-              - entity: "sensor.seplos_bms_pack_0_delta_cell_temperature"
-                name: "Δ Temperature"
               - entity: "sensor.seplos_bms_pack_0_charging_cycles"
                 name: "Cycle count"
               - entity: "sensor.seplos_bms_pack_0_full_capacity"
@@ -4064,15 +4074,6 @@ views:
             grid_options:
               columns: 6
               rows: 1
-          - type: "tile"
-            entity: "sensor.seplos_bms_pack_0_parameters"
-            name: "BMS settings read"
-            tap_action:
-              action: "more-info"
-            icon_tap_action:
-              action: "more-info"
-            grid_options:
-              columns: "full"
           - type: "markdown"
             content: |-
               {% set l = state_attr('sensor.seplos_bms_pack_0_cell_type', 'limits') %}{% set l = l if l is mapping else {} %}**Datasheet limits**
@@ -4282,7 +4283,7 @@ views:
             color: "grey"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_0_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -4299,7 +4300,7 @@ views:
             icon: "mdi:pause-circle-outline"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_0_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -4314,7 +4315,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_0_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -4328,6 +4329,16 @@ views:
               columns: 6
               rows: 1
             color: "grey"
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_0_parameters"
+            name: "Settings read"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            grid_options:
+              columns: 6
+              rows: 1
       - type: "grid"
         cards:
           - type: "heading"
@@ -4393,7 +4404,7 @@ views:
         column_span: 2
         cards:
           - type: "markdown"
-            content: "{% set st = states('sensor.seplos_bms_pack_1_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_1_last_publish'), none) %}<h2>Pack 01&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }} ({{ d ~ ' s' if d < 60 else (d // 60) ~ ' m' if d < 3600 else (d // 3600) ~ ' h' }} ago){% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
+            content: "{% set st = states('sensor.seplos_bms_pack_1_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_1_last_publish'), none) %}<h2>Pack 01&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }}{% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
             grid_options:
               columns: "full"
             text_only: true
@@ -6558,75 +6569,119 @@ views:
             grid_options:
               columns: 10
             cards:
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                icon: "mdi:check-circle-outline"
-                color: "green"
-                visibility:
-                  - condition: "state"
+              - type: "grid"
+                columns: 2
+                square: false
+                cards:
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                    state: "ok"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                icon: "mdi:alert-circle-outline"
-                color: "amber"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                    icon: "mdi:check-circle-outline"
+                    color: "green"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                        state: "ok"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                    state: "alarm"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                icon: "mdi:shield-alert-outline"
-                color: "orange"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                    icon: "mdi:alert-circle-outline"
+                    color: "amber"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                        state: "alarm"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                    state: "protection"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                icon: "mdi:alert-octagon-outline"
-                color: "red"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                    icon: "mdi:shield-alert-outline"
+                    color: "orange"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                        state: "protection"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                    state: "fault"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_1_bms_alarm"
-                icon: "mdi:help-circle-outline"
-                color: "grey"
-                visibility:
-                  - condition: "template"
-                    value_template: "{{ states('sensor.seplos_bms_pack_1_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                    icon: "mdi:alert-octagon-outline"
+                    color: "red"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                        state: "fault"
+                  - type: "tile"
+                    entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_1_bms_alarm"
+                    icon: "mdi:help-circle-outline"
+                    color: "grey"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states('sensor.seplos_bms_pack_1_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_1_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_1_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_1_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
+                    color: "orange"
+                    icon: "mdi:lock"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_1_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_1_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_1_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
+                    icon: "mdi:lock-open-variant-outline"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_1_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_1_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_1_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
+                    color: "grey"
               - type: "markdown"
                 content: |-
                   {% set severity = states('sensor.seplos_bms_pack_1_bms_alarm') %}
@@ -6884,45 +6939,13 @@ views:
                       - condition: "template"
                         value_template: "{% set v = states('sensor.seplos_bms_pack_1_delta_cell_voltage') %}{% set bs = [state_attr('sensor.seplos_bms_pack_1_parameters', 'balancing_start_difference_v')] | select('number') | list %}{% set df = [state_attr('sensor.seplos_bms_pack_1_parameters', 'cell_difference_fault_v')] | select('number') | list %}{% if not is_number(v) %}{% set b = 'unknown' %}{% elif bs or df %}{% set b = 'red' if df and (v | float) >= df[0] else 'amber' if bs and (v | float) >= bs[0] else 'green' %}{% else %}{% set b = 'spread' if (v | float) >= 0.03 else 'amber' if (v | float) >= 0.01 else 'green' %}{% endif %}{{ b == 'unknown' }}"
                   - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_1_pack_lock_active"
-                    name: "Pack lock"
+                    entity: "sensor.seplos_bms_pack_1_delta_cell_temperature"
+                    name: "Δ Temperature"
                     tap_action:
                       action: "more-info"
                     icon_tap_action:
                       action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_1_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_1_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
-                    color: "orange"
-                    icon: "mdi:lock"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_1_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_1_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_1_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
-                    icon: "mdi:lock-open-variant-outline"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_1_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_1_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_1_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
-                    color: "grey"
+                    icon: "mdi:delta"
       - type: "grid"
         cards:
           - type: "heading"
@@ -6932,8 +6955,6 @@ views:
           - type: "entities"
             show_header_toggle: false
             entities:
-              - entity: "sensor.seplos_bms_pack_1_delta_cell_temperature"
-                name: "Δ Temperature"
               - entity: "sensor.seplos_bms_pack_1_charging_cycles"
                 name: "Cycle count"
               - entity: "sensor.seplos_bms_pack_1_full_capacity"
@@ -7673,15 +7694,6 @@ views:
             grid_options:
               columns: 6
               rows: 1
-          - type: "tile"
-            entity: "sensor.seplos_bms_pack_1_parameters"
-            name: "BMS settings read"
-            tap_action:
-              action: "more-info"
-            icon_tap_action:
-              action: "more-info"
-            grid_options:
-              columns: "full"
           - type: "markdown"
             content: |-
               {% set l = state_attr('sensor.seplos_bms_pack_1_cell_type', 'limits') %}{% set l = l if l is mapping else {} %}**Datasheet limits**
@@ -7891,7 +7903,7 @@ views:
             color: "grey"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_1_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -7908,7 +7920,7 @@ views:
             icon: "mdi:pause-circle-outline"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_1_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -7923,7 +7935,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_1_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -7937,6 +7949,16 @@ views:
               columns: 6
               rows: 1
             color: "grey"
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_1_parameters"
+            name: "Settings read"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            grid_options:
+              columns: 6
+              rows: 1
       - type: "grid"
         cards:
           - type: "heading"
@@ -8002,7 +8024,7 @@ views:
         column_span: 2
         cards:
           - type: "markdown"
-            content: "{% set st = states('sensor.seplos_bms_pack_2_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_2_last_publish'), none) %}<h2>Pack 02&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }} ({{ d ~ ' s' if d < 60 else (d // 60) ~ ' m' if d < 3600 else (d // 3600) ~ ' h' }} ago){% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
+            content: "{% set st = states('sensor.seplos_bms_pack_2_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_2_last_publish'), none) %}<h2>Pack 02&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }}{% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
             grid_options:
               columns: "full"
             text_only: true
@@ -10167,75 +10189,119 @@ views:
             grid_options:
               columns: 10
             cards:
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                icon: "mdi:check-circle-outline"
-                color: "green"
-                visibility:
-                  - condition: "state"
+              - type: "grid"
+                columns: 2
+                square: false
+                cards:
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                    state: "ok"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                icon: "mdi:alert-circle-outline"
-                color: "amber"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                    icon: "mdi:check-circle-outline"
+                    color: "green"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                        state: "ok"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                    state: "alarm"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                icon: "mdi:shield-alert-outline"
-                color: "orange"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                    icon: "mdi:alert-circle-outline"
+                    color: "amber"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                        state: "alarm"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                    state: "protection"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                icon: "mdi:alert-octagon-outline"
-                color: "red"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                    icon: "mdi:shield-alert-outline"
+                    color: "orange"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                        state: "protection"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                    state: "fault"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_2_bms_alarm"
-                icon: "mdi:help-circle-outline"
-                color: "grey"
-                visibility:
-                  - condition: "template"
-                    value_template: "{{ states('sensor.seplos_bms_pack_2_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                    icon: "mdi:alert-octagon-outline"
+                    color: "red"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                        state: "fault"
+                  - type: "tile"
+                    entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_2_bms_alarm"
+                    icon: "mdi:help-circle-outline"
+                    color: "grey"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states('sensor.seplos_bms_pack_2_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_2_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_2_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_2_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
+                    color: "orange"
+                    icon: "mdi:lock"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_2_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_2_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_2_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
+                    icon: "mdi:lock-open-variant-outline"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_2_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_2_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_2_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
+                    color: "grey"
               - type: "markdown"
                 content: |-
                   {% set severity = states('sensor.seplos_bms_pack_2_bms_alarm') %}
@@ -10493,45 +10559,13 @@ views:
                       - condition: "template"
                         value_template: "{% set v = states('sensor.seplos_bms_pack_2_delta_cell_voltage') %}{% set bs = [state_attr('sensor.seplos_bms_pack_2_parameters', 'balancing_start_difference_v')] | select('number') | list %}{% set df = [state_attr('sensor.seplos_bms_pack_2_parameters', 'cell_difference_fault_v')] | select('number') | list %}{% if not is_number(v) %}{% set b = 'unknown' %}{% elif bs or df %}{% set b = 'red' if df and (v | float) >= df[0] else 'amber' if bs and (v | float) >= bs[0] else 'green' %}{% else %}{% set b = 'spread' if (v | float) >= 0.03 else 'amber' if (v | float) >= 0.01 else 'green' %}{% endif %}{{ b == 'unknown' }}"
                   - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_2_pack_lock_active"
-                    name: "Pack lock"
+                    entity: "sensor.seplos_bms_pack_2_delta_cell_temperature"
+                    name: "Δ Temperature"
                     tap_action:
                       action: "more-info"
                     icon_tap_action:
                       action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_2_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_2_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
-                    color: "orange"
-                    icon: "mdi:lock"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_2_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_2_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_2_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
-                    icon: "mdi:lock-open-variant-outline"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_2_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_2_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_2_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
-                    color: "grey"
+                    icon: "mdi:delta"
       - type: "grid"
         cards:
           - type: "heading"
@@ -10541,8 +10575,6 @@ views:
           - type: "entities"
             show_header_toggle: false
             entities:
-              - entity: "sensor.seplos_bms_pack_2_delta_cell_temperature"
-                name: "Δ Temperature"
               - entity: "sensor.seplos_bms_pack_2_charging_cycles"
                 name: "Cycle count"
               - entity: "sensor.seplos_bms_pack_2_full_capacity"
@@ -11282,15 +11314,6 @@ views:
             grid_options:
               columns: 6
               rows: 1
-          - type: "tile"
-            entity: "sensor.seplos_bms_pack_2_parameters"
-            name: "BMS settings read"
-            tap_action:
-              action: "more-info"
-            icon_tap_action:
-              action: "more-info"
-            grid_options:
-              columns: "full"
           - type: "markdown"
             content: |-
               {% set l = state_attr('sensor.seplos_bms_pack_2_cell_type', 'limits') %}{% set l = l if l is mapping else {} %}**Datasheet limits**
@@ -11500,7 +11523,7 @@ views:
             color: "grey"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_2_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -11517,7 +11540,7 @@ views:
             icon: "mdi:pause-circle-outline"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_2_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -11532,7 +11555,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_2_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -11546,6 +11569,16 @@ views:
               columns: 6
               rows: 1
             color: "grey"
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_2_parameters"
+            name: "Settings read"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            grid_options:
+              columns: 6
+              rows: 1
       - type: "grid"
         cards:
           - type: "heading"
@@ -11611,7 +11644,7 @@ views:
         column_span: 2
         cards:
           - type: "markdown"
-            content: "{% set st = states('sensor.seplos_bms_pack_3_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_3_last_publish'), none) %}<h2>Pack 03&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }} ({{ d ~ ' s' if d < 60 else (d // 60) ~ ' m' if d < 3600 else (d // 3600) ~ ' h' }} ago){% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
+            content: "{% set st = states('sensor.seplos_bms_pack_3_system_status') %}{% set t = as_datetime(states('sensor.seplos_bms_pack_3_last_publish'), none) %}<h2>Pack 03&emsp;<small>{% if st not in ['unknown', 'unavailable', ''] %}<ha-icon icon=\"mdi:information-outline\"></ha-icon> {{ st }}&emsp;{% endif %}{% if t %}<ha-icon icon=\"mdi:update\"></ha-icon> {% set d = ((now() - t).total_seconds() | int, 0) | max %}{% if d >= 120 %}<font color=\"#ffc107\">{% endif %}{{ as_local(t).strftime('%H:%M:%S') }}{% if d >= 120 %} · stale</font>{% endif %}{% endif %}</small></h2>"
             grid_options:
               columns: "full"
             text_only: true
@@ -13776,75 +13809,119 @@ views:
             grid_options:
               columns: 10
             cards:
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                icon: "mdi:check-circle-outline"
-                color: "green"
-                visibility:
-                  - condition: "state"
+              - type: "grid"
+                columns: 2
+                square: false
+                cards:
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                    state: "ok"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                icon: "mdi:alert-circle-outline"
-                color: "amber"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                    icon: "mdi:check-circle-outline"
+                    color: "green"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                        state: "ok"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                    state: "alarm"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                icon: "mdi:shield-alert-outline"
-                color: "orange"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                    icon: "mdi:alert-circle-outline"
+                    color: "amber"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                        state: "alarm"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                    state: "protection"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                icon: "mdi:alert-octagon-outline"
-                color: "red"
-                visibility:
-                  - condition: "state"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                    icon: "mdi:shield-alert-outline"
+                    color: "orange"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                        state: "protection"
+                  - type: "tile"
                     entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                    state: "fault"
-              - type: "tile"
-                entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                name: "BMS alarm"
-                tap_action:
-                  action: "more-info"
-                icon_tap_action:
-                  action: "more-info"
-                  entity: "sensor.seplos_bms_pack_3_bms_alarm"
-                icon: "mdi:help-circle-outline"
-                color: "grey"
-                visibility:
-                  - condition: "template"
-                    value_template: "{{ states('sensor.seplos_bms_pack_3_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                    icon: "mdi:alert-octagon-outline"
+                    color: "red"
+                    visibility:
+                      - condition: "state"
+                        entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                        state: "fault"
+                  - type: "tile"
+                    entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                    name: "BMS alarm"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                      entity: "sensor.seplos_bms_pack_3_bms_alarm"
+                    icon: "mdi:help-circle-outline"
+                    color: "grey"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states('sensor.seplos_bms_pack_3_bms_alarm') not in ['ok', 'alarm', 'protection', 'fault'] }}"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_3_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_3_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_3_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
+                    color: "orange"
+                    icon: "mdi:lock"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_3_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_3_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_3_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
+                    icon: "mdi:lock-open-variant-outline"
+                  - type: "tile"
+                    entity: "binary_sensor.seplos_bms_pack_3_pack_lock_active"
+                    name: "Pack lock"
+                    tap_action:
+                      action: "more-info"
+                    icon_tap_action:
+                      action: "more-info"
+                    visibility:
+                      - condition: "template"
+                        value_template: "{{ states['binary_sensor.seplos_bms_pack_3_pack_lock_active'] is not none }}"
+                      - condition: "template"
+                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_3_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
+                    color: "grey"
               - type: "markdown"
                 content: |-
                   {% set severity = states('sensor.seplos_bms_pack_3_bms_alarm') %}
@@ -14102,45 +14179,13 @@ views:
                       - condition: "template"
                         value_template: "{% set v = states('sensor.seplos_bms_pack_3_delta_cell_voltage') %}{% set bs = [state_attr('sensor.seplos_bms_pack_3_parameters', 'balancing_start_difference_v')] | select('number') | list %}{% set df = [state_attr('sensor.seplos_bms_pack_3_parameters', 'cell_difference_fault_v')] | select('number') | list %}{% if not is_number(v) %}{% set b = 'unknown' %}{% elif bs or df %}{% set b = 'red' if df and (v | float) >= df[0] else 'amber' if bs and (v | float) >= bs[0] else 'green' %}{% else %}{% set b = 'spread' if (v | float) >= 0.03 else 'amber' if (v | float) >= 0.01 else 'green' %}{% endif %}{{ b == 'unknown' }}"
                   - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_3_pack_lock_active"
-                    name: "Pack lock"
+                    entity: "sensor.seplos_bms_pack_3_delta_cell_temperature"
+                    name: "Δ Temperature"
                     tap_action:
                       action: "more-info"
                     icon_tap_action:
                       action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_3_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_3_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'on' }}"
-                    color: "orange"
-                    icon: "mdi:lock"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_3_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_3_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_3_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'off' }}"
-                    icon: "mdi:lock-open-variant-outline"
-                  - type: "tile"
-                    entity: "binary_sensor.seplos_bms_pack_3_pack_lock_active"
-                    name: "Pack lock"
-                    tap_action:
-                      action: "more-info"
-                    icon_tap_action:
-                      action: "more-info"
-                    visibility:
-                      - condition: "template"
-                        value_template: "{{ states['binary_sensor.seplos_bms_pack_3_pack_lock_active'] is not none }}"
-                      - condition: "template"
-                        value_template: "{% set s = states('binary_sensor.seplos_bms_pack_3_pack_lock_active') %}{% set b = s if s in ['on', 'off'] else 'unknown' %}{{ b == 'unknown' }}"
-                    color: "grey"
+                    icon: "mdi:delta"
       - type: "grid"
         cards:
           - type: "heading"
@@ -14150,8 +14195,6 @@ views:
           - type: "entities"
             show_header_toggle: false
             entities:
-              - entity: "sensor.seplos_bms_pack_3_delta_cell_temperature"
-                name: "Δ Temperature"
               - entity: "sensor.seplos_bms_pack_3_charging_cycles"
                 name: "Cycle count"
               - entity: "sensor.seplos_bms_pack_3_full_capacity"
@@ -14891,15 +14934,6 @@ views:
             grid_options:
               columns: 6
               rows: 1
-          - type: "tile"
-            entity: "sensor.seplos_bms_pack_3_parameters"
-            name: "BMS settings read"
-            tap_action:
-              action: "more-info"
-            icon_tap_action:
-              action: "more-info"
-            grid_options:
-              columns: "full"
           - type: "markdown"
             content: |-
               {% set l = state_attr('sensor.seplos_bms_pack_3_cell_type', 'limits') %}{% set l = l if l is mapping else {} %}**Datasheet limits**
@@ -15109,7 +15143,7 @@ views:
             color: "grey"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_3_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -15126,7 +15160,7 @@ views:
             icon: "mdi:pause-circle-outline"
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_3_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -15141,7 +15175,7 @@ views:
               rows: 1
           - type: "tile"
             entity: "binary_sensor.seplos_bms_pack_3_maintenance_mode"
-            name: "Slave polling paused"
+            name: "Polling paused"
             tap_action:
               action: "more-info"
             icon_tap_action:
@@ -15155,6 +15189,16 @@ views:
               columns: 6
               rows: 1
             color: "grey"
+          - type: "tile"
+            entity: "sensor.seplos_bms_pack_3_parameters"
+            name: "Settings read"
+            tap_action:
+              action: "more-info"
+            icon_tap_action:
+              action: "more-info"
+            grid_options:
+              columns: 6
+              rows: 1
       - type: "grid"
         cards:
           - type: "heading"
